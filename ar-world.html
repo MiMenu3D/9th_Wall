@@ -1,0 +1,117 @@
+<!doctype html>
+<!-- 9th Wall v1.00 -->
+<html>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>9th Wall AR</title>
+  <!-- 8th Wall ECS runtime -->
+  <script crossorigin="anonymous" src="../external/runtime/runtime.js"></script>
+  <!-- 8th Wall XR — SLAM World Tracking -->
+  <script src="https://cdn.jsdelivr.net/npm/@8thwall/engine-binary@1/dist/xr.js" async crossorigin="anonymous" data-preload-chunks="slam"></script>
+  <!-- 8th Wall landing page (splash screen) -->
+  <script src="https://cdn.jsdelivr.net/npm/@8thwall/landing-page@1/dist/landing-page.js" crossorigin="anonymous"></script>
+  <!-- Three.js — needed for PMREM + Light Estimation -->
+  <script src="https://unpkg.com/three@0.139.2/build/three.min.js"></script>
+  <script src="https://unpkg.com/three@0.139.2/examples/js/loaders/RGBELoader.js"></script>
+</head>
+<body>
+
+  <button id="envToggle" onclick="toggleEnv()"
+    style="position:fixed;bottom:20px;left:20px;z-index:99999;padding:12px 16px;border-radius:12px;border:none;background:rgba(0,0,0,0.7);color:white;font-size:14px;">
+    Env: HDR
+  </button>
+
+  <script>
+    // === PMREM + Light Estimation ===
+    // Injects environment reflections and adaptive exposure into the 8th Wall ECS scene.
+    // Uses XR8.Threejs.xrScene() to access the underlying Three.js renderer and scene.
+
+    let pmremGenerator = null, cameraRT = null, originalEnv = null;
+    let envMode = 'hdr', envInterval = null;
+    let _scene = null, _renderer = null;
+
+    function installPMREM() {
+      XR8.addCameraPipelineModule({
+        name: 'pmrem-light-estimator',
+        onStart: () => {
+          const xrScene = XR8.Threejs.xrScene();
+          _scene    = xrScene.scene;
+          _renderer = xrScene.renderer;
+
+          pmremGenerator = new THREE.PMREMGenerator(_renderer);
+          pmremGenerator.compileEquirectangularShader();
+
+          // Baseline HDR environment
+          new THREE.RGBELoader().load('../HDR/terrace_sea.hdr', (hdr) => {
+            hdr.mapping = THREE.EquirectangularReflectionMapping;
+            originalEnv = hdr;
+            if (envMode === 'hdr') _scene.environment = hdr;
+          });
+
+          // Light Estimation: sample camera video every 50ms
+          const waitForVideo = setInterval(() => {
+            const video = document.querySelector('video');
+            if (video && video.readyState >= 2) {
+              clearInterval(waitForVideo);
+
+              const envCanvas  = document.createElement('canvas');
+              envCanvas.width  = 64;
+              envCanvas.height = 64;
+              const envTexture = new THREE.CanvasTexture(envCanvas);
+              envTexture.mapping = THREE.EquirectangularReflectionMapping;
+              const ctx = envCanvas.getContext('2d');
+              let smoothed = 120;
+
+              envInterval = setInterval(() => {
+                if (!video || video.readyState < 2) return;
+                ctx.drawImage(video, 0, 0, 64, 64);
+                envTexture.needsUpdate = true;
+
+                if (pmremGenerator) {
+                  if (cameraRT) cameraRT.dispose();
+                  cameraRT = pmremGenerator.fromEquirectangular(envTexture);
+                  if (envMode === 'cam') _scene.environment = cameraRT.texture;
+                }
+
+                // Brightness → adaptive exposure
+                const pixels = ctx.getImageData(0, 0, 64, 64).data;
+                let total = 0;
+                for (let i = 0; i < pixels.length; i += 4) {
+                  total += (pixels[i] + pixels[i + 1] + pixels[i + 2]) / 3;
+                }
+                const brightness = total / (pixels.length / 4);
+                smoothed += (brightness - smoothed) * 0.08;
+                _renderer.exposure = 0.6 + (smoothed / 255) * 0.9;
+              }, 50);
+            }
+          }, 500);
+        }
+      });
+    }
+
+    if (window.XR8) installPMREM();
+    else window.addEventListener('xrloaded', installPMREM, { once: true });
+
+    window.toggleEnv = function () {
+      const btn = document.getElementById('envToggle');
+      if (!_scene) return;
+      if (envMode === 'hdr') {
+        if (cameraRT) _scene.environment = cameraRT.texture;
+        envMode = 'cam';
+        if (btn) btn.innerText = 'Env: CAM';
+      } else if (envMode === 'cam') {
+        _scene.environment = null;
+        envMode = 'off';
+        if (btn) btn.innerText = 'Env: OFF';
+      } else {
+        if (originalEnv) _scene.environment = originalEnv;
+        envMode = 'hdr';
+        if (btn) btn.innerText = 'Env: HDR';
+      }
+    };
+  </script>
+
+  <script src="bundle-world.js"></script>
+</body>
+</html>
