@@ -1,12 +1,12 @@
 <!doctype html>
-<!-- 9th Wall v1.00 -->
+<!-- 9th Wall v1.01 -->
 <html>
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>9th Wall AR</title>
   <!-- 8th Wall ECS runtime -->
-  <script crossorigin="anonymous" src="../external/runtime/runtime.js"></script>
+  <script crossorigin="anonymous" src="external/runtime/runtime.js"></script>
   <!-- 8th Wall XR — SLAM World Tracking -->
   <script src="https://cdn.jsdelivr.net/npm/@8thwall/engine-binary@1/dist/xr.js" async crossorigin="anonymous" data-preload-chunks="slam"></script>
   <!-- 8th Wall landing page (splash screen) -->
@@ -43,7 +43,7 @@
           pmremGenerator.compileEquirectangularShader();
 
           // Baseline HDR environment
-          new THREE.RGBELoader().load('../HDR/terrace_sea.hdr', (hdr) => {
+          new THREE.RGBELoader().load('HDR/terrace_sea.hdr', (hdr) => {
             hdr.mapping = THREE.EquirectangularReflectionMapping;
             originalEnv = hdr;
             if (envMode === 'hdr') _scene.environment = hdr;

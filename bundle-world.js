@@ -1,4 +1,4 @@
-﻿// 9th Wall v1.00
+﻿// 9th Wall v1.01
 (()=>{
   var e={
     574(){
@@ -134,7 +134,7 @@
     if (_idx !== null && parseInt(_idx) < _models.length) {
       i.objects["a02b4479-461e-40c2-ba91-0ccabbd1bd83"].gltfModel.src = {
         type: "asset",
-        asset: "../" + _models[parseInt(_idx)]
+        asset: _models[parseInt(_idx)]
       };
     }
     window.ecs.application.init(i)
