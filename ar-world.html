@@ -1,5 +1,4 @@
-<!doctype html>
-<!-- 9th Wall v1.05 -->
+<!-- 9th Wall v1.06 -->
 <html>
 <head>
   <meta charset="UTF-8">
@@ -17,39 +16,60 @@
 </head>
 <body>
 
-    <button id="envToggle"
-      style="position:fixed;bottom:20px;left:20px;z-index:100000;padding:12px 16px;border-radius:12px;border:none;background:rgba(0,0,0,0.7);color:white;font-size:14px;pointer-events:auto;">
-      Env: HDR
-    </button>
+  <div id="debugLog" onclick="this.classList.toggle('minimized')"
+    style="position:fixed;top:10px;right:10px;z-index:1000000;background:rgba(0,0,0,0.9);color:#0f0;font-family:monospace;font-size:10px;padding:8px;border-radius:4px;cursor:pointer;line-height:1.2;border:1px solid #0f0;">
+    <div id="debugTitle">v1.06 (Tap to toggle)</div>
+    <div id="debugContent">
+      ar-world: v1.06<br>
+      bundle: v1.06<br>
+      Status: Waiting...
+    </div>
+  </div>
+  <style>
+    #debugLog.minimized { height: 12px; width: 70px; overflow: hidden; border-color: #555; }
+    #debugLog.minimized #debugContent { display: none; }
+  </style>
 
-    <script>
-      // === PMREM + Light Estimation ===
-      // Injects environment reflections and adaptive exposure into the 8th Wall ECS scene.
-      // Uses XR8.Threejs.xrScene() to access the underlying Three.js renderer and scene.
+  <button id="envToggle"
+    style="position:fixed;bottom:20px;left:20px;z-index:1000000;padding:12px 16px;border-radius:12px;border:1px solid white;background:rgba(0,0,0,0.7);color:white;font-size:14px;pointer-events:auto !important;">
+    Env: HDR
+  </button>
 
-      let pmremGenerator = null, cameraRT = null, originalEnv = null;
-      let envMode = 'hdr', envInterval = null;
-      let _scene = null, _renderer = null;
+  <script>
+    const log = (msg) => {
+      const el = document.getElementById('debugContent');
+      if (el) el.innerHTML += `<br>> ${msg}`;
+    };
 
-      document.getElementById('envToggle').addEventListener('click', (e) => {
-        e.stopPropagation();
-        e.preventDefault();
-        toggleEnv();
-      });
+    // === PMREM + Light Estimation ===
+    // Injects environment reflections and adaptive exposure into the 8th Wall ECS scene.
+    // Uses XR8.Threejs.xrScene() to access the underlying Three.js renderer and scene.
 
-      function installPMREM() {
+    let pmremGenerator = null, cameraRT = null, originalEnv = null;
+    let envMode = 'hdr', envInterval = null;
+    let _scene = null, _renderer = null;
+
+    document.getElementById('envToggle').addEventListener('click', (e) => {
+      log('Button clicked');
+      toggleEnv();
+    });
+
+    function installPMREM() {
       XR8.addCameraPipelineModule({
         name: 'pmrem-light-estimator',
         onStart: () => {
           const xrScene = XR8.Threejs.xrScene();
           _scene    = xrScene.scene;
           _renderer = xrScene.renderer;
+          log('Scene ready');
 
           pmremGenerator = new THREE.PMREMGenerator(_renderer);
           pmremGenerator.compileEquirectangularShader();
 
-                    // Baseline HDR environment
+          // Baseline HDR environment
+          log('Loading HDR...');
           new THREE.RGBELoader().load('../HDR/terrace_sea.hdr', (hdr) => {
+            log('HDR Loaded');
             hdr.mapping = THREE.EquirectangularReflectionMapping;
             originalEnv = hdr;
             if (envMode === 'hdr') _scene.environment = hdr;
@@ -60,6 +80,7 @@
             const video = document.querySelector('video');
             if (video && video.readyState >= 2) {
               clearInterval(waitForVideo);
+              log('Video stream ready');
 
               const envCanvas  = document.createElement('canvas');
               envCanvas.width  = 64;
@@ -98,12 +119,12 @@
 
     if (window.ecs) {
       const _i = ecs.application.init;
-            ecs.application.init = c => {
+      ecs.application.init = c => {
         for (const k in c.objects) {
           const obj = c.objects[k];
           if (obj.name === 'Loading Screen') delete c.objects[k];
           if (obj.name === 'Model') {
-            obj.scale = [3.5, 3.5, 3.5];
+            obj.scale = [5.5, 5.5, 5.5];
             const anim = obj.components['a2c75775-5a0f-44d7-910c-c111bc850bf6'];
             if (anim && anim.parameters) anim.parameters.toY = 0;
           }
@@ -117,7 +138,11 @@
 
     window.toggleEnv = function () {
       const btn = document.getElementById('envToggle');
-      if (!_scene) return;
+      if (!_scene) {
+        log('Error: _scene is null');
+        return;
+      }
+      log('Mode: ' + envMode);
       if (envMode === 'hdr') {
         if (cameraRT) _scene.environment = cameraRT.texture;
         envMode = 'cam';
@@ -137,3 +162,4 @@
   <script src="bundle-world.js"></script>
 </body>
 </html>
+
