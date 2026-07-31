@@ -1,4 +1,4 @@
-<!-- 9th Wall v1.11 -->
+<!-- 9th Wall v1.12 -->
 <html>
 <head>
   <meta charset="UTF-8">
@@ -18,9 +18,9 @@
 
   <div id="debugLog" onclick="this.classList.toggle('minimized')"
     style="position:fixed;top:10px;right:10px;z-index:1000000;background:rgba(0,0,0,0.9);color:#0f0;font-family:monospace;font-size:10px;padding:8px;border-radius:4px;cursor:pointer;line-height:1.2;border:1px solid #0f0;">
-    <div id="debugTitle">v1.06 (Tap to toggle)</div>
+    <div id="debugTitle">v1.11 (Tap to toggle)</div>
     <div id="debugContent">
-      ar-world: v1.06<br>
+      ar-world: v1.11<br>
       bundle: v1.06<br>
       Status: Waiting...
     </div>
@@ -41,41 +41,42 @@
       if (el) el.innerHTML += `<br>> ${msg}`;
     };
 
-    // === PMREM + Light Estimation ===
-    // Injects environment reflections and adaptive exposure into the 8th Wall ECS scene.
-    // Uses XR8.Threejs.xrScene() to access the underlying Three.js renderer and scene.
-
     let pmremGenerator = null, cameraRT = null, originalEnv = null;
     let envMode = 'hdr', envInterval = null;
     let _scene = null, _renderer = null;
 
-    document.getElementById('envToggle').addEventListener('click', (e) => {
-      log('Button clicked');
-      toggleEnv();
-    });
-
-    function installPMREM() {
-      XR8.addCameraPipelineModule({
+    // Conectamos tu iluminación directamente con el motor 8th Wall ECS
+    if (window.ecs) {
+      ecs.registerComponent({
         name: 'pmrem-light-estimator',
-        onStart: () => {
-          const xrScene = XR8.Threejs.xrScene();
-          _scene    = xrScene.scene;
-          _renderer = xrScene.renderer;
-          log('Scene ready');
+        add: (world) => {
+          // Obtenemos la escena real de Three.js
+          _scene    = world.three.scene;
+          _renderer = world.three.renderer;
+
+          log('Scene ECS ready');
+
+          // Activamos la exposición correcta
+          _renderer.toneMapping = THREE.ACESFilmicToneMapping;
+          _renderer.toneMappingExposure = 1.0;
 
           pmremGenerator = new THREE.PMREMGenerator(_renderer);
           pmremGenerator.compileEquirectangularShader();
 
-          // Baseline HDR environment
+          // Cargar mapa HDR con la ruta correcta
           log('Loading HDR...');
           new THREE.RGBELoader().load('HDR/terrace_sea.hdr', (hdr) => {
             log('HDR Loaded');
             hdr.mapping = THREE.EquirectangularReflectionMapping;
             originalEnv = hdr;
-            if (envMode === 'hdr') _scene.environment = hdr;
+            if (envMode === 'hdr') {
+              _scene.environment = hdr;
+            }
+          }, undefined, (err) => {
+            log('Error al cargar HDR');
           });
 
-          // Light Estimation: sample camera video every 50ms
+          // Light Estimation: Muestrear la cámara real
           const waitForVideo = setInterval(() => {
             const video = document.querySelector('video');
             if (video && video.readyState >= 2) {
@@ -98,10 +99,12 @@
                 if (pmremGenerator) {
                   if (cameraRT) cameraRT.dispose();
                   cameraRT = pmremGenerator.fromEquirectangular(envTexture);
-                  if (envMode === 'cam') _scene.environment = cameraRT.texture;
+                  if (envMode === 'cam') {
+                    _scene.environment = cameraRT.texture;
+                  }
                 }
 
-                // Brightness → adaptive exposure
+                // Cálculo de brillo medio
                 const pixels = ctx.getImageData(0, 0, 64, 64).data;
                 let total = 0;
                 for (let i = 0; i < pixels.length; i += 4) {
@@ -109,32 +112,45 @@
                 }
                 const brightness = total / (pixels.length / 4);
                 smoothed += (brightness - smoothed) * 0.08;
-                _renderer.exposure = 0.6 + (smoothed / 255) * 0.9;
+                _renderer.toneMappingExposure = 0.5 + (smoothed / 255) * 0.9;
               }, 50);
             }
           }, 500);
         }
       });
-    }
 
-    if (window.ecs) {
+      // Modificamos el arranque para encender nuestro estimador y bajar la luz que cegaba el objeto
       const _i = ecs.application.init;
       ecs.application.init = c => {
         for (const k in c.objects) {
           const obj = c.objects[k];
+          
           if (obj.name === 'Loading Screen') delete c.objects[k];
+          
           if (obj.name === 'Model') {
-            obj.scale = [9.01, 9.01, 9.01];
+            obj.scale = [10.01, 10.01, 10.01];
             const anim = obj.components['a2c75775-5a0f-44d7-910c-c111bc850bf6'];
             if (anim && anim.parameters) anim.parameters.toY = 0;
+          }
+
+          // Bajamos la luz blanca cegadora por defecto
+          if (obj.name === 'Ambient Light' && obj.light) {
+            obj.light.intensity = 0.2;
+          }
+
+          // Activamos nuestro sistema en la Cámara
+          if (obj.name === 'Camera') {
+            obj.components['pmrem-light-estimator'] = {};
           }
         }
         return _i.call(ecs.application, c);
       };
     }
 
-    if (window.XR8) installPMREM();
-    else window.addEventListener('xrloaded', installPMREM, { once: true });
+    document.getElementById('envToggle').addEventListener('click', () => {
+      log('Button clicked');
+      toggleEnv();
+    });
 
     window.toggleEnv = function () {
       const btn = document.getElementById('envToggle');
