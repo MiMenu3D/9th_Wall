@@ -1,4 +1,4 @@
-<!-- 9th Wall v1.08 -->
+<!-- 9th Wall v1.06 -->
 <html>
 <head>
   <meta charset="UTF-8">
@@ -18,10 +18,10 @@
 
   <div id="debugLog" onclick="this.classList.toggle('minimized')"
     style="position:fixed;top:10px;right:10px;z-index:1000000;background:rgba(0,0,0,0.9);color:#0f0;font-family:monospace;font-size:10px;padding:8px;border-radius:4px;cursor:pointer;line-height:1.2;border:1px solid #0f0;">
-    <div id="debugTitle">v1.07 (Tap to toggle)</div>
+    <div id="debugTitle">v1.06 (Tap to toggle)</div>
     <div id="debugContent">
-      ar-world: v1.07<br>
-      bundle: v1.07<br>
+      ar-world: v1.06<br>
+      bundle: v1.06<br>
       Status: Waiting...
     </div>
   </div>
@@ -58,13 +58,10 @@
       XR8.addCameraPipelineModule({
         name: 'pmrem-light-estimator',
         onStart: () => {
-            const checkScene = setInterval(() => {
-            const xrScene = XR8.Threejs.xrScene();
-            if (xrScene && xrScene.scene && xrScene.renderer) {
-              _scene    = xrScene.scene;
-              _renderer = xrScene.renderer;
-              log('Scene Captured!');
-              clearInterval(checkScene);
+          const xrScene = XR8.Threejs.xrScene();
+          _scene    = xrScene.scene;
+          _renderer = xrScene.renderer;
+          log('Scene ready');
 
           pmremGenerator = new THREE.PMREMGenerator(_renderer);
           pmremGenerator.compileEquirectangularShader();
@@ -126,25 +123,12 @@
         for (const k in c.objects) {
           const obj = c.objects[k];
           if (obj.name === 'Loading Screen') delete c.objects[k];
-          if (obj.name.includes('Light')) delete c.objects[k]; // Quirófano: fuera luces default
-                    if (obj.name === 'Model') {
-            obj.scale = [0.1, 0.1, 0.1]; // Escala inicial para animar
-            const animId = 'a2c75775-5a0f-44d7-910c-c111bc850bf6';
-            const anim = obj.components[animId];
-            if (anim && anim.parameters) {
-              anim.parameters.toY = 0;
-              // Inyección de animaciones extra
-              obj.components['scale-animation'] = {
-                id: 'scale-anim-01', name: 'scale-animation',
-                parameters: { fromX:0.1, fromY:0.1, fromZ:0.1, toX:10, toY:10, toZ:10, duration:2000, easingFunction:'Elastic', easeOut:true }
-              };
-              obj.components['rotation-animation'] = {
-                id: 'rot-anim-01', name: 'rotation-animation',
-                parameters: { fromY:0, toY:360, duration:2000, easingFunction:'Quadratic', easeOut:true }
-              };
-            }
+          if (obj.name === 'Model') {
+            obj.scale = [5.5, 5.5, 5.5];
+            const anim = obj.components['a2c75775-5a0f-44d7-910c-c111bc850bf6'];
+            if (anim && anim.parameters) anim.parameters.toY = 0;
           }
-        } // <--- Esta llave de cierre es la que faltaba
+        }
         return _i.call(ecs.application, c);
       };
     }
