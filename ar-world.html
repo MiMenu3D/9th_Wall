@@ -1,4 +1,4 @@
-<!-- 9th Wall v1.10 -->
+<!-- 9th Wall v1.11 -->
 <html>
 <head>
   <meta charset="UTF-8">
@@ -18,9 +18,9 @@
 
   <div id="debugLog" onclick="this.classList.toggle('minimized')"
     style="position:fixed;top:10px;right:10px;z-index:1000000;background:rgba(0,0,0,0.9);color:#0f0;font-family:monospace;font-size:10px;padding:8px;border-radius:4px;cursor:pointer;line-height:1.2;border:1px solid #0f0;">
-    <div id="debugTitle">v1.10 (Tap to toggle)</div>
+    <div id="debugTitle">v1.11 (Tap to toggle)</div>
     <div id="debugContent">
-      ar-world: v1.10<br>
+      ar-world: v1.11<br>
       bundle: v1.06<br>
       Status: Waiting...
     </div>
@@ -57,114 +57,79 @@
     function installPMREM() {
       XR8.addCameraPipelineModule({
         name: 'pmrem-light-estimator',
-        onStart: () => {
-                  onStart: () => {
+              onStart: () => {
+          log('PMREM Module: onStart (v1.10)');
           const checkScene = setInterval(() => {
             const xrScene = XR8.Threejs.xrScene();
             if (xrScene && xrScene.scene && xrScene.renderer) {
               _scene    = xrScene.scene;
               _renderer = xrScene.renderer;
-              log('Scene Captured! (v1.10)'); // Mensaje de debug actualizado
-              clearInterval(checkScene);
+              log('Scene Captured! (v1.10)');
+              clearInterval(checkScene); // Detenemos el intervalo una vez la escena está lista
 
-              // Resto de la inicialización de PMREM y HDR debe ir aquí DESPUÉS de clearInterval(checkScene);
-              // Lo que viene A CONTINUACIÓN de este bloque, dentro de onStart: () => {,
-              // se ejecutará SÓLO cuando la escena esté capturada.
+              // --- AHORA QUE LA ESCENA ESTÁ CAPTURADA, INICIALIZAMOS PMREM Y HDR ---
+              _renderer.toneMapping = THREE.ACESFilmicToneMapping; // Configuración inicial del renderizador
+              _renderer.toneMappingExposure = 1;
+              _renderer.outputEncoding = THREE.sRGBEncoding;
+              log('Renderer configured for HDR');
 
-          pmremGenerator = new THREE.PMREMGenerator(_renderer);
-          pmremGenerator.compileEquirectangularShader();
+              pmremGenerator = new THREE.PMREMGenerator(_renderer);
+              pmremGenerator.compileEquirectangularShader();
+              log('PMREM Generator ready');
 
-          // Baseline HDR environment
-          log('Loading HDR...');
-          new THREE.RGBELoader().load('../HDR/terrace_sea.hdr', (hdr) => {
-            log('HDR Loaded');
-            hdr.mapping = THREE.EquirectangularReflectionMapping;
-            originalEnv = hdr;
-            if (envMode === 'hdr') _scene.environment = hdr;
-          });
+              // Baseline HDR environment
+              log('Loading HDR image...');
+              new THREE.RGBELoader().load('../HDR/terrace_sea.hdr', (hdr) => {
+                log('HDR Image Loaded');
+                hdr.mapping = THREE.EquirectangularReflectionMapping;
+                originalEnv = hdr;
+                if (envMode === 'hdr') _scene.environment = hdr;
+                log('HDR environment applied to scene');
+              }, undefined, (err) => log('HDR Error loading: ' + err)); // Mensaje de error si falla la carga HDR
 
-          // Light Estimation: sample camera video every 50ms
-          const waitForVideo = setInterval(() => {
-            const video = document.querySelector('video');
-            if (video && video.readyState >= 2) {
-              clearInterval(waitForVideo);
-              log('Video stream ready');
+              // Light Estimation: sample camera video every 50ms
+              const waitForVideo = setInterval(() => {
+                const video = document.querySelector('video');
+                if (video && video.readyState >= 2) {
+                  clearInterval(waitForVideo);
+                  log('Video stream ready for Light Estimation');
 
-              const envCanvas  = document.createElement('canvas');
-              envCanvas.width  = 64;
-              envCanvas.height = 64;
-              const envTexture = new THREE.CanvasTexture(envCanvas);
-              envTexture.mapping = THREE.EquirectangularReflectionMapping;
-              const ctx = envCanvas.getContext('2d');
-              let smoothed = 120;
+                  const envCanvas  = document.createElement('canvas');
+                  envCanvas.width  = 64;
+                  envCanvas.height = 64;
+                  const envTexture = new THREE.CanvasTexture(envCanvas);
+                  envTexture.mapping = THREE.EquirectangularReflectionMapping;
+                  const ctx = envCanvas.getContext('2d');
+                  let smoothed = 120;
 
-              envInterval = setInterval(() => {
-                if (!video || video.readyState < 2) return;
-                ctx.drawImage(video, 0, 0, 64, 64);
-                envTexture.needsUpdate = true;
+                  envInterval = setInterval(() => {
+                    if (!video || video.readyState < 2) return;
+                    ctx.drawImage(video, 0, 0, 64, 64);
+                    envTexture.needsUpdate = true;
 
-                if (pmremGenerator) {
-                  if (cameraRT) cameraRT.dispose();
-                  cameraRT = pmremGenerator.fromEquirectangular(envTexture);
-                  if (envMode === 'cam') _scene.environment = cameraRT.texture;
+                    if (pmremGenerator) {
+                      if (cameraRT) cameraRT.dispose();
+                      cameraRT = pmremGenerator.fromEquirectangular(envTexture);
+                      if (envMode === 'cam') _scene.environment = cameraRT.texture;
+                    }
+
+                    // Brightness → adaptive exposure
+                    const pixels = ctx.getImageData(0, 0, 64, 64).data;
+                    let total = 0;
+                    for (let i = 0; i < pixels.length; i += 4) {
+                      total += (pixels[i] + pixels[i + 1] + pixels[i + 2]) / 3;
+                    }
+                    const brightness = total / (pixels.length / 4);
+                    smoothed += (brightness - smoothed) * 0.08;
+                    _renderer.exposure = 0.6 + (smoothed / 255) * 0.9;
+                  }, 50);
                 }
-
-                // Brightness → adaptive exposure
-                const pixels = ctx.getImageData(0, 0, 64, 64).data;
-                let total = 0;
-                for (let i = 0; i < pixels.length; i += 4) {
-                  total += (pixels[i] + pixels[i + 1] + pixels[i + 2]) / 3;
-                }
-                const brightness = total / (pixels.length / 4);
-                smoothed += (brightness - smoothed) * 0.08;
-                _renderer.exposure = 0.6 + (smoothed / 255) * 0.9;
-              }, 50);
+              }, 500);
+            } else {
+              // log('Waiting for Scene...'); // Debug opcional si la escena tarda
             }
-          }, 500);
+          }, 100); // Chequear cada 100ms
         }
-      });
-    }
-
-    if (window.ecs) {
-      const _i = ecs.application.init;
-      ecs.application.init = c => {
-        for (const k in c.objects) {
-          const obj = c.objects[k];
-          if (obj.name === 'Loading Screen') delete c.objects[k];
-          if (obj.name === 'Model') {
-            obj.scale = [10.01, 10.01, 10.01];
-            const anim = obj.components['a2c75775-5a0f-44d7-910c-c111bc850bf6'];
-            if (anim && anim.parameters) anim.parameters.toY = 0;
-          }
-        }
-        return _i.call(ecs.application, c);
-      };
-    }
-
-    if (window.XR8) installPMREM();
-    else window.addEventListener('xrloaded', installPMREM, { once: true });
-
-    window.toggleEnv = function () {
-      const btn = document.getElementById('envToggle');
-      if (!_scene) {
-        log('Error: _scene is null');
-        return;
-      }
-      log('Mode: ' + envMode);
-      if (envMode === 'hdr') {
-        if (cameraRT) _scene.environment = cameraRT.texture;
-        envMode = 'cam';
-        if (btn) btn.innerText = 'Env: CAM';
-      } else if (envMode === 'cam') {
-        _scene.environment = null;
-        envMode = 'off';
-        if (btn) btn.innerText = 'Env: OFF';
-      } else {
-        if (originalEnv) _scene.environment = originalEnv;
-        envMode = 'hdr';
-        if (btn) btn.innerText = 'Env: HDR';
-      }
-    };
   </script>
 
   <script src="bundle-world.js"></script>
