@@ -1,4 +1,4 @@
-<!-- 9th Wall v1.11 -->
+<!-- 9th Wall v1.20 -->
 <html>
 <head>
   <meta charset="UTF-8">
@@ -18,9 +18,9 @@
 
   <div id="debugLog" onclick="this.classList.toggle('minimized')"
     style="position:fixed;top:10px;right:10px;z-index:1000000;background:rgba(0,0,0,0.9);color:#0f0;font-family:monospace;font-size:10px;padding:8px;border-radius:4px;cursor:pointer;line-height:1.2;border:1px solid #0f0;">
-    <div id="debugTitle">v1.11 (Tap to toggle)</div>
+    <div id="debugTitle">v1.20 (Tap to toggle)</div>
     <div id="debugContent">
-      ar-world: v1.11<br>
+      ar-world: v1.20<br>
       bundle: v1.06<br>
       Status: Waiting...
     </div>
@@ -129,7 +129,22 @@
             if (anim && anim.parameters) anim.parameters.toY = 0;
           }
         }
-        return _i.call(ecs.application, c);
+        const app = _i.call(ecs.application, c);
+
+        // Capturamos la escena real de Three.js 1 segundo después del inicio
+        setTimeout(() => {
+          const w = ecs.application.world || (app && app.world);
+          if (w && w.three) {
+            _scene = w.three.scene;
+            _renderer = w.three.renderer;
+            if (originalEnv && envMode === 'hdr') _scene.environment = originalEnv;
+            log('Scene hook OK!');
+          } else {
+            log('Scene hook NULL');
+          }
+        }, 1000);
+
+        return app;
       };
     }
 
