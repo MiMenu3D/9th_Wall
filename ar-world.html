@@ -124,7 +124,7 @@
           const obj = c.objects[k];
           if (obj.name === 'Loading Screen') delete c.objects[k];
           if (obj.name === 'Model') {
-            obj.scale = [5.5, 5.5, 5.5];
+            obj.scale = [10.01, 10.01, 10.01];
             const anim = obj.components['a2c75775-5a0f-44d7-910c-c111bc850bf6'];
             if (anim && anim.parameters) anim.parameters.toY = 0;
           }
