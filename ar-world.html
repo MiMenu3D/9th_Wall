@@ -1,4 +1,4 @@
-<!-- 9th Wall v1.09 -->
+<!-- 9th Wall v1.10 -->
 <html>
 <head>
   <meta charset="UTF-8">
@@ -18,9 +18,9 @@
 
   <div id="debugLog" onclick="this.classList.toggle('minimized')"
     style="position:fixed;top:10px;right:10px;z-index:1000000;background:rgba(0,0,0,0.9);color:#0f0;font-family:monospace;font-size:10px;padding:8px;border-radius:4px;cursor:pointer;line-height:1.2;border:1px solid #0f0;">
-    <div id="debugTitle">v1.06 (Tap to toggle)</div>
+    <div id="debugTitle">v1.10 (Tap to toggle)</div>
     <div id="debugContent">
-      ar-world: v1.06<br>
+      ar-world: v1.10<br>
       bundle: v1.06<br>
       Status: Waiting...
     </div>
@@ -58,10 +58,18 @@
       XR8.addCameraPipelineModule({
         name: 'pmrem-light-estimator',
         onStart: () => {
-          const xrScene = XR8.Threejs.xrScene();
-          _scene    = xrScene.scene;
-          _renderer = xrScene.renderer;
-          log('Scene ready');
+                  onStart: () => {
+          const checkScene = setInterval(() => {
+            const xrScene = XR8.Threejs.xrScene();
+            if (xrScene && xrScene.scene && xrScene.renderer) {
+              _scene    = xrScene.scene;
+              _renderer = xrScene.renderer;
+              log('Scene Captured! (v1.10)'); // Mensaje de debug actualizado
+              clearInterval(checkScene);
+
+              // Resto de la inicialización de PMREM y HDR debe ir aquí DESPUÉS de clearInterval(checkScene);
+              // Lo que viene A CONTINUACIÓN de este bloque, dentro de onStart: () => {,
+              // se ejecutará SÓLO cuando la escena esté capturada.
 
           pmremGenerator = new THREE.PMREMGenerator(_renderer);
           pmremGenerator.compileEquirectangularShader();
