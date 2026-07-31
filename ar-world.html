@@ -1,4 +1,4 @@
-<!-- 9th Wall v1.09 -->
+<!-- 9th Wall v1.11 -->
 <html>
 <head>
   <meta charset="UTF-8">
@@ -68,7 +68,7 @@
 
           // Baseline HDR environment
           log('Loading HDR...');
-          new THREE.RGBELoader().load('../HDR/terrace_sea.hdr', (hdr) => {
+          new THREE.RGBELoader().load('HDR/terrace_sea.hdr', (hdr) => {
             log('HDR Loaded');
             hdr.mapping = THREE.EquirectangularReflectionMapping;
             originalEnv = hdr;
