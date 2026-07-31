@@ -1,4 +1,4 @@
-<!-- 9th Wall v1.12 -->
+<!-- 9th Wall v1.14 -->
 <html>
 <head>
   <meta charset="UTF-8">
@@ -18,9 +18,9 @@
 
   <div id="debugLog" onclick="this.classList.toggle('minimized')"
     style="position:fixed;top:10px;right:10px;z-index:1000000;background:rgba(0,0,0,0.9);color:#0f0;font-family:monospace;font-size:10px;padding:8px;border-radius:4px;cursor:pointer;line-height:1.2;border:1px solid #0f0;">
-    <div id="debugTitle">v1.11 (Tap to toggle)</div>
+    <div id="debugTitle">v1.14 (Tap to toggle)</div>
     <div id="debugContent">
-      ar-world: v1.11<br>
+      ar-world: v1.14<br>
       bundle: v1.06<br>
       Status: Waiting...
     </div>
@@ -45,77 +45,89 @@
     let envMode = 'hdr', envInterval = null;
     let _scene = null, _renderer = null;
 
-    // Conectamos tu iluminación directamente con el motor 8th Wall ECS
+    // Conectamos tu iluminación directamente con el motor 8th Wall ECS de forma segura
     if (window.ecs) {
       ecs.registerComponent({
         name: 'pmrem-light-estimator',
-        add: (world) => {
-          // Obtenemos la escena real de Three.js
-          _scene    = world.three.scene;
-          _renderer = world.three.renderer;
-
-          log('Scene ECS ready');
-
-          // Activamos la exposición correcta
-          _renderer.toneMapping = THREE.ACESFilmicToneMapping;
-          _renderer.toneMappingExposure = 1.0;
-
-          pmremGenerator = new THREE.PMREMGenerator(_renderer);
-          pmremGenerator.compileEquirectangularShader();
-
-          // Cargar mapa HDR con la ruta correcta
-          log('Loading HDR...');
-          new THREE.RGBELoader().load('HDR/terrace_sea.hdr', (hdr) => {
-            log('HDR Loaded');
-            hdr.mapping = THREE.EquirectangularReflectionMapping;
-            originalEnv = hdr;
-            if (envMode === 'hdr') {
-              _scene.environment = hdr;
+        schema: {},
+        schemaDefaults: {},
+        data: {},
+        add: (world, component) => {
+          // Función de seguridad: espera a que Three.js esté 100% listo
+          const startPMREM = () => {
+            if (!world || !world.three || !world.three.scene || !world.three.renderer) {
+              setTimeout(startPMREM, 100);
+              return;
             }
-          }, undefined, (err) => {
-            log('Error al cargar HDR');
-          });
 
-          // Light Estimation: Muestrear la cámara real
-          const waitForVideo = setInterval(() => {
-            const video = document.querySelector('video');
-            if (video && video.readyState >= 2) {
-              clearInterval(waitForVideo);
-              log('Video stream ready');
+            _scene    = world.three.scene;
+            _renderer = world.three.renderer;
 
-              const envCanvas  = document.createElement('canvas');
-              envCanvas.width  = 64;
-              envCanvas.height = 64;
-              const envTexture = new THREE.CanvasTexture(envCanvas);
-              envTexture.mapping = THREE.EquirectangularReflectionMapping;
-              const ctx = envCanvas.getContext('2d');
-              let smoothed = 120;
+            log('Scene ECS ready');
 
-              envInterval = setInterval(() => {
-                if (!video || video.readyState < 2) return;
-                ctx.drawImage(video, 0, 0, 64, 64);
-                envTexture.needsUpdate = true;
+            // Activamos la exposición correcta
+            _renderer.toneMapping = THREE.ACESFilmicToneMapping;
+            _renderer.toneMappingExposure = 1.0;
 
-                if (pmremGenerator) {
-                  if (cameraRT) cameraRT.dispose();
-                  cameraRT = pmremGenerator.fromEquirectangular(envTexture);
-                  if (envMode === 'cam') {
-                    _scene.environment = cameraRT.texture;
+            pmremGenerator = new THREE.PMREMGenerator(_renderer);
+            pmremGenerator.compileEquirectangularShader();
+
+            // Cargar mapa HDR con la ruta correcta
+            log('Loading HDR...');
+            new THREE.RGBELoader().load('HDR/terrace_sea.hdr', (hdr) => {
+              log('HDR Loaded');
+              hdr.mapping = THREE.EquirectangularReflectionMapping;
+              originalEnv = hdr;
+              if (envMode === 'hdr') {
+                _scene.environment = hdr;
+              }
+            }, undefined, (err) => {
+              log('Error al cargar HDR');
+            });
+
+            // Light Estimation: Muestrear la cámara real
+            const waitForVideo = setInterval(() => {
+              const video = document.querySelector('video');
+              if (video && video.readyState >= 2) {
+                clearInterval(waitForVideo);
+                log('Video stream ready');
+
+                const envCanvas  = document.createElement('canvas');
+                envCanvas.width  = 64;
+                envCanvas.height = 64;
+                const envTexture = new THREE.CanvasTexture(envCanvas);
+                envTexture.mapping = THREE.EquirectangularReflectionMapping;
+                const ctx = envCanvas.getContext('2d');
+                let smoothed = 120;
+
+                envInterval = setInterval(() => {
+                  if (!video || video.readyState < 2) return;
+                  ctx.drawImage(video, 0, 0, 64, 64);
+                  envTexture.needsUpdate = true;
+
+                  if (pmremGenerator) {
+                    if (cameraRT) cameraRT.dispose();
+                    cameraRT = pmremGenerator.fromEquirectangular(envTexture);
+                    if (envMode === 'cam') {
+                      _scene.environment = cameraRT.texture;
+                    }
                   }
-                }
 
-                // Cálculo de brillo medio
-                const pixels = ctx.getImageData(0, 0, 64, 64).data;
-                let total = 0;
-                for (let i = 0; i < pixels.length; i += 4) {
-                  total += (pixels[i] + pixels[i + 1] + pixels[i + 2]) / 3;
-                }
-                const brightness = total / (pixels.length / 4);
-                smoothed += (brightness - smoothed) * 0.08;
-                _renderer.toneMappingExposure = 0.5 + (smoothed / 255) * 0.9;
-              }, 50);
-            }
-          }, 500);
+                  // Cálculo de brillo medio
+                  const pixels = ctx.getImageData(0, 0, 64, 64).data;
+                  let total = 0;
+                  for (let i = 0; i < pixels.length; i += 4) {
+                    total += (pixels[i] + pixels[i + 1] + pixels[i + 2]) / 3;
+                  }
+                  const brightness = total / (pixels.length / 4);
+                  smoothed += (brightness - smoothed) * 0.08;
+                  _renderer.toneMappingExposure = 0.5 + (smoothed / 255) * 0.9;
+                }, 50);
+              }
+            }, 500);
+          };
+
+          startPMREM();
         }
       });
 
