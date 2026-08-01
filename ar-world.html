@@ -1,4 +1,4 @@
-<!-- 9th Wall v1.21 -->
+<!-- 9th Wall v1.22 -->
 <html>
 <head>
   <meta charset="UTF-8">
@@ -18,10 +18,10 @@
 
   <div id="debugLog" onclick="this.classList.toggle('minimized')"
     style="position:fixed;top:10px;right:10px;z-index:1000000;background:rgba(0,0,0,0.9);color:#0f0;font-family:monospace;font-size:10px;padding:8px;border-radius:4px;cursor:pointer;line-height:1.2;border:1px solid #0f0;">
-    <div id="debugTitle">v1.21 (Tap to toggle)</div>
+    <div id="debugTitle">v1.22 (Tap to toggle)</div>
     <div id="debugContent">
-      ar-world: v1.21<br>
-      bundle: v1.06<br>
+      ar-world: v1.22<br>
+      bundle: v1.20<br>
       Status: Waiting...
     </div>
   </div>
@@ -36,6 +36,7 @@
   </button>
 
   <script>
+    // 1. Mover 'log' al principio para que no dé error de sintaxis
     const log = (msg) => {
       const el = document.getElementById('debugContent');
       if (el) el.innerHTML += `<br>> ${msg}`;
@@ -45,16 +46,42 @@
     let envMode = 'hdr', envInterval = null;
     let _scene = null, _renderer = null;
 
+    // 2. GANCHO DE SEGURIDAD THREE.JS
+    const OriginalScene = THREE.Scene;
+    THREE.Scene = function() {
+      const scene = new OriginalScene(...arguments);
+      if (!_scene) {
+        _scene = scene;
+        window._scene = scene;
+        log('Three.js Scene capturada!');
+      }
+      return scene;
+    };
+
+    const OriginalRenderer = THREE.WebGLRenderer;
+    THREE.WebGLRenderer = function() {
+      const renderer = new OriginalRenderer(...arguments);
+      if (!_renderer) {
+        _renderer = renderer;
+        window._renderer = renderer;
+        log('Three.js Renderer capturado!');
+      }
+      return renderer;
+    };
+
     document.getElementById('envToggle').addEventListener('click', (e) => {
       log('Button clicked');
       toggleEnv();
     });
 
-    // Esta función recibe la escena automáticamente desde bundle-world.js al iniciar la AR
-    window.onSceneReady = function(scene, renderer) {
-      _scene = scene;
-      _renderer = renderer;
-      log('Scene hooked successfully!');
+    // 3. ARRANCAR ILUMINACIÓN EN CUANTO LOS HOOKS CAPTUREN LA ESCENA
+    function startPMREMWhenReady() {
+      if (!_scene || !_renderer) {
+        setTimeout(startPMREMWhenReady, 100);
+        return;
+      }
+
+      log('Iniciando PMREM en escena capturada...');
 
       pmremGenerator = new THREE.PMREMGenerator(_renderer);
       pmremGenerator.compileEquirectangularShader();
@@ -103,7 +130,10 @@
           }, 50);
         }
       }, 500);
-    };
+    }
+
+    // Iniciamos la comprobación
+    startPMREMWhenReady();
 
     if (window.ecs) {
       const _i = ecs.application.init;
