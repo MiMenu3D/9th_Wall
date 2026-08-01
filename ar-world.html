@@ -1,4 +1,4 @@
-<!-- 9th Wall v1.24 -->
+<!-- 9th Wall v1.25 -->
 <html>
 <head>
   <meta charset="UTF-8">
@@ -18,9 +18,9 @@
 
   <div id="debugLog" onclick="this.classList.toggle('minimized')"
     style="position:fixed;top:10px;right:10px;z-index:1000000;background:rgba(0,0,0,0.9);color:#0f0;font-family:monospace;font-size:10px;padding:8px;border-radius:4px;cursor:pointer;line-height:1.2;border:1px solid #0f0;">
-    <div id="debugTitle">v1.24 (Tap to toggle)</div>
+    <div id="debugTitle">v1.25 (Tap to toggle)</div>
     <div id="debugContent">
-      ar-world: v1.24<br>
+      ar-world: v1.25<br>
       bundle: v1.20<br>
       Status: Waiting...
     </div>
@@ -35,7 +35,7 @@
     Env: HDR
   </button>
 
-  <script>
+ <script>
     const log = (msg) => {
       const el = document.getElementById('debugContent');
       if (el) el.innerHTML += `<br>> ${msg}`;
@@ -45,29 +45,46 @@
     let envMode = 'hdr', envInterval = null;
     let _scene = null, _renderer = null;
 
+    // Intercepción de constructores Three.js sin modificar ECS ni permisos de cámara
+    if (window.THREE) {
+      const OrigScene = THREE.Scene;
+      THREE.Scene = function (...a) {
+        const s = new OrigScene(...a);
+        _scene = s;
+        log('Scene intercepted');
+        return s;
+      };
+      Object.assign(THREE.Scene, OrigScene);
+      THREE.Scene.prototype = OrigScene.prototype;
+
+      const OrigRenderer = THREE.WebGLRenderer;
+      THREE.WebGLRenderer = function (...a) {
+        const r = new OrigRenderer(...a);
+        _renderer = r;
+        log('Renderer intercepted');
+        return r;
+      };
+      Object.assign(THREE.WebGLRenderer, OrigRenderer);
+      THREE.WebGLRenderer.prototype = OrigRenderer.prototype;
+    }
+
     document.getElementById('envToggle').addEventListener('click', (e) => {
       log('Button clicked');
       toggleEnv();
     });
 
-    function initPMREMWithScene(scene, renderer) {
-      _scene = scene;
-      _renderer = renderer;
-      log('Scene & Renderer bound!');
-
+    function setupPMREM() {
       pmremGenerator = new THREE.PMREMGenerator(_renderer);
       pmremGenerator.compileEquirectangularShader();
 
-      // Cargar mapa HDR
       log('Loading HDR...');
       new THREE.RGBELoader().load('HDR/terrace_sea.hdr', (hdr) => {
         log('HDR Loaded');
         hdr.mapping = THREE.EquirectangularReflectionMapping;
         originalEnv = hdr;
-        if (envMode === 'hdr') _scene.environment = hdr;
+        if (envMode === 'hdr' && _scene) _scene.environment = hdr;
       });
 
-      // Estimación de luz por cámara (muestreo de vídeo cada 50ms)
       const waitForVideo = setInterval(() => {
         const video = document.querySelector('video');
         if (video && video.readyState >= 2) {
@@ -90,10 +107,9 @@
             if (pmremGenerator) {
               if (cameraRT) cameraRT.dispose();
               cameraRT = pmremGenerator.fromEquirectangular(envTexture);
-              if (envMode === 'cam') _scene.environment = cameraRT.texture;
+              if (envMode === 'cam' && _scene) _scene.environment = cameraRT.texture;
             }
 
-            // Brillo -> exposición adaptativa
             const pixels = ctx.getImageData(0, 0, 64, 64).data;
             let total = 0;
             for (let i = 0; i < pixels.length; i += 4) {
@@ -101,39 +117,19 @@
             }
             const brightness = total / (pixels.length / 4);
             smoothed += (brightness - smoothed) * 0.08;
-            _renderer.exposure = 0.6 + (smoothed / 255) * 0.9;
+            if (_renderer) _renderer.exposure = 0.6 + (smoothed / 255) * 0.9;
           }, 50);
         }
       }, 500);
     }
 
-    if (window.ecs) {
-      ecs.registerComponent({
-        name: 'capture-scene-ecs',
-        start: (world) => {
-          if (!_scene && world.three && world.three.scene) {
-            log('ECS start: Scene ready');
-            initPMREMWithScene(world.three.scene, world.three.renderer);
-          }
-        }
-      });
-
-      const _i = ecs.application.init;
-      ecs.application.init = c => {
-        for (const k in c.objects) {
-          const obj = c.objects[k];
-          if (obj.name === 'Camera') {
-            obj.components['capture-scene-ecs'] = {};
-          }
-          if (obj.name === 'Model') {
-            obj.scale = [9.01, 9.01, 9.01];
-            const anim = obj.components['a2c75775-5a0f-44d7-910c-c111bc850bf6'];
-            if (anim && anim.parameters) anim.parameters.toY = 0;
-          }
-        }
-        return _i.call(ecs.application, c);
-      };
-    }
+    const checkReady = setInterval(() => {
+      if (_scene && _renderer && !pmremGenerator) {
+        clearInterval(checkReady);
+        log('PMREM starting...');
+        setupPMREM();
+      }
+    }, 100);
 
     window.toggleEnv = function () {
       const btn = document.getElementById('envToggle');
