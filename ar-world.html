@@ -1,4 +1,4 @@
-<!-- 9th Wall v1.36 -->
+<!-- 9th Wall v1.37 -->
 <html>
 <head>
   <meta charset="UTF-8">
@@ -11,16 +11,14 @@
   <!-- 8th Wall landing page (splash screen) -->
   <script src="https://cdn.jsdelivr.net/npm/@8thwall/landing-page@1/dist/landing-page.js" crossorigin="anonymous"></script>
   <!-- Three.js — needed for PMREM + Light Estimation -->
-  <script src="https://unpkg.com/three@0.139.2/build/three.min.js"></script>
-  <script src="https://unpkg.com/three@0.139.2/examples/js/loaders/RGBELoader.js"></script>
 </head>
 <body>
 
   <div id="debugLog" onclick="this.classList.toggle('minimized')"
     style="position:fixed;top:10px;right:10px;z-index:1000000;background:rgba(0,0,0,0.9);color:#0f0;font-family:monospace;font-size:10px;padding:8px;border-radius:4px;cursor:pointer;line-height:1.2;border:1px solid #0f0;">
-    <div id="debugTitle">v1.36 (Tap to toggle)</div>
+    <div id="debugTitle">v1.37 (Tap to toggle)</div>
     <div id="debugContent">
-      ar-world: v1.36<br>
+      ar-world: v1.37<br>
       bundle: v1.01<br>
       Status: Waiting...
     </div>
@@ -50,7 +48,7 @@
       toggleEnv();
     });
 
-    // === ESTRATEGIA 03: Acoplamiento Dinámico al THREE Nativo de 8th Wall ===
+    // === ESTRATEGIA 03: Acoplamiento sobre el THREE Nativo del motor ===
     if (window.ecs) {
       window.ecs.registerComponent({
         name: 'scene-capturer',
@@ -60,14 +58,22 @@
               _scene = world.three.scene;
               _renderer = world.three.renderer;
               
-              // Extraemos la instancia exacta de Three.js que está usando el motor nativo de 8th Wall
-              const nativeTHREE = world.three.Three || window.THREE;
-              log('Captura exitosa. Usando Three nativo: ' + (!!world.three.Three));
+              // Buscamos el THREE nativo expuesto globalmente por el runtime de 8th Wall
+              const nativeTHREE = window.THREE;
+              log('Captura exitosa. Usando Three nativo: ' + (!!nativeTHREE));
               
-              // Cargamos dinámicamente el cargador RGBELoader sobre la instancia nativa
-              loadNativeRGBELoader(nativeTHREE).then((LoaderClass) => {
-                initPMREMLogic(_scene, _renderer, nativeTHREE, LoaderClass);
-              });
+              if (nativeTHREE) {
+                // Descargamos y registramos RGBELoader directamente en el THREE nativo
+                loadNativeRGBELoader(nativeTHREE).then((LoaderClass) => {
+                  if (LoaderClass) {
+                    initPMREMLogic(_scene, _renderer, nativeTHREE, LoaderClass);
+                  } else {
+                    log('Error: No se pudo instanciar el cargador.');
+                  }
+                });
+              } else {
+                log('Error: window.THREE nativo no encontrado.');
+              }
 
             } catch (err) {
               log('Error al capturar: ' + err.message);
@@ -77,7 +83,7 @@
       });
     }
 
-    // Función auxiliar para acoplar RGBELoader al Three.js nativo de 8th Wall
+    // Descarga dinámica de RGBELoader sobre la instancia nativa del motor
     function loadNativeRGBELoader(THREE_INSTANCE) {
       return new Promise((resolve) => {
         if (THREE_INSTANCE.RGBELoader) {
@@ -85,34 +91,31 @@
           return;
         }
         
-        // Apuntamos temporalmente window.THREE al de 8th Wall para que el addon se registre en él
-        const oldTHREE = window.THREE;
-        window.THREE = THREE_INSTANCE;
-        
+        log('Descargando RGBELoader...');
         fetch('https://unpkg.com/three@0.139.2/examples/js/loaders/RGBELoader.js')
           .then(res => res.text())
           .then(code => {
-            // Evaluamos el script en el contexto del THREE de 8th Wall
+            // Evaluamos el código del loader forzando el ámbito del THREE nativo de 8th Wall
+            window.THREE = THREE_INSTANCE;
             (new Function(code))();
-            log('RGBELoader acoplado al Three nativo.');
+            log('RGBELoader acoplado al Three nativo con éxito.');
             resolve(THREE_INSTANCE.RGBELoader);
           })
           .catch(err => {
-            log('Error al acoplar RGBELoader: ' + err.message + '. Usando fallback.');
-            window.THREE = oldTHREE;
-            resolve(THREE.RGBELoader);
+            log('Error al descargar RGBELoader: ' + err.message);
+            resolve(null);
           });
       });
     }
 
     function initPMREMLogic(scene, renderer, THREE_INSTANCE, LoaderClass) {
       try {
-        // Instanciamos el generador usando la clase nativa del motor de 8th Wall
+        // Inicializamos PMREM usando la clase nativa del motor de 8th Wall
         pmremGenerator = new THREE_INSTANCE.PMREMGenerator(renderer);
         pmremGenerator.compileEquirectangularShader();
         log('PMREM compilado en motor nativo');
 
-        // Carga de textura de entorno HDR usando el cargador acoplado
+        // Carga de textura de entorno HDR
         new LoaderClass().load('HDR/terrace_sea.hdr', (hdr) => {
           log('HDR cargado');
           hdr.mapping = THREE_INSTANCE.EquirectangularReflectionMapping;
@@ -122,7 +125,7 @@
           log('Error cargando HDR: ' + err.message);
         });
 
-        // Bucle para estimación de luz (Mantenemos intactos tus 50ms y resoluciones)
+        // Bucle para estimación de luz (Mantenemos intactos tus 50ms y optimizaciones)
         const waitForVideo = setInterval(() => {
           const video = document.querySelector('video');
           if (video && video.readyState >= 2) {
@@ -162,7 +165,7 @@
               } catch (e) {
                 // Silencioso
               }
-            }, 50); // Frecuencia de 50ms original
+            }, 50); // Refresco de 50ms original sin alterar
           }
         }, 500);
 
@@ -171,7 +174,7 @@
       }
     }
 
-    // Interceptor de la inicialización de ECS (Manteniendo la eliminación de Loading Screen original)
+    // Interceptor de la inicialización de ECS (Mantiene la estructura original estable)
     if (window.ecs) {
       const _i = ecs.application.init;
       ecs.application.init = c => {
