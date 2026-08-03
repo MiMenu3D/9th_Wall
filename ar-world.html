@@ -1,4 +1,4 @@
-<!-- 9th Wall v1.28 -->
+<!-- 9th Wall v1.30 -->
 <html>
 <head>
   <meta charset="UTF-8">
@@ -18,9 +18,9 @@
 
   <div id="debugLog" onclick="this.classList.toggle('minimized')"
     style="position:fixed;top:10px;right:10px;z-index:1000000;background:rgba(0,0,0,0.9);color:#0f0;font-family:monospace;font-size:10px;padding:8px;border-radius:4px;cursor:pointer;line-height:1.2;border:1px solid #0f0;">
-    <div id="debugTitle">v1.28 (Tap to toggle)</div>
+    <div id="debugTitle">v1.30 (Tap to toggle)</div>
     <div id="debugContent">
-      ar-world: v1.28<br>
+      ar-world: v1.30<br>
       bundle: v1.22<br>
       Status: Waiting...
     </div>
@@ -50,7 +50,7 @@
       toggleEnv();
     });
 
-    // Callback activado desde el componente env-lighting corregido en bundle-world.js
+    // Repetición pura de la Prueba 08 (v1.12) aprovechando el fix de bundle-world.js v1.22
     window.onSceneReady = function (scene, renderer) {
       if (_scene) return;
       _scene = scene;
@@ -106,12 +106,12 @@
       }, 500);
     };
 
+    // Aplicar escala del modelo respetando el árbol de entidades (sin borrar nada)
     if (window.ecs) {
       const _i = ecs.application.init;
       ecs.application.init = c => {
         for (const k in c.objects) {
           const obj = c.objects[k];
-          if (obj.name === 'Loading Screen') delete c.objects[k];
           if (obj.name === 'Model') {
             obj.scale = [9.01, 9.01, 9.01];
             const anim = obj.components['a2c75775-5a0f-44d7-910c-c111bc850bf6'];
