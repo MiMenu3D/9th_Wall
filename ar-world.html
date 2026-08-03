@@ -1,4 +1,4 @@
-<!-- 9th Wall v1.25 -->
+<!-- 9th Wall v1.26 -->
 <html>
 <head>
   <meta charset="UTF-8">
@@ -18,10 +18,10 @@
 
   <div id="debugLog" onclick="this.classList.toggle('minimized')"
     style="position:fixed;top:10px;right:10px;z-index:1000000;background:rgba(0,0,0,0.9);color:#0f0;font-family:monospace;font-size:10px;padding:8px;border-radius:4px;cursor:pointer;line-height:1.2;border:1px solid #0f0;">
-    <div id="debugTitle">v1.25 (Tap to toggle)</div>
+    <div id="debugTitle">v1.26 (Tap to toggle)</div>
     <div id="debugContent">
-      ar-world: v1.25<br>
-      bundle: v1.20<br>
+      ar-world: v1.26<br>
+      bundle: v1.21<br>
       Status: Waiting...
     </div>
   </div>
@@ -35,7 +35,7 @@
     Env: HDR
   </button>
 
- <script>
+  <script>
     const log = (msg) => {
       const el = document.getElementById('debugContent');
       if (el) el.innerHTML += `<br>> ${msg}`;
@@ -44,28 +44,24 @@
     let pmremGenerator = null, cameraRT = null, originalEnv = null;
     let envMode = 'hdr', envInterval = null;
     let _scene = null, _renderer = null;
+    let activeEnv = null;
 
-    // Intercepción de constructores Three.js sin modificar ECS ni permisos de cámara
-    if (window.THREE) {
-      const OrigScene = THREE.Scene;
-      THREE.Scene = function (...a) {
-        const s = new OrigScene(...a);
-        _scene = s;
-        log('Scene intercepted');
-        return s;
+    // Estrategia 9 + 7: Proxy sobre WebGLRenderer.prototype.render
+    if (window.THREE && THREE.WebGLRenderer) {
+      const OrigRender = THREE.WebGLRenderer.prototype.render;
+      THREE.WebGLRenderer.prototype.render = function (scene, camera) {
+        if (!_scene && scene) {
+          _scene = scene;
+          _renderer = this;
+          log('Scene & Renderer captured via Proxy!');
+          setupPMREM();
+        }
+        // Mantiene activa la iluminación personalizada justo antes de cada renderizado
+        if (_scene && activeEnv !== undefined) {
+          _scene.environment = activeEnv;
+        }
+        OrigRender.call(this, scene, camera);
       };
-      Object.assign(THREE.Scene, OrigScene);
-      THREE.Scene.prototype = OrigScene.prototype;
-
-      const OrigRenderer = THREE.WebGLRenderer;
-      THREE.WebGLRenderer = function (...a) {
-        const r = new OrigRenderer(...a);
-        _renderer = r;
-        log('Renderer intercepted');
-        return r;
-      };
-      Object.assign(THREE.WebGLRenderer, OrigRenderer);
-      THREE.WebGLRenderer.prototype = OrigRenderer.prototype;
     }
 
     document.getElementById('envToggle').addEventListener('click', (e) => {
@@ -74,6 +70,7 @@
     });
 
     function setupPMREM() {
+      if (!_renderer) return;
       pmremGenerator = new THREE.PMREMGenerator(_renderer);
       pmremGenerator.compileEquirectangularShader();
 
@@ -82,9 +79,10 @@
         log('HDR Loaded');
         hdr.mapping = THREE.EquirectangularReflectionMapping;
         originalEnv = hdr;
-        if (envMode === 'hdr' && _scene) _scene.environment = hdr;
+        if (envMode === 'hdr') activeEnv = hdr;
       });
 
+      // Muestreo del vídeo de la cámara cada 50ms para iluminación adaptativa
       const waitForVideo = setInterval(() => {
         const video = document.querySelector('video');
         if (video && video.readyState >= 2) {
@@ -107,7 +105,7 @@
             if (pmremGenerator) {
               if (cameraRT) cameraRT.dispose();
               cameraRT = pmremGenerator.fromEquirectangular(envTexture);
-              if (envMode === 'cam' && _scene) _scene.environment = cameraRT.texture;
+              if (envMode === 'cam') activeEnv = cameraRT.texture;
             }
 
             const pixels = ctx.getImageData(0, 0, 64, 64).data;
@@ -123,13 +121,21 @@
       }, 500);
     }
 
-    const checkReady = setInterval(() => {
-      if (_scene && _renderer && !pmremGenerator) {
-        clearInterval(checkReady);
-        log('PMREM starting...');
-        setupPMREM();
-      }
-    }, 100);
+    // Ajuste de escala del modelo sin alterar jerarquía de pantallas de carga
+    if (window.ecs) {
+      const _i = ecs.application.init;
+      ecs.application.init = c => {
+        for (const k in c.objects) {
+          const obj = c.objects[k];
+          if (obj.name === 'Model') {
+            obj.scale = [9.01, 9.01, 9.01];
+            const anim = obj.components['a2c75775-5a0f-44d7-910c-c111bc850bf6'];
+            if (anim && anim.parameters) anim.parameters.toY = 0;
+          }
+        }
+        return _i.call(ecs.application, c);
+      };
+    }
 
     window.toggleEnv = function () {
       const btn = document.getElementById('envToggle');
@@ -139,15 +145,15 @@
       }
       log('Mode: ' + envMode);
       if (envMode === 'hdr') {
-        if (cameraRT) _scene.environment = cameraRT.texture;
+        if (cameraRT) activeEnv = cameraRT.texture;
         envMode = 'cam';
         if (btn) btn.innerText = 'Env: CAM';
       } else if (envMode === 'cam') {
-        _scene.environment = null;
+        activeEnv = null;
         envMode = 'off';
         if (btn) btn.innerText = 'Env: OFF';
       } else {
-        if (originalEnv) _scene.environment = originalEnv;
+        if (originalEnv) activeEnv = originalEnv;
         envMode = 'hdr';
         if (btn) btn.innerText = 'Env: HDR';
       }
@@ -157,4 +163,3 @@
   <script src="bundle-world.js"></script>
 </body>
 </html>
-
