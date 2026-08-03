@@ -1,4 +1,4 @@
-<!-- 9th Wall v1.35 -->
+<!-- 9th Wall v1.36 -->
 <html>
 <head>
   <meta charset="UTF-8">
@@ -18,9 +18,9 @@
 
   <div id="debugLog" onclick="this.classList.toggle('minimized')"
     style="position:fixed;top:10px;right:10px;z-index:1000000;background:rgba(0,0,0,0.9);color:#0f0;font-family:monospace;font-size:10px;padding:8px;border-radius:4px;cursor:pointer;line-height:1.2;border:1px solid #0f0;">
-    <div id="debugTitle">v1.35 (Tap to toggle)</div>
+    <div id="debugTitle">v1.36 (Tap to toggle)</div>
     <div id="debugContent">
-      ar-world: v1.35<br>
+      ar-world: v1.36<br>
       bundle: v1.01<br>
       Status: Waiting...
     </div>
@@ -50,19 +50,25 @@
       toggleEnv();
     });
 
-    // === ESTRATEGIA 02: Registro e inyección asíncrona de componente ECS nativo ===
+    // === ESTRATEGIA 03: Acoplamiento Dinámico al THREE Nativo de 8th Wall ===
     if (window.ecs) {
       window.ecs.registerComponent({
         name: 'scene-capturer',
         add: (world, component) => {
-          // Retardo asíncrono seguro de 100ms para asegurar que el motor gráfico
-          // y la cámara completen su secuencia de inicio nativa antes de extraer las referencias.
           setTimeout(() => {
             try {
               _scene = world.three.scene;
               _renderer = world.three.renderer;
-              log('Captura exitosa');
-              initPMREM();
+              
+              // Extraemos la instancia exacta de Three.js que está usando el motor nativo de 8th Wall
+              const nativeTHREE = world.three.Three || window.THREE;
+              log('Captura exitosa. Usando Three nativo: ' + (!!world.three.Three));
+              
+              // Cargamos dinámicamente el cargador RGBELoader sobre la instancia nativa
+              loadNativeRGBELoader(nativeTHREE).then((LoaderClass) => {
+                initPMREMLogic(_scene, _renderer, nativeTHREE, LoaderClass);
+              });
+
             } catch (err) {
               log('Error al capturar: ' + err.message);
             }
@@ -71,24 +77,52 @@
       });
     }
 
-    function initPMREM() {
-      if (!_renderer || !_scene) return;
-      try {
-        pmremGenerator = new THREE.PMREMGenerator(_renderer);
-        pmremGenerator.compileEquirectangularShader();
-        log('PMREM compilado');
+    // Función auxiliar para acoplar RGBELoader al Three.js nativo de 8th Wall
+    function loadNativeRGBELoader(THREE_INSTANCE) {
+      return new Promise((resolve) => {
+        if (THREE_INSTANCE.RGBELoader) {
+          resolve(THREE_INSTANCE.RGBELoader);
+          return;
+        }
+        
+        // Apuntamos temporalmente window.THREE al de 8th Wall para que el addon se registre en él
+        const oldTHREE = window.THREE;
+        window.THREE = THREE_INSTANCE;
+        
+        fetch('https://unpkg.com/three@0.139.2/examples/js/loaders/RGBELoader.js')
+          .then(res => res.text())
+          .then(code => {
+            // Evaluamos el script en el contexto del THREE de 8th Wall
+            (new Function(code))();
+            log('RGBELoader acoplado al Three nativo.');
+            resolve(THREE_INSTANCE.RGBELoader);
+          })
+          .catch(err => {
+            log('Error al acoplar RGBELoader: ' + err.message + '. Usando fallback.');
+            window.THREE = oldTHREE;
+            resolve(THREE.RGBELoader);
+          });
+      });
+    }
 
-        // Carga del archivo HDR
-        new THREE.RGBELoader().load('HDR/terrace_sea.hdr', (hdr) => {
+    function initPMREMLogic(scene, renderer, THREE_INSTANCE, LoaderClass) {
+      try {
+        // Instanciamos el generador usando la clase nativa del motor de 8th Wall
+        pmremGenerator = new THREE_INSTANCE.PMREMGenerator(renderer);
+        pmremGenerator.compileEquirectangularShader();
+        log('PMREM compilado en motor nativo');
+
+        // Carga de textura de entorno HDR usando el cargador acoplado
+        new LoaderClass().load('HDR/terrace_sea.hdr', (hdr) => {
           log('HDR cargado');
-          hdr.mapping = THREE.EquirectangularReflectionMapping;
+          hdr.mapping = THREE_INSTANCE.EquirectangularReflectionMapping;
           originalEnv = hdr;
-          if (envMode === 'hdr') _scene.environment = hdr;
+          if (envMode === 'hdr') scene.environment = hdr;
         }, undefined, (err) => {
           log('Error cargando HDR: ' + err.message);
         });
 
-        // Bucle para estimación de luz en tiempo real
+        // Bucle para estimación de luz (Mantenemos intactos tus 50ms y resoluciones)
         const waitForVideo = setInterval(() => {
           const video = document.querySelector('video');
           if (video && video.readyState >= 2) {
@@ -98,8 +132,8 @@
             const envCanvas = document.createElement('canvas');
             envCanvas.width = 64;
             envCanvas.height = 64;
-            const envTexture = new THREE.CanvasTexture(envCanvas);
-            envTexture.mapping = THREE.EquirectangularReflectionMapping;
+            const envTexture = new THREE_INSTANCE.CanvasTexture(envCanvas);
+            envTexture.mapping = THREE_INSTANCE.EquirectangularReflectionMapping;
             const ctx = envCanvas.getContext('2d');
             let smoothed = 120;
 
@@ -112,11 +146,11 @@
                 if (pmremGenerator) {
                   const oldRT = cameraRT;
                   cameraRT = pmremGenerator.fromEquirectangular(envTexture);
-                  if (envMode === 'cam') _scene.environment = cameraRT.texture;
-                  if (oldRT) oldRT.dispose(); // Limpieza en tarjeta gráfica
+                  if (envMode === 'cam') scene.environment = cameraRT.texture;
+                  if (oldRT) oldRT.dispose(); 
                 }
 
-                // Ajuste de exposición según brillo de la cámara
+                // Estimación de exposición
                 const pixels = ctx.getImageData(0, 0, 64, 64).data;
                 let total = 0;
                 for (let i = 0; i < pixels.length; i += 4) {
@@ -124,20 +158,20 @@
                 }
                 const brightness = total / (pixels.length / 4);
                 smoothed += (brightness - smoothed) * 0.08;
-                _renderer.exposure = 0.6 + (smoothed / 255) * 0.9;
+                renderer.exposure = 0.6 + (smoothed / 255) * 0.9;
               } catch (e) {
-                // Silenciar errores en frames huérfanos
+                // Silencioso
               }
-            }, 50);
+            }, 50); // Frecuencia de 50ms original
           }
         }, 500);
 
       } catch (err) {
-        log('Error PMREM: ' + err.message);
+        log('Error PMREM nativo: ' + err.message);
       }
     }
 
-    // Interceptor de la inicialización de ECS (Basado estrictamente en v1.33/1.09)
+    // Interceptor de la inicialización de ECS (Manteniendo la eliminación de Loading Screen original)
     if (window.ecs) {
       const _i = ecs.application.init;
       ecs.application.init = c => {
@@ -149,7 +183,6 @@
             const anim = obj.components['a2c75775-5a0f-44d7-910c-c111bc850bf6'];
             if (anim && anim.parameters) anim.parameters.toY = 0;
           }
-          // Inyectar el capturador en la cámara nativa de forma limpia
           if (obj.name === 'Camera') {
             obj.components['scene-capturer-comp'] = {
               id: 'scene-capturer-comp',
@@ -168,7 +201,7 @@
         log('Error: _scene sigue siendo null');
         return;
       }
-      log('Modo de entorno: ' + envMode);
+      
       if (envMode === 'hdr') {
         if (cameraRT) _scene.environment = cameraRT.texture;
         envMode = 'cam';
@@ -182,10 +215,11 @@
         envMode = 'hdr';
         if (btn) btn.innerText = 'Env: HDR';
       }
+
+      log('Entorno cambiado a: ' + envMode.toUpperCase());
     };
   </script>
 
   <script src="bundle-world.js"></script>
 </body>
 </html>
-
