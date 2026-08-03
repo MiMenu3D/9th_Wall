@@ -1,4 +1,4 @@
-<!-- 9th Wall v1.32 -->
+<!-- 9th Wall v1.33 (1.09 recycle) -->
 <html>
 <head>
   <meta charset="UTF-8">
@@ -18,10 +18,10 @@
 
   <div id="debugLog" onclick="this.classList.toggle('minimized')"
     style="position:fixed;top:10px;right:10px;z-index:1000000;background:rgba(0,0,0,0.9);color:#0f0;font-family:monospace;font-size:10px;padding:8px;border-radius:4px;cursor:pointer;line-height:1.2;border:1px solid #0f0;">
-    <div id="debugTitle">v1.32 (Tap to toggle)</div>
+    <div id="debugTitle">v1.33 (Tap to toggle)</div>
     <div id="debugContent">
-      ar-world: v1.32<br>
-      bundle: v1.23<br>
+      ar-world: v1.33 (1.09x)<br>
+      bundle: v1.01<br>
       Status: Waiting...
     </div>
   </div>
@@ -41,6 +41,10 @@
       if (el) el.innerHTML += `<br>> ${msg}`;
     };
 
+    // === PMREM + Light Estimation ===
+    // Injects environment reflections and adaptive exposure into the 8th Wall ECS scene.
+    // Uses XR8.Threejs.xrScene() to access the underlying Three.js renderer and scene.
+
     let pmremGenerator = null, cameraRT = null, originalEnv = null;
     let envMode = 'hdr', envInterval = null;
     let _scene = null, _renderer = null;
@@ -50,94 +54,89 @@
       toggleEnv();
     });
 
-    window.onSceneReady = function (scene, renderer) {
-      if (_scene) return;
-      _scene = scene;
-      _renderer = renderer;
-      log('Scene & Renderer captured from bundle!');
+    function installPMREM() {
+      XR8.addCameraPipelineModule({
+        name: 'pmrem-light-estimator',
+        onStart: () => {
+          const xrScene = XR8.Threejs.xrScene();
+          _scene    = xrScene.scene;
+          _renderer = xrScene.renderer;
+          log('Scene ready');
 
-      try {
-        pmremGenerator = new THREE.PMREMGenerator(_renderer);
-        pmremGenerator.compileEquirectangularShader();
+          pmremGenerator = new THREE.PMREMGenerator(_renderer);
+          pmremGenerator.compileEquirectangularShader();
 
-        log('Loading HDR...');
-        new THREE.RGBELoader().load('HDR/terrace_sea.hdr', (hdr) => {
-          log('HDR Loaded');
-          hdr.mapping = THREE.EquirectangularReflectionMapping;
-          originalEnv = hdr;
-          if (envMode === 'hdr' && _scene) _scene.environment = hdr;
-        }, undefined, (err) => {
-          log('HDR Load Error: ' + err);
-        });
+          // Baseline HDR environment
+          log('Loading HDR...');
+          new THREE.RGBELoader().load('HDR/terrace_sea.hdr', (hdr) => {
+            log('HDR Loaded');
+            hdr.mapping = THREE.EquirectangularReflectionMapping;
+            originalEnv = hdr;
+            if (envMode === 'hdr') _scene.environment = hdr;
+          });
 
-        const waitForVideo = setInterval(() => {
-          const video = document.querySelector('video');
-          if (video && video.readyState >= 2) {
-            clearInterval(waitForVideo);
-            log('Video stream ready');
+          // Light Estimation: sample camera video every 50ms
+          const waitForVideo = setInterval(() => {
+            const video = document.querySelector('video');
+            if (video && video.readyState >= 2) {
+              clearInterval(waitForVideo);
+              log('Video stream ready');
 
-            const envCanvas  = document.createElement('canvas');
-            envCanvas.width  = 64;
-            envCanvas.height = 64;
-            const envTexture = new THREE.CanvasTexture(envCanvas);
-            envTexture.mapping = THREE.EquirectangularReflectionMapping;
-            const ctx = envCanvas.getContext('2d');
-            let smoothed = 120;
+              const envCanvas  = document.createElement('canvas');
+              envCanvas.width  = 64;
+              envCanvas.height = 64;
+              const envTexture = new THREE.CanvasTexture(envCanvas);
+              envTexture.mapping = THREE.EquirectangularReflectionMapping;
+              const ctx = envCanvas.getContext('2d');
+              let smoothed = 120;
 
-            envInterval = setInterval(() => {
-              if (!video || video.readyState < 2) return;
-              ctx.drawImage(video, 0, 0, 64, 64);
-              envTexture.needsUpdate = true;
+              envInterval = setInterval(() => {
+                if (!video || video.readyState < 2) return;
+                ctx.drawImage(video, 0, 0, 64, 64);
+                envTexture.needsUpdate = true;
 
-              if (pmremGenerator) {
-                if (cameraRT) cameraRT.dispose();
-                cameraRT = pmremGenerator.fromEquirectangular(envTexture);
-                if (envMode === 'cam' && _scene) _scene.environment = cameraRT.texture;
-              }
+                if (pmremGenerator) {
+                  if (cameraRT) cameraRT.dispose();
+                  cameraRT = pmremGenerator.fromEquirectangular(envTexture);
+                  if (envMode === 'cam') _scene.environment = cameraRT.texture;
+                }
 
-              const pixels = ctx.getImageData(0, 0, 64, 64).data;
-              let total = 0;
-              for (let i = 0; i < pixels.length; i += 4) {
-                total += (pixels[i] + pixels[i + 1] + pixels[i + 2]) / 3;
-              }
-              const brightness = total / (pixels.length / 4);
-              smoothed += (brightness - smoothed) * 0.08;
-              if (_renderer) _renderer.exposure = 0.6 + (smoothed / 255) * 0.9;
-            }, 50);
-          }
-        }, 500);
-      } catch (err) {
-        log('Init Error: ' + err.message);
-      }
-    };
-
-    // Sondeo de respaldo por si el callback ocurre antes o después de la carga
-    const checkSceneInterval = setInterval(() => {
-      if (window.worldThreeScene && window.worldThreeRenderer && !_scene) {
-        log('Scene captured via fallback timer!');
-        window.onSceneReady(window.worldThreeScene, window.worldThreeRenderer);
-      }
-    }, 200);
-
-    // Intercepción ultra-segura de ecs.application.init (evita el TypeError de undefined.call)
-    if (window.ecs && window.ecs.application && typeof window.ecs.application.init === 'function') {
-      const _i = window.ecs.application.init;
-      window.ecs.application.init = function (c) {
-        if (c && c.objects) {
-          for (const k in c.objects) {
-            const obj = c.objects[k];
-            if (obj.name === 'Model') {
-              obj.scale = [9.01, 9.01, 9.01];
-              const anim = obj.components && obj.components['a2c75775-5a0f-44d7-910c-c111bc850bf6'];
-              if (anim && anim.parameters) anim.parameters.toY = 0;
+                // Brightness → adaptive exposure
+                const pixels = ctx.getImageData(0, 0, 64, 64).data;
+                let total = 0;
+                for (let i = 0; i < pixels.length; i += 4) {
+                  total += (pixels[i] + pixels[i + 1] + pixels[i + 2]) / 3;
+                }
+                const brightness = total / (pixels.length / 4);
+                smoothed += (brightness - smoothed) * 0.08;
+                _renderer.exposure = 0.6 + (smoothed / 255) * 0.9;
+              }, 50);
             }
+          }, 500);
+        }
+      });
+    }
+
+    if (window.ecs) {
+      const _i = ecs.application.init;
+      ecs.application.init = c => {
+        for (const k in c.objects) {
+          const obj = c.objects[k];
+          if (obj.name === 'Loading Screen') delete c.objects[k];
+          if (obj.name === 'Model') {
+            obj.scale = [10.01, 10.01, 10.01];
+            const anim = obj.components['a2c75775-5a0f-44d7-910c-c111bc850bf6'];
+            if (anim && anim.parameters) anim.parameters.toY = 0;
           }
         }
-        return _i.call(window.ecs.application, c);
+        return _i.call(ecs.application, c);
       };
     }
 
-    function toggleEnv() {
+    if (window.XR8) installPMREM();
+    else window.addEventListener('xrloaded', installPMREM, { once: true });
+
+    window.toggleEnv = function () {
       const btn = document.getElementById('envToggle');
       if (!_scene) {
         log('Error: _scene is null');
@@ -157,9 +156,10 @@
         envMode = 'hdr';
         if (btn) btn.innerText = 'Env: HDR';
       }
-    }
+    };
   </script>
 
   <script src="bundle-world.js"></script>
 </body>
 </html>
+

@@ -1,4 +1,4 @@
-﻿// 9th Wall v1.23
+﻿// 9th Wall v1.01
 (()=>{
   var e={
     574(){
@@ -137,26 +137,6 @@
         asset: _models[parseInt(_idx)]
       };
     }
-window.ecs.registerComponent({
-      name: "env-lighting",
-      tick: (world) => {
-        if (world.three && world.three.scene && world.three.renderer) {
-          window.worldThreeScene = world.three.scene;
-          window.worldThreeRenderer = world.three.renderer;
-          if (window.onSceneReady && !window._sceneReadyCalled) {
-            window._sceneReadyCalled = true;
-            setTimeout(() => {
-              try {
-                window.onSceneReady(world.three.scene, world.three.renderer);
-              } catch (err) {
-                console.error("onSceneReady error:", err);
-              }
-            }, 0);
-          }
-        }
-      }
-    });
-    i.objects["52ba8a86-a459-4df8-b954-a570e85e0484"].components["env-lighting"] = {};
-
-    window.ecs.application.init(i)  })()
+    window.ecs.application.init(i)
+  })()
 })();
