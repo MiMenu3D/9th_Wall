@@ -1,4 +1,4 @@
-﻿// 9th Wall v1.22
+﻿// 9th Wall v1.23
 (()=>{
   var e={
     574(){
@@ -145,7 +145,13 @@ window.ecs.registerComponent({
           window.worldThreeRenderer = world.three.renderer;
           if (window.onSceneReady && !window._sceneReadyCalled) {
             window._sceneReadyCalled = true;
-            window.onSceneReady(world.three.scene, world.three.renderer);
+            setTimeout(() => {
+              try {
+                window.onSceneReady(world.three.scene, world.three.renderer);
+              } catch (err) {
+                console.error("onSceneReady error:", err);
+              }
+            }, 0);
           }
         }
       }

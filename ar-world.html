@@ -1,4 +1,4 @@
-<!-- 9th Wall v1.30 -->
+<!-- 9th Wall v1.31 -->
 <html>
 <head>
   <meta charset="UTF-8">
@@ -18,10 +18,10 @@
 
   <div id="debugLog" onclick="this.classList.toggle('minimized')"
     style="position:fixed;top:10px;right:10px;z-index:1000000;background:rgba(0,0,0,0.9);color:#0f0;font-family:monospace;font-size:10px;padding:8px;border-radius:4px;cursor:pointer;line-height:1.2;border:1px solid #0f0;">
-    <div id="debugTitle">v1.30 (Tap to toggle)</div>
+    <div id="debugTitle">v1.31 (Tap to toggle)</div>
     <div id="debugContent">
-      ar-world: v1.30<br>
-      bundle: v1.22<br>
+      ar-world: v1.31<br>
+      bundle: v1.23<br>
       Status: Waiting...
     </div>
   </div>
@@ -50,63 +50,67 @@
       toggleEnv();
     });
 
-    // Repetición pura de la Prueba 08 (v1.12) aprovechando el fix de bundle-world.js v1.22
     window.onSceneReady = function (scene, renderer) {
       if (_scene) return;
       _scene = scene;
       _renderer = renderer;
       log('Scene & Renderer captured from bundle!');
 
-      pmremGenerator = new THREE.PMREMGenerator(_renderer);
-      pmremGenerator.compileEquirectangularShader();
+      try {
+        pmremGenerator = new THREE.PMREMGenerator(_renderer);
+        pmremGenerator.compileEquirectangularShader();
 
-      log('Loading HDR...');
-      new THREE.RGBELoader().load('HDR/terrace_sea.hdr', (hdr) => {
-        log('HDR Loaded');
-        hdr.mapping = THREE.EquirectangularReflectionMapping;
-        originalEnv = hdr;
-        if (envMode === 'hdr' && _scene) _scene.environment = hdr;
-      });
+        log('Loading HDR...');
+        new THREE.RGBELoader().load('HDR/terrace_sea.hdr', (hdr) => {
+          log('HDR Loaded');
+          hdr.mapping = THREE.EquirectangularReflectionMapping;
+          originalEnv = hdr;
+          if (envMode === 'hdr' && _scene) _scene.environment = hdr;
+        }, undefined, (err) => {
+          log('HDR Load Error: ' + err);
+        });
 
-      const waitForVideo = setInterval(() => {
-        const video = document.querySelector('video');
-        if (video && video.readyState >= 2) {
-          clearInterval(waitForVideo);
-          log('Video stream ready');
+        const waitForVideo = setInterval(() => {
+          const video = document.querySelector('video');
+          if (video && video.readyState >= 2) {
+            clearInterval(waitForVideo);
+            log('Video stream ready');
 
-          const envCanvas  = document.createElement('canvas');
-          envCanvas.width  = 64;
-          envCanvas.height = 64;
-          const envTexture = new THREE.CanvasTexture(envCanvas);
-          envTexture.mapping = THREE.EquirectangularReflectionMapping;
-          const ctx = envCanvas.getContext('2d');
-          let smoothed = 120;
+            const envCanvas  = document.createElement('canvas');
+            envCanvas.width  = 64;
+            envCanvas.height = 64;
+            const envTexture = new THREE.CanvasTexture(envCanvas);
+            envTexture.mapping = THREE.EquirectangularReflectionMapping;
+            const ctx = envCanvas.getContext('2d');
+            let smoothed = 120;
 
-          envInterval = setInterval(() => {
-            if (!video || video.readyState < 2) return;
-            ctx.drawImage(video, 0, 0, 64, 64);
-            envTexture.needsUpdate = true;
+            envInterval = setInterval(() => {
+              if (!video || video.readyState < 2) return;
+              ctx.drawImage(video, 0, 0, 64, 64);
+              envTexture.needsUpdate = true;
 
-            if (pmremGenerator) {
-              if (cameraRT) cameraRT.dispose();
-              cameraRT = pmremGenerator.fromEquirectangular(envTexture);
-              if (envMode === 'cam' && _scene) _scene.environment = cameraRT.texture;
-            }
+              if (pmremGenerator) {
+                if (cameraRT) cameraRT.dispose();
+                cameraRT = pmremGenerator.fromEquirectangular(envTexture);
+                if (envMode === 'cam' && _scene) _scene.environment = cameraRT.texture;
+              }
 
-            const pixels = ctx.getImageData(0, 0, 64, 64).data;
-            let total = 0;
-            for (let i = 0; i < pixels.length; i += 4) {
-              total += (pixels[i] + pixels[i + 1] + pixels[i + 2]) / 3;
-            }
-            const brightness = total / (pixels.length / 4);
-            smoothed += (brightness - smoothed) * 0.08;
-            if (_renderer) _renderer.exposure = 0.6 + (smoothed / 255) * 0.9;
-          }, 50);
-        }
-      }, 500);
+              const pixels = ctx.getImageData(0, 0, 64, 64).data;
+              let total = 0;
+              for (let i = 0; i < pixels.length; i += 4) {
+                total += (pixels[i] + pixels[i + 1] + pixels[i + 2]) / 3;
+              }
+              const brightness = total / (pixels.length / 4);
+              smoothed += (brightness - smoothed) * 0.08;
+              if (_renderer) _renderer.exposure = 0.6 + (smoothed / 255) * 0.9;
+            }, 50);
+          }
+        }, 500);
+      } catch (err) {
+        log('Init Error: ' + err.message);
+      }
     };
 
-    // Aplicar escala del modelo respetando el árbol de entidades (sin borrar nada)
     if (window.ecs) {
       const _i = ecs.application.init;
       ecs.application.init = c => {
