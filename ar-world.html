@@ -1,4 +1,4 @@
-<!-- 9th Wall v1.37 -->
+<!-- 9th Wall v1.38 -->
 <html>
 <head>
   <meta charset="UTF-8">
@@ -15,10 +15,10 @@
 <body>
 
   <div id="debugLog" onclick="this.classList.toggle('minimized')"
-    style="position:fixed;top:10px;right:10px;z-index:1000000;background:rgba(0,0,0,0.9);color:#0f0;font-family:monospace;font-size:10px;padding:8px;border-radius:4px;cursor:pointer;line-height:1.2;border:1px solid #0f0;">
-    <div id="debugTitle">v1.37 (Tap to toggle)</div>
+    style="position:fixed;top:10px;right:10px;z-index:1000000;background:rgba(0,0,0,0.9);color:#0f0;font-family:monospace;font-size:12px;padding:8px;border-radius:4px;cursor:pointer;line-height:1.2;border:1px solid #0f0;">
+    <div id="debugTitle">v1.38 (Tap to toggle)</div>
     <div id="debugContent">
-      ar-world: v1.37<br>
+      ar-world: v1.38<br>
       bundle: v1.01<br>
       Status: Waiting...
     </div>
@@ -181,6 +181,21 @@
         for (const k in c.objects) {
           const obj = c.objects[k];
           if (obj.name === 'Loading Screen') delete c.objects[k];
+          
+          // Solución a la doble iluminación nativa:
+          if (obj.name === 'Ambient Light') {
+            if (obj.light) {
+              obj.light.intensity = 0; // Apagamos la luz ambiental nativa por completo
+              log('Luz ambiental nativa neutralizada.');
+            }
+          }
+          if (obj.name === 'Directional Light') {
+            if (obj.light) {
+              obj.light.intensity = 0.05; // Atenuamos la luz direccional para conservar sombras suaves
+              log('Luz direccional reducida para evitar sobreexposición.');
+            }
+          }
+
           if (obj.name === 'Model') {
             obj.scale = [10.01, 10.01, 10.01];
             const anim = obj.components['a2c75775-5a0f-44d7-910c-c111bc850bf6'];
