@@ -1,4 +1,4 @@
-<!-- 9th Wall v1.31 -->
+<!-- 9th Wall v1.32 -->
 <html>
 <head>
   <meta charset="UTF-8">
@@ -18,9 +18,9 @@
 
   <div id="debugLog" onclick="this.classList.toggle('minimized')"
     style="position:fixed;top:10px;right:10px;z-index:1000000;background:rgba(0,0,0,0.9);color:#0f0;font-family:monospace;font-size:10px;padding:8px;border-radius:4px;cursor:pointer;line-height:1.2;border:1px solid #0f0;">
-    <div id="debugTitle">v1.31 (Tap to toggle)</div>
+    <div id="debugTitle">v1.32 (Tap to toggle)</div>
     <div id="debugContent">
-      ar-world: v1.31<br>
+      ar-world: v1.32<br>
       bundle: v1.23<br>
       Status: Waiting...
     </div>
@@ -111,22 +111,33 @@
       }
     };
 
-    if (window.ecs) {
-      const _i = ecs.application.init;
-      ecs.application.init = c => {
-        for (const k in c.objects) {
-          const obj = c.objects[k];
-          if (obj.name === 'Model') {
-            obj.scale = [9.01, 9.01, 9.01];
-            const anim = obj.components['a2c75775-5a0f-44d7-910c-c111bc850bf6'];
-            if (anim && anim.parameters) anim.parameters.toY = 0;
+    // Sondeo de respaldo por si el callback ocurre antes o después de la carga
+    const checkSceneInterval = setInterval(() => {
+      if (window.worldThreeScene && window.worldThreeRenderer && !_scene) {
+        log('Scene captured via fallback timer!');
+        window.onSceneReady(window.worldThreeScene, window.worldThreeRenderer);
+      }
+    }, 200);
+
+    // Intercepción ultra-segura de ecs.application.init (evita el TypeError de undefined.call)
+    if (window.ecs && window.ecs.application && typeof window.ecs.application.init === 'function') {
+      const _i = window.ecs.application.init;
+      window.ecs.application.init = function (c) {
+        if (c && c.objects) {
+          for (const k in c.objects) {
+            const obj = c.objects[k];
+            if (obj.name === 'Model') {
+              obj.scale = [9.01, 9.01, 9.01];
+              const anim = obj.components && obj.components['a2c75775-5a0f-44d7-910c-c111bc850bf6'];
+              if (anim && anim.parameters) anim.parameters.toY = 0;
+            }
           }
         }
-        return _i.call(ecs.application, c);
+        return _i.call(window.ecs.application, c);
       };
     }
 
-    window.toggleEnv = function () {
+    function toggleEnv() {
       const btn = document.getElementById('envToggle');
       if (!_scene) {
         log('Error: _scene is null');
@@ -146,7 +157,7 @@
         envMode = 'hdr';
         if (btn) btn.innerText = 'Env: HDR';
       }
-    };
+    }
   </script>
 
   <script src="bundle-world.js"></script>
