@@ -1,4 +1,4 @@
-﻿// 9th Wall v2.03
+﻿// 9th Wall v2.04
 (()=>{
   var e={
     574(){
@@ -260,7 +260,7 @@ const i = {
       "position": [0, 0, 0],
       "rotation": [-0.7071068, 0, 0, 0.7071068],
       // === AQUÍ CONTROLAS LA ESCALA DEL SUELO DE SOMBRAS (GROUND) ===
-      "scale": [10, 10, 10],
+      "scale": [30, 30, 30],
       "geometry": { "type": "plane", "width": 1, "height": 1 },
       "material": { "type": "shadow", "color": "#000000", "opacity": 0.5 },
       "parentId": "84028e73-ee70-412d-b8d4-c09bf07c655c",
@@ -283,7 +283,7 @@ const i = {
       "position": [0, -0.01, 0],
       "rotation": [-0.707106799999999, 0, 0, 0.7071067623730954],
       // === AQUÍ CONTROLAS LA ESCALA DEL PLANO OCULTADOR (HIDER) ===
-      "scale": [10, 10, 10],
+      "scale": [1, 1, 1],
       "geometry": { "type": "plane", "width": 1, "height": 1 },
       "material": { "type": "hider" },
       "parentId": "84028e73-ee70-412d-b8d4-c09bf07c655c",
