@@ -1,4 +1,4 @@
-<!-- 9th Wall v1.34 -->
+<!-- 9th Wall v1.35 -->
 <html>
 <head>
   <meta charset="UTF-8">
@@ -18,9 +18,9 @@
 
   <div id="debugLog" onclick="this.classList.toggle('minimized')"
     style="position:fixed;top:10px;right:10px;z-index:1000000;background:rgba(0,0,0,0.9);color:#0f0;font-family:monospace;font-size:10px;padding:8px;border-radius:4px;cursor:pointer;line-height:1.2;border:1px solid #0f0;">
-    <div id="debugTitle">v1.34 (Tap to toggle)</div>
+    <div id="debugTitle">v1.35 (Tap to toggle)</div>
     <div id="debugContent">
-      ar-world: v1.34 (1.09x)<br>
+      ar-world: v1.35<br>
       bundle: v1.01<br>
       Status: Waiting...
     </div>
@@ -50,48 +50,50 @@
       toggleEnv();
     });
 
-    // === ESTRATEGIA 01: Intercepción Auto-Desconectable en render() ===
-    (function() {
-      const originalRender = THREE.WebGLRenderer.prototype.render;
-      THREE.WebGLRenderer.prototype.render = function(scene, camera) {
-        if (scene && scene.isScene && scene.children.length > 2) {
-          _scene = scene;
-          _renderer = this;
-          
-          // Se restaura de inmediato la función de renderizado nativa 
-          // para no afectar el rendimiento ni el framerate
-          THREE.WebGLRenderer.prototype.render = originalRender;
-          log('Renderer y Scene capturados correctamente.');
-
-          // Lanzar la inicialización de PMREM y Estimador de luz
-          initPMREMLogic(_scene, _renderer);
+    // === ESTRATEGIA 02: Registro e inyección asíncrona de componente ECS nativo ===
+    if (window.ecs) {
+      window.ecs.registerComponent({
+        name: 'scene-capturer',
+        add: (world, component) => {
+          // Retardo asíncrono seguro de 100ms para asegurar que el motor gráfico
+          // y la cámara completen su secuencia de inicio nativa antes de extraer las referencias.
+          setTimeout(() => {
+            try {
+              _scene = world.three.scene;
+              _renderer = world.three.renderer;
+              log('Captura exitosa');
+              initPMREM();
+            } catch (err) {
+              log('Error al capturar: ' + err.message);
+            }
+          }, 100);
         }
-        return originalRender.apply(this, arguments);
-      };
-    })();
+      });
+    }
 
-    function initPMREMLogic(scene, renderer) {
+    function initPMREM() {
+      if (!_renderer || !_scene) return;
       try {
-        pmremGenerator = new THREE.PMREMGenerator(renderer);
+        pmremGenerator = new THREE.PMREMGenerator(_renderer);
         pmremGenerator.compileEquirectangularShader();
-        log('PMREM listo');
+        log('PMREM compilado');
 
-        // Carga de textura de entorno HDR
+        // Carga del archivo HDR
         new THREE.RGBELoader().load('HDR/terrace_sea.hdr', (hdr) => {
-          log('HDR cargado de forma exitosa');
+          log('HDR cargado');
           hdr.mapping = THREE.EquirectangularReflectionMapping;
           originalEnv = hdr;
-          if (envMode === 'hdr') scene.environment = hdr;
+          if (envMode === 'hdr') _scene.environment = hdr;
         }, undefined, (err) => {
-          log('Error de carga HDR: ' + err.message);
+          log('Error cargando HDR: ' + err.message);
         });
 
-        // Loop de lectura de cámara cada 50ms para estimación de luz
+        // Bucle para estimación de luz en tiempo real
         const waitForVideo = setInterval(() => {
           const video = document.querySelector('video');
           if (video && video.readyState >= 2) {
             clearInterval(waitForVideo);
-            log('Vídeo detectado, iniciando estimación');
+            log('Vídeo listo para estimación');
 
             const envCanvas = document.createElement('canvas');
             envCanvas.width = 64;
@@ -110,11 +112,11 @@
                 if (pmremGenerator) {
                   const oldRT = cameraRT;
                   cameraRT = pmremGenerator.fromEquirectangular(envTexture);
-                  if (envMode === 'cam') scene.environment = cameraRT.texture;
-                  if (oldRT) oldRT.dispose(); // Evitar acumulación en memoria física
+                  if (envMode === 'cam') _scene.environment = cameraRT.texture;
+                  if (oldRT) oldRT.dispose(); // Limpieza en tarjeta gráfica
                 }
 
-                // Cálculo de exposición en función del brillo promedio
+                // Ajuste de exposición según brillo de la cámara
                 const pixels = ctx.getImageData(0, 0, 64, 64).data;
                 let total = 0;
                 for (let i = 0; i < pixels.length; i += 4) {
@@ -122,60 +124,39 @@
                 }
                 const brightness = total / (pixels.length / 4);
                 smoothed += (brightness - smoothed) * 0.08;
-                renderer.exposure = 0.6 + (smoothed / 255) * 0.9;
+                _renderer.exposure = 0.6 + (smoothed / 255) * 0.9;
               } catch (e) {
-                // Control de excepciones silenciosas en fotogramas perdidos
+                // Silenciar errores en frames huérfanos
               }
             }, 50);
           }
         }, 500);
 
       } catch (err) {
-        log('Error al iniciar PMREM: ' + err.message);
+        log('Error PMREM: ' + err.message);
       }
     }
 
-    // Interceptor seguro de la inicialización de ECS (Corrige bugs secundarios)
+    // Interceptor de la inicialización de ECS (Basado estrictamente en v1.33/1.09)
     if (window.ecs) {
       const _i = ecs.application.init;
       ecs.application.init = c => {
-        try {
-          // Solución Bug Godzilla: Si se limpia caché, sustituir el modelo de respaldo
-          const _idx = sessionStorage.getItem("modelo_actual");
-          if (_idx === null) {
-            const modelId = "a02b4479-461e-40c2-ba91-0ccabbd1bd83";
-            if (c.objects[modelId] && c.objects[modelId].gltfModel) {
-              c.objects[modelId].gltfModel.src = {
-                type: "asset",
-                asset: "Plato_01.glb"
-              };
-              log('Aplicada corrección Godzilla (respaldo Plato_01.glb)');
-            }
+        for (const k in c.objects) {
+          const obj = c.objects[k];
+          if (obj.name === 'Loading Screen') delete c.objects[k];
+          if (obj.name === 'Model') {
+            obj.scale = [10.01, 10.01, 10.01];
+            const anim = obj.components['a2c75775-5a0f-44d7-910c-c111bc850bf6'];
+            if (anim && anim.parameters) anim.parameters.toY = 0;
           }
-
-          for (const k in c.objects) {
-            const obj = c.objects[k];
-            
-            // Ocultado seguro de Loading Screen sin eliminar nodos (Evita crash jerárquico)
-            if (obj.name === 'Loading Screen') {
-              if (obj.ui) {
-                obj.ui.backgroundOpacity = 0;
-                obj.ui.flexDirection = 'none';
-              }
-              log('Loading Screen minimizada de forma segura');
-            }
-            if (obj.name === 'Text' && obj.ui && obj.parentId === 'c7231d72-b7a3-44ea-b5f5-bb9ea9572ed9') {
-              obj.ui.text = "";
-            }
-
-            if (obj.name === 'Model') {
-              obj.scale = [10.01, 10.01, 10.01];
-              const anim = obj.components['a2c75775-5a0f-44d7-910c-c111bc850bf6'];
-              if (anim && anim.parameters) anim.parameters.toY = 0;
-            }
+          // Inyectar el capturador en la cámara nativa de forma limpia
+          if (obj.name === 'Camera') {
+            obj.components['scene-capturer-comp'] = {
+              id: 'scene-capturer-comp',
+              name: 'scene-capturer',
+              parameters: {}
+            };
           }
-        } catch (err) {
-          log('Error en init: ' + err.message);
         }
         return _i.call(ecs.application, c);
       };
