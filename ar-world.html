@@ -1,4 +1,4 @@
-<!-- 9th Wall v1.26 -->
+<!-- 9th Wall v1.27 -->
 <html>
 <head>
   <meta charset="UTF-8">
@@ -18,9 +18,9 @@
 
   <div id="debugLog" onclick="this.classList.toggle('minimized')"
     style="position:fixed;top:10px;right:10px;z-index:1000000;background:rgba(0,0,0,0.9);color:#0f0;font-family:monospace;font-size:10px;padding:8px;border-radius:4px;cursor:pointer;line-height:1.2;border:1px solid #0f0;">
-    <div id="debugTitle">v1.26 (Tap to toggle)</div>
+    <div id="debugTitle">v1.27 (Tap to toggle)</div>
     <div id="debugContent">
-      ar-world: v1.26<br>
+      ar-world: v1.27<br>
       bundle: v1.21<br>
       Status: Waiting...
     </div>
@@ -44,25 +44,6 @@
     let pmremGenerator = null, cameraRT = null, originalEnv = null;
     let envMode = 'hdr', envInterval = null;
     let _scene = null, _renderer = null;
-    let activeEnv = null;
-
-    // Estrategia 9 + 7: Proxy sobre WebGLRenderer.prototype.render
-    if (window.THREE && THREE.WebGLRenderer) {
-      const OrigRender = THREE.WebGLRenderer.prototype.render;
-      THREE.WebGLRenderer.prototype.render = function (scene, camera) {
-        if (!_scene && scene) {
-          _scene = scene;
-          _renderer = this;
-          log('Scene & Renderer captured via Proxy!');
-          setupPMREM();
-        }
-        // Mantiene activa la iluminación personalizada justo antes de cada renderizado
-        if (_scene && activeEnv !== undefined) {
-          _scene.environment = activeEnv;
-        }
-        OrigRender.call(this, scene, camera);
-      };
-    }
 
     document.getElementById('envToggle').addEventListener('click', (e) => {
       log('Button clicked');
@@ -70,7 +51,7 @@
     });
 
     function setupPMREM() {
-      if (!_renderer) return;
+      if (!_renderer || !_scene) return;
       pmremGenerator = new THREE.PMREMGenerator(_renderer);
       pmremGenerator.compileEquirectangularShader();
 
@@ -79,10 +60,9 @@
         log('HDR Loaded');
         hdr.mapping = THREE.EquirectangularReflectionMapping;
         originalEnv = hdr;
-        if (envMode === 'hdr') activeEnv = hdr;
+        if (envMode === 'hdr' && _scene) _scene.environment = hdr;
       });
 
-      // Muestreo del vídeo de la cámara cada 50ms para iluminación adaptativa
       const waitForVideo = setInterval(() => {
         const video = document.querySelector('video');
         if (video && video.readyState >= 2) {
@@ -105,7 +85,7 @@
             if (pmremGenerator) {
               if (cameraRT) cameraRT.dispose();
               cameraRT = pmremGenerator.fromEquirectangular(envTexture);
-              if (envMode === 'cam') activeEnv = cameraRT.texture;
+              if (envMode === 'cam' && _scene) _scene.environment = cameraRT.texture;
             }
 
             const pixels = ctx.getImageData(0, 0, 64, 64).data;
@@ -121,16 +101,31 @@
       }, 500);
     }
 
-    // Ajuste de escala del modelo sin alterar jerarquía de pantallas de carga
     if (window.ecs) {
+      ecs.registerComponent({
+        name: 'scene-capturer',
+        tick: (world) => {
+          if (!_scene && world.three && world.three.scene && world.three.renderer) {
+            _scene = world.three.scene;
+            _renderer = world.three.renderer;
+            log('Scene captured via tick!');
+            setupPMREM();
+          }
+        }
+      });
+
       const _i = ecs.application.init;
       ecs.application.init = c => {
         for (const k in c.objects) {
           const obj = c.objects[k];
+          if (obj.name === 'Loading Screen') delete c.objects[k];
           if (obj.name === 'Model') {
             obj.scale = [9.01, 9.01, 9.01];
             const anim = obj.components['a2c75775-5a0f-44d7-910c-c111bc850bf6'];
             if (anim && anim.parameters) anim.parameters.toY = 0;
+          }
+          if (obj.name === 'Camera') {
+            obj.components['scene-capturer'] = {};
           }
         }
         return _i.call(ecs.application, c);
@@ -145,15 +140,15 @@
       }
       log('Mode: ' + envMode);
       if (envMode === 'hdr') {
-        if (cameraRT) activeEnv = cameraRT.texture;
+        if (cameraRT) _scene.environment = cameraRT.texture;
         envMode = 'cam';
         if (btn) btn.innerText = 'Env: CAM';
       } else if (envMode === 'cam') {
-        activeEnv = null;
+        _scene.environment = null;
         envMode = 'off';
         if (btn) btn.innerText = 'Env: OFF';
       } else {
-        if (originalEnv) activeEnv = originalEnv;
+        if (originalEnv) _scene.environment = originalEnv;
         envMode = 'hdr';
         if (btn) btn.innerText = 'Env: HDR';
       }
