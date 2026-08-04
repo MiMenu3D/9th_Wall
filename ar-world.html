@@ -1,4 +1,4 @@
-<!-- 9th Wall v2.05 -->
+<!-- 9th Wall v2.06 -->
 <html>
 <head>
   <meta charset="UTF-8">
@@ -16,10 +16,10 @@
 
   <div id="debugLog" onclick="this.classList.toggle('minimized')"
     style="position:fixed;top:10px;right:10px;z-index:1000000;background:rgba(0,0,0,0.9);color:#0f0;font-family:monospace;font-size:12px;padding:8px;border-radius:4px;cursor:pointer;line-height:1.2;border:1px solid #0f0;">
-    <div id="debugTitle">v2.05 (Tap to toggle)</div>
+    <div id="debugTitle">v2.06 (Tap to toggle)</div>
     <div id="debugContent">
-      ar-world: v2.05<br>
-      bundle: v2.05<br>
+      ar-world: v2.06<br>
+      bundle: v2.06<br>
     </div>
   </div>
   <style>
@@ -160,7 +160,7 @@
                 }
                 const brightness = total / (pixels.length / 4);
                 smoothed += (brightness - smoothed) * 0.08;
-                renderer.exposure = 0.4 + (smoothed / 255) * 5.5; // Ajuste de exposición basado en brillo promedio. Valores anteriores 0.6 y 0.9 respectivamente.
+                renderer.exposure = 0.6 + (smoothed / 255) * 100.5; // Ajuste de exposición basado en brillo promedio. Valores anteriores 0.6 y 0.9 respectivamente.
               } catch (e) {
                 // Silencioso
               }
@@ -194,7 +194,7 @@
           }
 
           if (obj.name === 'Model') {
-            obj.scale = [10.01, 10.01, 10.01];
+            obj.scale = [1.01, 1.01, 1.01];
             const anim = obj.components['a2c75775-5a0f-44d7-910c-c111bc850bf6'];
             if (anim && anim.parameters) anim.parameters.toY = 0;
           }
