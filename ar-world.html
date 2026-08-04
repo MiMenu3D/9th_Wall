@@ -1,4 +1,4 @@
-<!-- 9th Wall v2.04 -->
+<!-- 9th Wall v2.14 -->
 <html>
 <head>
   <meta charset="UTF-8">
@@ -16,14 +16,14 @@
 
   <div id="debugLog" onclick="this.classList.toggle('minimized')"
     style="position:fixed;top:10px;right:10px;z-index:1000000;background:rgba(0,0,0,0.9);color:#0f0;font-family:monospace;font-size:12px;padding:8px;border-radius:4px;cursor:pointer;line-height:1.2;border:1px solid #0f0;">
-    <div id="debugTitle">v2.04 (Tap to toggle)</div>
+    <div id="debugTitle">FPS: --</div>
     <div id="debugContent">
-      ar-world: v2.04<br>
-      bundle: v2.03<br>
+      ar-world: v2.14<br>
+      bundle: v2.14
     </div>
   </div>
   <style>
-    #debugLog.minimized { height: 12px; width: 70px; overflow: hidden; border-color: #555; }
+    #debugLog.minimized { height: 15px; width: 60px; overflow: hidden; border-color: #555; }
     #debugLog.minimized #debugContent { display: none; }
   </style>
 
@@ -33,6 +33,22 @@
   </button>
 
   <script>
+    let lastTime = performance.now();
+    let frameCount = 0;
+    function updateFPS() {
+      frameCount++;
+      const now = performance.now();
+      if (now >= lastTime + 1000) {
+        const fps = Math.round((frameCount * 1000) / (now - lastTime));
+        const fpsEl = document.getElementById('debugTitle');
+        if (fpsEl) fpsEl.innerText = `FPS: ${fps}`;
+        frameCount = 0;
+        lastTime = now;
+      }
+      requestAnimationFrame(updateFPS);
+    }
+    requestAnimationFrame(updateFPS);
+    
     const log = (msg) => {
       const el = document.getElementById('debugContent');
       if (el) el.innerHTML += `<br>> ${msg}`;
