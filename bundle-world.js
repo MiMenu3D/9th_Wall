@@ -1,4 +1,4 @@
-﻿// 9th Wall v2.06
+﻿// 9th Wall v2.07
 (()=>{
   var e={
     574(){
@@ -135,7 +135,7 @@
         // Cámara de Realidad Aumentada
         "52ba8a86-a459-4df8-b954-a570e85e0484": {
           "id": "52ba8a86-a459-4df8-b954-a570e85e0484",
-          "position": [0, 0.2, 3.211226375221431], // Altura original, 2; cambiada a 0.2, lo que implica modificar escala de objeto en ar-world.html.
+          "position": [0, 2, 3.211226375221431], // Altura original, 2; cambiada a 0.2, lo que implica modificar escala de objeto en ar-world.html.
 
           "rotation": [-0.0004637899966810532, 0.9978406073902779, -0.06529682289718859, -0.007087458033270938],
           "scale": [1.0000000000000002, 1, 1.0000000000000004],
