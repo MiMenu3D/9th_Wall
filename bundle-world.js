@@ -1,4 +1,4 @@
-﻿// 9th Wall v2.03
+﻿// 9th Wall v2.10
 (()=>{
   var e={
     574(){
@@ -101,7 +101,7 @@
           "id": "492cfe2c-9334-4a9c-a48a-be80132af9fb",
           "position": [5, 25, 5],
           "rotation": [0, 0, 0, 1],
-          "scale": [1, 1, 1],
+          "scale": [2, 2, 2],
           "geometry": null,
           "material": null,
           "parentId": "84028e73-ee70-412d-b8d4-c09bf07c655c",
@@ -111,7 +111,7 @@
             "shadowBias": 0,
             "shadowRadius": 2,
             "followCamera": false,
-            "shadowCamera": [-10, 10, 10, -10, 0.5, 200] // <-- AQUÍ ESTÁ LA SHADOW CAMERA
+            "shadowCamera": [-5, 5, 5, -5, 0.5, 200] // <-- AQUÍ ESTÁ LA SHADOW CAMERA
           },
           "name": "Directional Light",
           "order": 0.6785011504707911
