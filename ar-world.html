@@ -1,4 +1,4 @@
-<!-- 9th Wall v2.11 -->
+<!-- 9th Wall v2.04 -->
 <html>
 <head>
   <meta charset="UTF-8">
@@ -16,10 +16,10 @@
 
   <div id="debugLog" onclick="this.classList.toggle('minimized')"
     style="position:fixed;top:10px;right:10px;z-index:1000000;background:rgba(0,0,0,0.9);color:#0f0;font-family:monospace;font-size:12px;padding:8px;border-radius:4px;cursor:pointer;line-height:1.2;border:1px solid #0f0;">
-    <div id="debugTitle">v2.11 (Tap to toggle)</div>
+    <div id="debugTitle">v2.04 (Tap to toggle)</div>
     <div id="debugContent">
-      ar-world: v2.11<br>
-      bundle: v2.11<br>
+      ar-world: v2.04<br>
+      bundle: v2.03<br>
     </div>
   </div>
   <style>
@@ -194,7 +194,7 @@
           }
 
           if (obj.name === 'Model') {
-            obj.scale = [5.01, 5.01, 5.01];
+            obj.scale = [10.01, 10.01, 10.01];
             const anim = obj.components['a2c75775-5a0f-44d7-910c-c111bc850bf6'];
             if (anim && anim.parameters) anim.parameters.toY = 0;
           }
