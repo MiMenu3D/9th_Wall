@@ -1,4 +1,4 @@
-<!-- 9th Wall v2.09 -->
+<!-- 9th Wall v2.10 -->
 <html>
 <head>
   <meta charset="UTF-8">
@@ -16,10 +16,10 @@
 
   <div id="debugLog" onclick="this.classList.toggle('minimized')"
     style="position:fixed;top:10px;right:10px;z-index:1000000;background:rgba(0,0,0,0.9);color:#0f0;font-family:monospace;font-size:12px;padding:8px;border-radius:4px;cursor:pointer;line-height:1.2;border:1px solid #0f0;">
-    <div id="debugTitle">v2.08 (Tap to toggle)</div>
+    <div id="debugTitle">v2.10 (Tap to toggle)</div>
     <div id="debugContent">
-      ar-world: v2.08<br>
-      bundle: v2.08<br>
+      ar-world: v2.10<br>
+      bundle: v2.10<br>
     </div>
   </div>
   <style>
@@ -68,8 +68,12 @@
                       child.position.set(pos.x, pos.y, pos.z);
                     }
                     if (child.name === 'Directional Light') {
-                      child.position.set(pos.x + 0.5, pos.y + 3, pos.z + 0.5);
+                        child.position.set(pos.x + 0.5, pos.y + 3, pos.z + 0.5);
+                    if (child.target) {
+                        child.target.position.set(pos.x, pos.y, pos.z);
+                        child.target.updateMatrixWorld();
                     }
+                  }
                   });
                   log('Sombra y plano movidos al tap');
                 } catch (e) {
