@@ -1,4 +1,4 @@
-﻿// 9th Wall v2.05
+﻿// 9th Wall v2.06
 (()=>{
   var e={
     574(){
@@ -111,7 +111,7 @@
             "shadowBias": 0,
             "shadowRadius": 2,
             "followCamera": false,
-            "shadowCamera": [-10, 10, 10, -10, 0.5, 200] // <-- AQUÍ ESTÁ LA SHADOW CAMERA
+            "shadowCamera": [-1, 1, 1, -1, 0.5, 200] // <-- AQUÍ ESTÁ LA SHADOW CAMERA. Por defecto -10, 10, 10, -10.
           },
           "name": "Directional Light",
           "order": 0.6785011504707911
@@ -211,7 +211,7 @@
           "id": "bc7753ae-2b39-4f48-910a-7921b756487b",
           "position": [0, 0, 0],
           "rotation": [-0.7071068, 0, 0, 0.7071068],
-          "scale": [10, 10, 10], // Por defecto: 50, 50, 50
+          "scale": [50, 50, 50], // Por defecto: 50, 50, 50
 
           "geometry": { "type": "plane", "width": 1, "height": 1 },
           "material": { "type": "shadow", "color": "#000000", "opacity": 0.4 },
@@ -235,7 +235,7 @@
           "id": "17af117a-efce-48dd-857e-e383a3649c7b",
           "position": [0, -0.01, 0],
           "rotation": [-0.707106799999999, 0, 0, 0.7071067623730954],
-          "scale": [10, 10, 10], // Por defecto: 50, 50, 50
+          "scale": [50, 50, 50], // Por defecto: 50, 50, 50
           "geometry": { "type": "plane", "width": 1, "height": 1 },
           "material": { "type": "hider" },
           "parentId": "84028e73-ee70-412d-b8d4-c09bf07c655c",
