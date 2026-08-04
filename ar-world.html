@@ -1,4 +1,4 @@
-<!-- 9th Wall v2.07 -->
+<!-- 9th Wall v2.08 -->
 <html>
 <head>
   <meta charset="UTF-8">
@@ -16,10 +16,10 @@
 
   <div id="debugLog" onclick="this.classList.toggle('minimized')"
     style="position:fixed;top:10px;right:10px;z-index:1000000;background:rgba(0,0,0,0.9);color:#0f0;font-family:monospace;font-size:12px;padding:8px;border-radius:4px;cursor:pointer;line-height:1.2;border:1px solid #0f0;">
-    <div id="debugTitle">v2.07 (Tap to toggle)</div>
+    <div id="debugTitle">v2.08 (Tap to toggle)</div>
     <div id="debugContent">
-      ar-world: v2.07<br>
-      bundle: v2.07<br>
+      ar-world: v2.08<br>
+      bundle: v2.08<br>
     </div>
   </div>
   <style>
@@ -56,6 +56,27 @@
             try {
               _scene = world.three.scene;
               _renderer = world.three.renderer;
+              
+              // --- REPOSICIONADOR SEGURO DE SOMBRAS EN TAP ---
+              world.events.addListener(world.events.globalId, 'object-placed', (evt) => {
+                try {
+                  const pos = (evt && evt.data) ? evt.data.worldPosition : null;
+                  if (!pos || !_scene) return;
+                  
+                  _scene.traverse((child) => {
+                    if (child.name === 'Ground' || child.name === 'Hider') {
+                      child.position.set(pos.x, pos.y, pos.z);
+                    }
+                    if (child.name === 'Directional Light') {
+                      child.position.set(pos.x + 0.5, pos.y + 3, pos.z + 0.5);
+                    }
+                  });
+                  log('Sombra y plano movidos al tap');
+                } catch (e) {
+                  log('Err reposicionando sombra: ' + e.message);
+                }
+              });
+              // ------------------------------------------------
               
               // Buscamos el THREE nativo expuesto globalmente por el runtime de 8th Wall
               const nativeTHREE = window.THREE;
@@ -194,7 +215,7 @@
           }
 
           if (obj.name === 'Model') {
-            obj.scale = [10.01, 10.01, 10.01];
+            obj.scale = [1.01, 1.01, 1.01];
             const anim = obj.components['a2c75775-5a0f-44d7-910c-c111bc850bf6'];
             if (anim && anim.parameters) anim.parameters.toY = 0;
           }
