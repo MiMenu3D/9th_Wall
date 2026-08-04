@@ -1,4 +1,4 @@
-<!-- 9th Wall v2.08 -->
+<!-- 9th Wall v2.09 -->
 <html>
 <head>
   <meta charset="UTF-8">
@@ -56,6 +56,27 @@
             try {
               _scene = world.three.scene;
               _renderer = world.three.renderer;
+              
+              // --- REPOSICIONADOR SEGURO DE SOMBRAS EN TAP ---
+              world.events.addListener(world.events.globalId, 'object-placed', (evt) => {
+                try {
+                  const pos = (evt && evt.data) ? evt.data.worldPosition : null;
+                  if (!pos || !_scene) return;
+                  
+                  _scene.traverse((child) => {
+                    if (child.name === 'Ground' || child.name === 'Hider') {
+                      child.position.set(pos.x, pos.y, pos.z);
+                    }
+                    if (child.name === 'Directional Light') {
+                      child.position.set(pos.x + 0.5, pos.y + 3, pos.z + 0.5);
+                    }
+                  });
+                  log('Sombra y plano movidos al tap');
+                } catch (e) {
+                  log('Err reposicionando sombra: ' + e.message);
+                }
+              });
+              // ------------------------------------------------
               
               // Buscamos el THREE nativo expuesto globalmente por el runtime de 8th Wall
               const nativeTHREE = window.THREE;
