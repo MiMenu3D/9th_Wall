@@ -1,4 +1,4 @@
-<!-- 9th Wall v2.04 -->
+<!-- 9th Wall v2.05 -->
 <html>
 <head>
   <meta charset="UTF-8">
@@ -16,10 +16,10 @@
 
   <div id="debugLog" onclick="this.classList.toggle('minimized')"
     style="position:fixed;top:10px;right:10px;z-index:1000000;background:rgba(0,0,0,0.9);color:#0f0;font-family:monospace;font-size:12px;padding:8px;border-radius:4px;cursor:pointer;line-height:1.2;border:1px solid #0f0;">
-    <div id="debugTitle">v2.04 (Tap to toggle)</div>
+    <div id="debugTitle">v2.05 (Tap to toggle)</div>
     <div id="debugContent">
-      ar-world: v2.04<br>
-      bundle: v2.03<br>
+      ar-world: v2.05<br>
+      bundle: v2.05<br>
     </div>
   </div>
   <style>
@@ -160,7 +160,7 @@
                 }
                 const brightness = total / (pixels.length / 4);
                 smoothed += (brightness - smoothed) * 0.08;
-                renderer.exposure = 0.4 + (smoothed / 255) * 1.5; // Ajuste de exposición basado en brillo promedio. Valores anteriores 0.6 y 0.9 respectivamente.
+                renderer.exposure = 0.4 + (smoothed / 255) * 5.5; // Ajuste de exposición basado en brillo promedio. Valores anteriores 0.6 y 0.9 respectivamente.
               } catch (e) {
                 // Silencioso
               }
