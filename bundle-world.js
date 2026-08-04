@@ -1,4 +1,4 @@
-﻿// 9th Wall v2.10
+﻿// 9th Wall v2.11
 (()=>{
   var e={
     574(){
@@ -101,7 +101,7 @@
           "id": "492cfe2c-9334-4a9c-a48a-be80132af9fb",
           "position": [5, 25, 5],
           "rotation": [0, 0, 0, 1],
-          "scale": [2, 2, 2],
+          "scale": [4, 4, 4],
           "geometry": null,
           "material": null,
           "parentId": "84028e73-ee70-412d-b8d4-c09bf07c655c",
@@ -111,7 +111,7 @@
             "shadowBias": 0,
             "shadowRadius": 2,
             "followCamera": false,
-            "shadowCamera": [-5, 5, 5, -5, 0.5, 200] // <-- AQUÍ ESTÁ LA SHADOW CAMERA
+            "shadowCamera": [-2, 2, 2, -2, 0.5, 200] // <-- AQUÍ ESTÁ LA SHADOW CAMERA
           },
           "name": "Directional Light",
           "order": 0.6785011504707911
@@ -135,7 +135,7 @@
         // Cámara de Realidad Aumentada
         "52ba8a86-a459-4df8-b954-a570e85e0484": {
           "id": "52ba8a86-a459-4df8-b954-a570e85e0484",
-          "position": [0, 2, 3.211226375221431],
+          "position": [0, 1, 3.211226375221431],
           "rotation": [-0.0004637899966810532, 0.9978406073902779, -0.06529682289718859, -0.007087458033270938],
           "scale": [1.0000000000000002, 1, 1.0000000000000004],
           "geometry": null,
