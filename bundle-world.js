@@ -1,4 +1,4 @@
-﻿// 9th Wall v2.09
+﻿// 9th Wall v2.03
 (()=>{
   var e={
     574(){
@@ -111,7 +111,7 @@
             "shadowBias": 0,
             "shadowRadius": 2,
             "followCamera": false,
-            "shadowCamera": [-10, 10, 10, -10, 0.5, 200] // <-- AQUÍ ESTÁ LA SHADOW CAMERA. Por defecto -10, 10, 10, -10.
+            "shadowCamera": [-10, 10, 10, -10, 0.5, 200] // <-- AQUÍ ESTÁ LA SHADOW CAMERA
           },
           "name": "Directional Light",
           "order": 0.6785011504707911
@@ -135,7 +135,7 @@
         // Cámara de Realidad Aumentada
         "52ba8a86-a459-4df8-b954-a570e85e0484": {
           "id": "52ba8a86-a459-4df8-b954-a570e85e0484",
-          "position": [0, 0.25, 3.211226375221431],
+          "position": [0, 2, 3.211226375221431],
           "rotation": [-0.0004637899966810532, 0.9978406073902779, -0.06529682289718859, -0.007087458033270938],
           "scale": [1.0000000000000002, 1, 1.0000000000000004],
           "geometry": null,
@@ -211,8 +211,7 @@
           "id": "bc7753ae-2b39-4f48-910a-7921b756487b",
           "position": [0, 0, 0],
           "rotation": [-0.7071068, 0, 0, 0.7071068],
-          "scale": [2, 2, 2], // Por defecto: 50, 50, 50
-
+          "scale": [50, 50, 50],
           "geometry": { "type": "plane", "width": 1, "height": 1 },
           "material": { "type": "shadow", "color": "#000000", "opacity": 0.4 },
           "parentId": "84028e73-ee70-412d-b8d4-c09bf07c655c",
@@ -235,7 +234,7 @@
           "id": "17af117a-efce-48dd-857e-e383a3649c7b",
           "position": [0, -0.01, 0],
           "rotation": [-0.707106799999999, 0, 0, 0.7071067623730954],
-          "scale": [50, 50, 50], // Por defecto: 50, 50, 50
+          "scale": [50, 50, 50],
           "geometry": { "type": "plane", "width": 1, "height": 1 },
           "material": { "type": "hider" },
           "parentId": "84028e73-ee70-412d-b8d4-c09bf07c655c",
