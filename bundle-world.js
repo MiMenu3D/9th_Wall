@@ -1,4 +1,4 @@
-﻿// 9th Wall v2.06
+﻿// 9th Wall v2.07
 (()=>{
   var e={
     574(){
@@ -111,7 +111,7 @@
             "shadowBias": 0,
             "shadowRadius": 2,
             "followCamera": false,
-            "shadowCamera": [-1, 1, 1, -1, 0.5, 200] // <-- AQUÍ ESTÁ LA SHADOW CAMERA. Por defecto -10, 10, 10, -10.
+            "shadowCamera": [-5, 5, 5, -5, 0.5, 200] // <-- AQUÍ ESTÁ LA SHADOW CAMERA. Por defecto -10, 10, 10, -10.
           },
           "name": "Directional Light",
           "order": 0.6785011504707911
