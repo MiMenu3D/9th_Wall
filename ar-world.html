@@ -1,4 +1,4 @@
-<!-- 9th Wall v2.14 -->
+<!-- 9th Wall v2.15 -->
 <html>
 <head>
   <meta charset="UTF-8">
@@ -18,7 +18,7 @@
     style="position:fixed;top:10px;right:10px;z-index:1000000;background:rgba(0,0,0,0.9);color:#0f0;font-family:monospace;font-size:12px;padding:8px;border-radius:4px;cursor:pointer;line-height:1.2;border:1px solid #0f0;">
     <div id="debugTitle">FPS: --</div>
     <div id="debugContent">
-      ar-world: v2.14<br>
+      ar-world: v2.15<br>
       bundle: v2.14
     </div>
   </div>
@@ -58,6 +58,104 @@
     let envMode = 'hdr', envInterval = null;
     let _scene = null, _renderer = null;
 
+    // === GESTIÓN DE LA NUBE DE PUNTOS (DIAGNÓSTICO) ===
+    let pointCloudMesh = null;
+    const maxPoints = 1000; // Límite de puntos a dibujar en pantalla simultáneamente
+    const positionsArray = new Float32Array(maxPoints * 3);
+
+    // Inicializa el sistema de partículas de Three.js para pintar los puntos en 3D
+    function initPointCloud(scene, THREE_INSTANCE) {
+      const geometry = new THREE_INSTANCE.BufferGeometry();
+      geometry.setAttribute('position', new THREE_INSTANCE.BufferAttribute(positionsArray, 3));
+      
+      const material = new THREE_INSTANCE.PointsMaterial({
+        color: 0xffcc00,       // Amarillo/Dorado oficial para mejor visibilidad
+        size: 0.04,            // Tamaño de los puntos (4cm aprox)
+        sizeAttenuation: true, // Los puntos se encogen si te alejas
+        transparent: true,
+        opacity: 0.9
+      });
+      
+      pointCloudMesh = new THREE_INSTANCE.Points(geometry, material);
+      scene.add(pointCloudMesh);
+      log('Nube de puntos 3D inicializada');
+    }
+
+    // Actualiza la posición de los puntos en tiempo real con los datos de 8th Wall
+    function updatePointCloud(worldPoints) {
+      if (!pointCloudMesh || !worldPoints) return;
+      
+      const positions = pointCloudMesh.geometry.attributes.position.array;
+      const count = Math.min(worldPoints.length, maxPoints);
+      
+      for (let i = 0; i < count; i++) {
+        const pt = worldPoints[i].position;
+        positions[i * 3] = pt.x;
+        positions[i * 3 + 1] = pt.y;
+        positions[i * 3 + 2] = pt.z;
+      }
+      
+      // Indicamos a Three.js cuántos puntos dibujar y que debe actualizar sus posiciones
+      pointCloudMesh.geometry.setDrawRange(0, count);
+      pointCloudMesh.geometry.attributes.position.needsUpdate = true;
+    }
+
+    // Módulo de cámara de 8th Wall para extraer las coordenadas del SLAM en cada cuadro
+    const pointCloudPipelineModule = () => {
+      return {
+        name: 'pointcloud-debugger',
+        onUpdate: (e) => {
+          const { processCpuResult } = e;
+          if (processCpuResult && processCpuResult.reality) {
+            const { worldPoints } = processCpuResult.reality;
+            if (worldPoints) {
+              updatePointCloud(worldPoints);
+            }
+          }
+        }
+      };
+    };
+
+    // Añadir el extractor de puntos al motor de realidad aumentada
+    const addPointCloudPipeline = () => {
+      const onxrloaded = () => {
+        window.XR8.addCameraPipelineModule(pointCloudPipelineModule());
+      };
+      if (window.XR8) {
+        onxrloaded();
+      } else {
+        window.addEventListener('xrloaded', onxrloaded);
+      }
+    };
+    addPointCloudPipeline();
+
+    // === GESTIÓN DE PRUEBAS VISUALES DE SUELO Y CÁMARA DE SOMBRAS ===
+    function ejecutarPruebasVisuales(scene, THREE_INSTANCE) {
+      setTimeout(() => {
+        log('Buscando suelo y luces para diagnósticos...');
+
+        scene.traverse((node) => {
+          // PRUEBA 1: Buscar el suelo (Ground) y pintarlo de rojo semitransparente
+          if (node.isMesh && (node.name.toLowerCase().includes('ground') || node.name.toLowerCase().includes('suelo'))) {
+            node.material = new THREE_INSTANCE.MeshBasicMaterial({
+              color: 0xff0000,
+              transparent: true,
+              opacity: 0.4,
+              side: THREE_INSTANCE.DoubleSide
+            });
+            log('Suelo detectado y pintado de rojo');
+          }
+
+          // PRUEBA 2: Buscar la luz direccional y dibujar su área matemática de sombras
+          if (node.isDirectionalLight) {
+            const helper = new THREE_INSTANCE.CameraHelper(node.shadow.camera);
+            scene.add(helper);
+            log('Caja de sombras (CameraHelper) activada');
+          }
+        });
+      }, 3000); // 3 segundos para asegurar la correcta instanciación
+    }
+
     document.getElementById('envToggle').addEventListener('click', (e) => {
       log('Button clicked');
       toggleEnv();
@@ -73,11 +171,13 @@
               _scene = world.three.scene;
               _renderer = world.three.renderer;
               
-              // Buscamos el THREE nativo expuesto globalmente por el runtime de 8th Wall
               const nativeTHREE = window.THREE;
               log('Captura exitosa. Usando Three nativo: ' + (!!nativeTHREE));
               
               if (nativeTHREE) {
+                // Inicializamos la nube de puntos vacía en la escena
+                initPointCloud(_scene, nativeTHREE);
+
                 // Descargamos y registramos RGBELoader directamente en el THREE nativo
                 loadNativeRGBELoader(nativeTHREE).then((LoaderClass) => {
                   if (LoaderClass) {
@@ -110,7 +210,6 @@
         fetch('https://unpkg.com/three@0.139.2/examples/js/loaders/RGBELoader.js')
           .then(res => res.text())
           .then(code => {
-            // Evaluamos el código del loader forzando el ámbito del THREE nativo de 8th Wall
             window.THREE = THREE_INSTANCE;
             (new Function(code))();
             log('RGBELoader acoplado al Three nativo con éxito.');
@@ -140,7 +239,7 @@
           log('Error cargando HDR: ' + err.message);
         });
 
-        // Bucle para estimación de luz (Mantenemos intactos tus 50ms y optimizaciones)
+        // Bucle para estimación de luz
         const waitForVideo = setInterval(() => {
           const video = document.querySelector('video');
           if (video && video.readyState >= 2) {
@@ -176,20 +275,23 @@
                 }
                 const brightness = total / (pixels.length / 4);
                 smoothed += (brightness - smoothed) * 0.08;
-                renderer.exposure = 0.4 + (smoothed / 255) * 1.5; // Ajuste de exposición basado en brillo promedio. Valores anteriores 0.6 y 0.9 respectivamente.
+                renderer.exposure = 0.4 + (smoothed / 255) * 1.5;
               } catch (e) {
                 // Silencioso
               }
-            }, 50); // Refresco de 50ms original sin alterar
+            }, 50);
           }
         }, 500);
+
+        // Activamos las pruebas visuales (Suelo rojo y Caja de sombras)
+        ejecutarPruebasVisuales(scene, THREE_INSTANCE);
 
       } catch (err) {
         log('Error PMREM nativo: ' + err.message);
       }
     }
 
-    // Interceptor de la inicialización de ECS (Mantiene la estructura original estable)
+    // Interceptor de la inicialización de ECS
     if (window.ecs) {
       const _i = ecs.application.init;
       ecs.application.init = c => {
@@ -197,15 +299,14 @@
           const obj = c.objects[k];
           if (obj.name === 'Loading Screen') delete c.objects[k];
           
-          // Solución a la doble iluminación nativa:
           if (obj.name === 'Ambient Light') {
             if (obj.light) {
-              obj.light.intensity = 0; // Apagamos la luz ambiental nativa por completo
+              obj.light.intensity = 0;
             }
           }
           if (obj.name === 'Directional Light') {
             if (obj.light) {
-              obj.light.intensity = 0.00; // Atenuamos la luz direccional para conservar sombras suaves
+              obj.light.intensity = 0.00;
             }
           }
 
