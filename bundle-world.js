@@ -1,4 +1,4 @@
-﻿// 9th Wall v2.28
+﻿// 9th Wall v2.29
 (()=>{
   var e={
     574(){
@@ -109,7 +109,7 @@
         
         const material = new THREE_INSTANCE.PointsMaterial({
           color: 0xffcc00,       // Amarillo/Dorado
-          size: 0.005,             // Tamaño fijo de 8 píxeles
+          size: 0.002,             // Tamaño fijo de 8 píxeles
           sizeAttenuation: true, // NoFijo, visible independientemente de la distancia
           opacity: 1.0,
           depthWrite: true,     // Renderizar por encima del hider
@@ -210,7 +210,7 @@
             "shadowBias": 0,
             "shadowRadius": 2,
             "followCamera": false,
-            "shadowCamera": [-5, 5, 5, -5, 0.5, 200] // <-- AQUÍ ESTÁ LA SHADOW CAMERA
+            "shadowCamera": [-1, 1, 1, -1, 0.5, 200] // <-- AQUÍ ESTÁ LA SHADOW CAMERA
           },
           "name": "Directional Light",
           "order": 0.6785011504707911
@@ -316,7 +316,7 @@
           "id": "bc7753ae-2b39-4f48-910a-7921b756487b",
           "position": [0, 0.001, 0],
           "rotation": [-0.7071068, 0, 0, 0.7071068],
-          "scale": [5, 5, 5],
+          "scale": [2, 2, 2],
           "geometry": { "type": "plane", "width": 1, "height": 1 },
           "material": { "type": "shadow", "color": "#000000", "opacity": 0.4 },
           "parentId": "84028e73-ee70-412d-b8d4-c09bf07c655c",
@@ -339,7 +339,7 @@
           "id": "bc7753ae-2b39-4f48-910a-7921b756487c",
           "position": [0, 0, 0],
           "rotation": [-0.7071068, 0, 0, 0.7071068],
-          "scale": [5, 5, 5],
+          "scale": [2, 2, 2],
           "geometry": { "type": "plane", "width": 1, "height": 1 },
           "material": { "type": "basic", "color": "#ff0000", "opacity": 0.2 },
           "parentId": "84028e73-ee70-412d-b8d4-c09bf07c655c",
@@ -355,7 +355,7 @@
           "id": "17af117a-efce-48dd-857e-e383a3649c7b",
           "position": [0, -0.001, 0],
           "rotation": [-0.707106799999999, 0, 0, 0.7071067623730954],
-          "scale": [10, 10, 10],
+          "scale": [2, 2, 2],
           "geometry": { "type": "plane", "width": 1, "height": 1 },
           "material": { "type": "hider" },
           "parentId": "84028e73-ee70-412d-b8d4-c09bf07c655c",
