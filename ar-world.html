@@ -1,4 +1,4 @@
-<!-- 9th Wall v2.16 -->
+<!-- 9th Wall v2.17 -->
 <html>
 <head>
   <meta charset="UTF-8">
@@ -18,7 +18,7 @@
     style="position:fixed;top:10px;right:10px;z-index:1000000;background:rgba(0,0,0,0.9);color:#0f0;font-family:monospace;font-size:12px;padding:8px;border-radius:4px;cursor:pointer;line-height:1.2;border:1px solid #0f0;">
     <div id="debugTitle">FPS: --</div>
     <div id="debugContent">
-      ar-world: v2.16<br>
+      ar-world: v2.17<br>
       bundle: v2.14
     </div>
   </div>
@@ -58,27 +58,33 @@
     let envMode = 'hdr', envInterval = null;
     let _scene = null, _renderer = null;
 
+    // === GESTIÓN DE LA NUBE DE PUNTOS ===
     let pointCloudMesh = null;
-    const maxPoints = 1000;
+    const maxPoints = 500;
     const positionsArray = new Float32Array(maxPoints * 3);
+    
+    // Inicializamos con posiciones lejanas para no amontonar puntos en el centro (0,0,0)
+    for (let i = 0; i < maxPoints * 3; i++) {
+      positionsArray[i] = 999999;
+    }
 
     function initPointCloud(scene, THREE_INSTANCE) {
       const geometry = new THREE_INSTANCE.BufferGeometry();
       geometry.setAttribute('position', new THREE_INSTANCE.BufferAttribute(positionsArray, 3));
       
       const material = new THREE_INSTANCE.PointsMaterial({
-        color: 0xffcc00,
-        size: 0.05,
+        color: 0xffcc00,       // Amarillo/Dorado
+        size: 0.05,            // 5 cm
         sizeAttenuation: true,
         transparent: true,
         opacity: 1.0,
-        depthWrite: false,
+        depthWrite: false,     // Forzar dibujado sobre la cámara
         depthTest: false
       });
       
       pointCloudMesh = new THREE_INSTANCE.Points(geometry, material);
       scene.add(pointCloudMesh);
-      log('Puntos inicializados');
+      log('Nube de puntos inicializada');
     }
 
     function updatePointCloud(worldPoints) {
@@ -87,17 +93,24 @@
       const positions = pointCloudMesh.geometry.attributes.position.array;
       const count = Math.min(worldPoints.length, maxPoints);
       
+      // Actualizar puntos detectados
       for (let i = 0; i < count; i++) {
         const pt = worldPoints[i].position;
         positions[i * 3] = pt.x;
         positions[i * 3 + 1] = pt.y;
         positions[i * 3 + 2] = pt.z;
       }
+      // Ocultar el resto de puntos no usados
+      for (let i = count; i < maxPoints; i++) {
+        positions[i * 3] = 999999;
+        positions[i * 3 + 1] = 999999;
+        positions[i * 3 + 2] = 999999;
+      }
       
-      pointCloudMesh.geometry.setDrawRange(0, count);
       pointCloudMesh.geometry.attributes.position.needsUpdate = true;
     }
 
+    // Registramos el pipeline de cámara ANTES de que el motor inicie
     const pointCloudPipelineModule = () => {
       return {
         name: 'pointcloud-debugger',
@@ -113,29 +126,20 @@
       };
     };
 
-    function forzarSueloVisible(world, THREE_INSTANCE) {
-      setTimeout(() => {
-        const groundObj = world.three.entityToObject.get("bc7753ae-2b39-4f48-910a-7921b756487b");
-        if (groundObj) {
-          groundObj.traverse((node) => {
-            if (node.isMesh) {
-              node.material = new THREE_INSTANCE.MeshBasicMaterial({
-                color: 0xff0000,
-                transparent: true,
-                opacity: 0.4,
-                side: THREE_INSTANCE.DoubleSide
-              });
-              node.material.colorWrite = true;
-              node.visible = true;
-              log('Suelo forzado a rojo');
-            }
-          });
-        } else {
-          log('Suelo no detectado por ID');
-        }
-      }, 3000);
-    }
+    const addPointCloudPipeline = () => {
+      const onxrloaded = () => {
+        window.XR8.addCameraPipelineModule(pointCloudPipelineModule());
+        log('Pipeline de puntos acoplado');
+      };
+      if (window.XR8) {
+        onxrloaded();
+      } else {
+        window.addEventListener('xrloaded', onxrloaded);
+      }
+    };
+    addPointCloudPipeline();
 
+    // === GESTIÓN DE PRUEBAS VISUALES ===
     function ejecutarPruebasVisuales(scene, THREE_INSTANCE) {
       setTimeout(() => {
         scene.traverse((node) => {
@@ -170,14 +174,8 @@
               log('Captura exitosa: ' + (!!nativeTHREE));
               
               if (nativeTHREE) {
+                // Iniciamos la renderización de la nube de puntos capturada
                 initPointCloud(_scene, nativeTHREE);
-
-                if (window.XR8) {
-                  window.XR8.addCameraPipelineModule(pointCloudPipelineModule());
-                  log('Nube de puntos vinculada');
-                }
-
-                forzarSueloVisible(world, nativeTHREE);
 
                 loadNativeRGBELoader(nativeTHREE).then((LoaderClass) => {
                   if (LoaderClass) {
@@ -278,6 +276,7 @@
       }
     }
 
+    // Interceptor de la inicialización de ECS (Modificaciones nativas antes de compilar)
     if (window.ecs) {
       const _i = ecs.application.init;
       ecs.application.init = c => {
@@ -285,6 +284,16 @@
           const obj = c.objects[k];
           if (obj.name === 'Loading Screen') delete c.objects[k];
           
+          // Forzar al suelo (Ground) a ser un plano rojo semitransparente nativo
+          if (obj.name === 'Ground') {
+            obj.material = {
+              type: 'basic',
+              color: '#ff0000',
+              opacity: 0.5,
+              transparent: true
+            };
+          }
+
           if (obj.name === 'Ambient Light') {
             if (obj.light) {
               obj.light.intensity = 0;
