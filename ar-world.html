@@ -1,4 +1,4 @@
-<!-- 9th Wall v2.27 -->
+<!-- 9th Wall v2.31 -->
 <html>
 <head>
   <meta charset="UTF-8">
@@ -18,8 +18,8 @@
     style="position:fixed;top:10px;right:10px;z-index:1000000;background:rgba(0,0,0,0.9);color:#0f0;font-family:monospace;font-size:12px;padding:8px;border-radius:4px;cursor:pointer;line-height:1.2;border:1px solid #0f0;">
     <div id="debugTitle">FPS: --</div>
     <div id="debugContent">
-      ar-world: v2.27<br>
-      bundle: v2.29
+      ar-world: v2.31<br>
+      bundle: v2.31
     </div>
   </div>
   <style>
@@ -63,7 +63,7 @@
       toggleEnv();
     });
 
-    // === ESTRATEGIA 03: Acoplamiento sobre el THREE Nativo del motor ===
+    // === Acoplamiento sobre el THREE Nativo del motor ===
     if (window.ecs) {
       window.ecs.registerComponent({
         name: 'scene-capturer',
@@ -140,36 +140,38 @@
           log('Error cargando HDR: ' + err.message);
         });
 
-        // Bucle para estimación de luz (Mantenemos intactos tus 50ms y optimizaciones)
+        // Separamos la estimación de luz del PMREM para reducir el trabajo de GPU.
         const waitForVideo = setInterval(() => {
           const video = document.querySelector('video');
           if (video && video.readyState >= 2) {
             clearInterval(waitForVideo);
             log('Vídeo listo para estimación');
 
-            const envCanvas = document.createElement('canvas');
-            envCanvas.width = 64;
-            envCanvas.height = 64;
-            const envTexture = new THREE_INSTANCE.CanvasTexture(envCanvas);
+            // Refresco del Light Estimation: brillo medio para la exposición.
+            const lightEstimationSize = 16;
+            const lightEstimationInterval = 50;
+            const lightCanvas = document.createElement('canvas');
+            lightCanvas.width = lightEstimationSize;
+            lightCanvas.height = lightEstimationSize;
+            const lightCtx = lightCanvas.getContext('2d');
+
+            // Configuración del PMREM: reflejos de los materiales desde la cámara.
+            const pmremSize = 64;
+            const pmremInterval = 200;
+            const pmremCanvas = document.createElement('canvas');
+            pmremCanvas.width = pmremSize;
+            pmremCanvas.height = pmremSize;
+            const envTexture = new THREE_INSTANCE.CanvasTexture(pmremCanvas);
             envTexture.mapping = THREE_INSTANCE.EquirectangularReflectionMapping;
-            const ctx = envCanvas.getContext('2d');
+            const pmremCtx = pmremCanvas.getContext('2d');
             let smoothed = 120;
 
+            // Refresco del Light Estimation: lectura ligera del brillo de la cámara.
             envInterval = setInterval(() => {
               try {
                 if (!video || video.readyState < 2) return;
-                ctx.drawImage(video, 0, 0, 64, 64);
-                envTexture.needsUpdate = true;
-
-                if (pmremGenerator) {
-                  const oldRT = cameraRT;
-                  cameraRT = pmremGenerator.fromEquirectangular(envTexture);
-                  if (envMode === 'cam') scene.environment = cameraRT.texture;
-                  if (oldRT) oldRT.dispose(); 
-                }
-
-                // Estimación de exposición
-                const pixels = ctx.getImageData(0, 0, 64, 64).data;
+                lightCtx.drawImage(video, 0, 0, lightEstimationSize, lightEstimationSize);
+                const pixels = lightCtx.getImageData(0, 0, lightEstimationSize, lightEstimationSize).data;
                 let total = 0;
                 for (let i = 0; i < pixels.length; i += 4) {
                   total += (pixels[i] + pixels[i + 1] + pixels[i + 2]) / 3;
@@ -180,7 +182,23 @@
               } catch (e) {
                 // Silencioso
               }
-            }, 50); // Refresco de 50ms original sin alterar
+            }, lightEstimationInterval);
+
+            // Refresco del PMREM: actualización de reflejos menos frecuente.
+            setInterval(() => {
+              try {
+                if (!video || video.readyState < 2 || !pmremGenerator) return;
+                pmremCtx.drawImage(video, 0, 0, pmremSize, pmremSize);
+                envTexture.needsUpdate = true;
+
+                const oldRT = cameraRT;
+                cameraRT = pmremGenerator.fromEquirectangular(envTexture);
+                if (envMode === 'cam') scene.environment = cameraRT.texture;
+                if (oldRT) oldRT.dispose();
+              } catch (e) {
+                // Silencioso
+              }
+            }, pmremInterval);
           }
         }, 500);
 
