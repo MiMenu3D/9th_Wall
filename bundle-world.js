@@ -1,4 +1,4 @@
-﻿// 9th Wall v2.29
+﻿// 9th Wall v2.30
 (()=>{
   var e={
     574(){
@@ -6,7 +6,7 @@
         XR8.addCameraPipelineModule(LandingPage.pipelineModule()),
 
         // Registro oficial de nuestro módulo de puntos ANTES del arranque del motor
-        XR8.addCameraPipelineModule({
+        DEBUG_VISUALS.slamPointCloud && XR8.addCameraPipelineModule({
           name: 'pointcloud-debugger-inner',
           onStart: () => {
             if (window.XR8) {
@@ -29,6 +29,12 @@
     }
   },
   t={};
+  // Change any value to true to restore that debug visualization.
+  const DEBUG_VISUALS = Object.freeze({
+    slamPointCloud: false,
+    shadowCameraHelper: false,
+    groundVisual: false
+  });
   function a(o){
     var n=t[o];
     if(void 0!==n)return n.exports;
@@ -564,6 +570,15 @@
         type: "asset",
         asset: _models[parseInt(_idx)]
       };
+    }
+    if (!DEBUG_VISUALS.slamPointCloud) {
+      delete i.objects["52ba8a86-a459-4df8-b954-a570e85e0484"].components["point-cloud-visualizer-comp"];
+    }
+    if (!DEBUG_VISUALS.shadowCameraHelper) {
+      delete i.objects["492cfe2c-9334-4a9c-a48a-be80132af9fb"].components["shadow-camera-helper-comp"];
+    }
+    if (!DEBUG_VISUALS.groundVisual) {
+      delete i.objects["bc7753ae-2b39-4f48-910a-7921b756487c"];
     }
     window.ecs.application.init(i)
   })()
