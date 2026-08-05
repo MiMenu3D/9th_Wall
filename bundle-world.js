@@ -1,4 +1,4 @@
-﻿// 9th Wall v2.24
+﻿// 9th Wall v2.25
 (()=>{
   var e={
     574(){
@@ -109,10 +109,10 @@
         
         const material = new THREE_INSTANCE.PointsMaterial({
           color: 0xffcc00,       // Amarillo/Dorado
-          size: 6.0,             // Tamaño fijo de 8 píxeles
+          size: 0.5,             // Tamaño fijo de 8 píxeles
           sizeAttenuation: true, // NoFijo, visible independientemente de la distancia
           opacity: 1.0,
-          depthWrite: false,     // Renderizar por encima del hider
+          depthWrite: true,     // Renderizar por encima del hider
           depthTest: false
         });
 
