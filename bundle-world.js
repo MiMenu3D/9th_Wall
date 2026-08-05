@@ -1,4 +1,4 @@
-﻿// 9th Wall v2.21
+﻿// 9th Wall v2.22
 (()=>{
   var e={
     574(){
@@ -97,8 +97,9 @@
         
         const material = new THREE_INSTANCE.PointsMaterial({
           color: 0xffcc00,       // Amarillo/Dorado
-          size: 0.1,            // Tamaño de los puntos (10cm)
-          sizeAttenuation: true,
+          size: 0.2,            // Tamaño de los puntos (20cm)
+          sizeAttenuation: false,
+          transparent: false,
           opacity: 1.0,
           depthWrite: false,     // Renderizar por encima del hider
           depthTest: false
