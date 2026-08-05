@@ -35,17 +35,13 @@
   <script>
     let lastTime = performance.now();
     let frameCount = 0;
-    let ultimoConteoPuntos = 0;
-
     function updateFPS() {
       frameCount++;
       const now = performance.now();
       if (now >= lastTime + 1000) {
         const fps = Math.round((frameCount * 1000) / (now - lastTime));
         const fpsEl = document.getElementById('debugTitle');
-        if (fpsEl) {
-          fpsEl.innerText = `FPS: ${fps} | Pts: ${ultimoConteoPuntos}`;
-        }
+        if (fpsEl) fpsEl.innerText = `FPS: ${fps}`;
         frameCount = 0;
         lastTime = now;
       }
@@ -76,17 +72,17 @@
       geometry.setAttribute('position', new THREE_INSTANCE.BufferAttribute(positionsArray, 3));
       
       const material = new THREE_INSTANCE.PointsMaterial({
-        color: 0xffcc00,       // Dorado/Amarillo
-        size: 0.06,            // 6 cm
+        color: 0xffcc00,       // Amarillo/Dorado
+        size: 0.05,            // 5 cm
         sizeAttenuation: true,
         transparent: true,
         opacity: 1.0,
-        depthWrite: false,     // Dibujar por encima del hider
+        depthWrite: false,     // Forzar dibujado sobre la cámara
         depthTest: false
       });
       
       pointCloudMesh = new THREE_INSTANCE.Points(geometry, material);
-      pointCloudMesh.frustumCulled = false; // Desactivar descarte de renderizado de Three.js
+      pointCloudMesh.frustumCulled = false; // Desactivar descarte de renderizado nativo
       scene.add(pointCloudMesh);
       log('Nube de puntos inicializada');
     }
@@ -96,7 +92,6 @@
       
       const positions = pointCloudMesh.geometry.attributes.position.array;
       const count = Math.min(worldPoints.length, maxPoints);
-      ultimoConteoPuntos = count;
       
       for (let i = 0; i < count; i++) {
         const pt = worldPoints[i].position;
@@ -104,7 +99,6 @@
         positions[i * 3 + 1] = pt.y;
         positions[i * 3 + 2] = pt.z;
       }
-      
       for (let i = count; i < maxPoints; i++) {
         positions[i * 3] = 999999;
         positions[i * 3 + 1] = 999999;
@@ -131,9 +125,8 @@
 
     const addPointCloudPipeline = () => {
       const onxrloaded = () => {
-        window.XR8.XrController.configure({ enableWorldPoints: true });
         window.XR8.addCameraPipelineModule(pointCloudPipelineModule());
-        log('Pipeline y nube de puntos configurados');
+        log('Pipeline de puntos acoplado');
       };
       if (window.XR8) {
         onxrloaded();
@@ -143,7 +136,7 @@
     };
     addPointCloudPipeline();
 
-    // === DIAGNÓSTICO DE CÁMARA DE SOMBRAS ===
+    // === GESTIÓN DE PRUEBAS VISUALES ===
     function ejecutarPruebasVisuales(scene, THREE_INSTANCE) {
       setTimeout(() => {
         scene.traverse((node) => {
@@ -151,9 +144,9 @@
             if (node.shadow && node.shadow.camera) {
               const helper = new THREE_INSTANCE.CameraHelper(node.shadow.camera);
               scene.add(helper);
-              log('Asistente de Cámara de Sombras activo');
+              log('Caja de sombras activa');
             } else {
-              log('Luz direccional encontrada, pero sin cámara de sombras.');
+              log('Luz encontrada sin cámara de sombras');
             }
           }
         });
@@ -165,7 +158,6 @@
       toggleEnv();
     });
 
-    // === ESTRATEGIA 03: Acoplamiento sobre el THREE Nativo del motor ===
     if (window.ecs) {
       window.ecs.registerComponent({
         name: 'scene-capturer',
@@ -176,36 +168,48 @@
               _renderer = world.three.renderer;
               
               const nativeTHREE = window.THREE;
-              log('Captura exitosa. Usando Three nativo: ' + (!!nativeTHREE));
+              log('Captura exitosa: ' + (!!nativeTHREE));
               
               if (nativeTHREE) {
-                initPointCloud(_scene, nativeTHREE);
-
+                // Habilitamos oficialmente la nube de puntos nativa de 8th Wall
                 if (window.XR8) {
                   window.XR8.XrController.configure({ enableWorldPoints: true });
                 }
 
-                // Descargamos y registramos RGBELoader directamente en el THREE nativo
+                initPointCloud(_scene, nativeTHREE);
+
+                // Añadir un plano visual rojo como hijo del suelo real (bc7753ae-2b39-4f48-910a-7921b756487b)
+                // Esto conserva el AO/ShadowMaterial original del padre intacto.
+                const groundObj = world.three.entityToObject.get("bc7753ae-2b39-4f48-910a-7921b756487b");
+                if (groundObj) {
+                  const visualPlaneGeom = new nativeTHREE.PlaneGeometry(1, 1);
+                  const visualPlaneMat = new nativeTHREE.MeshBasicMaterial({
+                    color: 0xff0000,
+                    transparent: true,
+                    opacity: 0.4,
+                    side: nativeTHREE.DoubleSide
+                  });
+                  const visualPlaneMesh = new nativeTHREE.Mesh(visualPlaneGeom, visualPlaneMat);
+                  visualPlaneMesh.position.z = 0.001; // Desfase micrométrico para evitar Z-fighting
+                  groundObj.add(visualPlaneMesh);
+                  log('Suelo visual rojo acoplado');
+                }
+
                 loadNativeRGBELoader(nativeTHREE).then((LoaderClass) => {
                   if (LoaderClass) {
                     initPMREMLogic(_scene, _renderer, nativeTHREE, LoaderClass);
-                  } else {
-                    log('Error: No se pudo instanciar el cargador.');
                   }
                 });
-              } else {
-                log('Error: window.THREE nativo no encontrado.');
               }
 
             } catch (err) {
-              log('Error al capturar: ' + err.message);
+              log('Error: ' + err.message);
             }
           }, 100);
         }
       });
     }
 
-    // Descarga dinámica de RGBELoader sobre la instancia nativa del motor
     function loadNativeRGBELoader(THREE_INSTANCE) {
       return new Promise((resolve) => {
         if (THREE_INSTANCE.RGBELoader) {
@@ -219,11 +223,11 @@
           .then(code => {
             window.THREE = THREE_INSTANCE;
             (new Function(code))();
-            log('RGBELoader acoplado al Three nativo con éxito.');
+            log('RGBELoader listo');
             resolve(THREE_INSTANCE.RGBELoader);
           })
           .catch(err => {
-            log('Error al descargar RGBELoader: ' + err.message);
+            log('Error RGBELoader: ' + err.message);
             resolve(null);
           });
       });
@@ -233,7 +237,6 @@
       try {
         pmremGenerator = new THREE_INSTANCE.PMREMGenerator(renderer);
         pmremGenerator.compileEquirectangularShader();
-        log('PMREM compilado en motor nativo');
 
         new LoaderClass().load('HDR/terrace_sea.hdr', (hdr) => {
           log('HDR cargado');
@@ -241,14 +244,13 @@
           originalEnv = hdr;
           if (envMode === 'hdr') scene.environment = hdr;
         }, undefined, (err) => {
-          log('Error cargando HDR: ' + err.message);
+          log('Error HDR: ' + err.message);
         });
 
         const waitForVideo = setInterval(() => {
           const video = document.querySelector('video');
           if (video && video.readyState >= 2) {
             clearInterval(waitForVideo);
-            log('Vídeo listo para estimación');
 
             const envCanvas = document.createElement('canvas');
             envCanvas.width = 64;
@@ -288,11 +290,11 @@
         ejecutarPruebasVisuales(scene, THREE_INSTANCE);
 
       } catch (err) {
-        log('Error PMREM nativo: ' + err.message);
+        log('Error PMREM: ' + err.message);
       }
     }
 
-    // Interceptor de la inicialización de ECS
+    // Interceptor de la inicialización de ECS (Modificaciones nativas antes de compilar)
     if (window.ecs) {
       const _i = ecs.application.init;
       ecs.application.init = c => {
@@ -300,29 +302,6 @@
           const obj = c.objects[k];
           if (obj.name === 'Loading Screen') delete c.objects[k];
           
-          // Suelo original: se mantiene como receptor de sombras (ShadowMaterial)
-          if (obj.name === 'Ground') {
-            obj.material = {
-              type: 'shadow',
-              color: '#000000',
-              opacity: 0.4
-            };
-
-            // Duplicado Visual: Plano rojo semitransparente superpuesto a 1mm (+0.001 en Y)
-            c.objects['ground-visual-debug'] = {
-              id: 'ground-visual-debug',
-              position: [obj.position[0], obj.position[1] + 0.001, obj.position[2]],
-              rotation: obj.rotation,
-              scale: obj.scale,
-              geometry: { type: 'plane', width: 1, height: 1 },
-              material: { type: 'basic', color: '#ff0000', opacity: 0.4, transparent: true },
-              parentId: obj.parentId,
-              components: {},
-              name: 'Ground Visual Debug',
-              order: obj.order + 0.001
-            };
-          }
-
           if (obj.name === 'Ambient Light') {
             if (obj.light) {
               obj.light.intensity = 0;
