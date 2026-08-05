@@ -1,4 +1,4 @@
-﻿// 9th Wall v2.25
+﻿// 9th Wall v2.26
 (()=>{
   var e={
     574(){
@@ -109,7 +109,7 @@
         
         const material = new THREE_INSTANCE.PointsMaterial({
           color: 0xffcc00,       // Amarillo/Dorado
-          size: 0.5,             // Tamaño fijo de 8 píxeles
+          size: 0.05,             // Tamaño fijo de 8 píxeles
           sizeAttenuation: true, // NoFijo, visible independientemente de la distancia
           opacity: 1.0,
           depthWrite: true,     // Renderizar por encima del hider
@@ -314,9 +314,9 @@
         // Plano del suelo (Ground)
         "bc7753ae-2b39-4f48-910a-7921b756487b": {
           "id": "bc7753ae-2b39-4f48-910a-7921b756487b",
-          "position": [0, 0.001, 0],
+          "position": [0, 1.701, 0],
           "rotation": [-0.7071068, 0, 0, 0.7071068],
-          "scale": [10, 10, 10],
+          "scale": [5, 5, 5],
           "geometry": { "type": "plane", "width": 1, "height": 1 },
           "material": { "type": "shadow", "color": "#000000", "opacity": 0.4 },
           "parentId": "84028e73-ee70-412d-b8d4-c09bf07c655c",
@@ -337,9 +337,9 @@
         // Plano Visual Rojo (Ground Visual Debug)
         "bc7753ae-2b39-4f48-910a-7921b756487c": {
           "id": "bc7753ae-2b39-4f48-910a-7921b756487c",
-          "position": [0, 0, 0],
+          "position": [0, 1.700, 0],
           "rotation": [-0.7071068, 0, 0, 0.7071068],
-          "scale": [10, 10, 10],
+          "scale": [5, 5, 5],
           "geometry": { "type": "plane", "width": 1, "height": 1 },
           "material": { "type": "basic", "color": "#ff0000", "opacity": 0.2 },
           "parentId": "84028e73-ee70-412d-b8d4-c09bf07c655c",
@@ -353,7 +353,7 @@
         // Plano Ocultador (Hider)
         "17af117a-efce-48dd-857e-e383a3649c7b": {
           "id": "17af117a-efce-48dd-857e-e383a3649c7b",
-          "position": [0, -0.01, 0],
+          "position": [0, 1.691, 0],
           "rotation": [-0.707106799999999, 0, 0, 0.7071067623730954],
           "scale": [10, 10, 10],
           "geometry": { "type": "plane", "width": 1, "height": 1 },
