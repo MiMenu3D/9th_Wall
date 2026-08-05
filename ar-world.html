@@ -1,4 +1,4 @@
-<!-- 9th Wall v2.18 -->
+<!-- 9th Wall v2.19 -->
 <html>
 <head>
   <meta charset="UTF-8">
@@ -18,7 +18,7 @@
     style="position:fixed;top:10px;right:10px;z-index:1000000;background:rgba(0,0,0,0.9);color:#0f0;font-family:monospace;font-size:12px;padding:8px;border-radius:4px;cursor:pointer;line-height:1.2;border:1px solid #0f0;">
     <div id="debugTitle">FPS: --</div>
     <div id="debugContent">
-      ar-world: v2.18<br>
+      ar-world: v2.19<br>
       bundle: v2.14
     </div>
   </div>
@@ -35,13 +35,17 @@
   <script>
     let lastTime = performance.now();
     let frameCount = 0;
+    let ultimoConteoPuntos = 0;
+
     function updateFPS() {
       frameCount++;
       const now = performance.now();
       if (now >= lastTime + 1000) {
         const fps = Math.round((frameCount * 1000) / (now - lastTime));
         const fpsEl = document.getElementById('debugTitle');
-        if (fpsEl) fpsEl.innerText = `FPS: ${fps}`;
+        if (fpsEl) {
+          fpsEl.innerText = `FPS: ${fps} | Pts: ${ultimoConteoPuntos}`;
+        }
         frameCount = 0;
         lastTime = now;
       }
@@ -63,7 +67,6 @@
     const maxPoints = 500;
     const positionsArray = new Float32Array(maxPoints * 3);
     
-    // Inicializamos con posiciones lejanas para evitar aglomeración inicial en el centro
     for (let i = 0; i < maxPoints * 3; i++) {
       positionsArray[i] = 999999;
     }
@@ -73,16 +76,17 @@
       geometry.setAttribute('position', new THREE_INSTANCE.BufferAttribute(positionsArray, 3));
       
       const material = new THREE_INSTANCE.PointsMaterial({
-        color: 0xffcc00,       // Color dorado oficial para depuración
-        size: 0.05,            // Tamaño de los puntos (5 cm)
+        color: 0xffcc00,       // Dorado/Amarillo
+        size: 0.06,            // 6 cm
         sizeAttenuation: true,
         transparent: true,
         opacity: 1.0,
-        depthWrite: false,     // Renderiza los puntos por encima del hider
+        depthWrite: false,     // Dibujar por encima del hider
         depthTest: false
       });
       
       pointCloudMesh = new THREE_INSTANCE.Points(geometry, material);
+      pointCloudMesh.frustumCulled = false; // Desactivar descarte de renderizado de Three.js
       scene.add(pointCloudMesh);
       log('Nube de puntos inicializada');
     }
@@ -92,6 +96,7 @@
       
       const positions = pointCloudMesh.geometry.attributes.position.array;
       const count = Math.min(worldPoints.length, maxPoints);
+      ultimoConteoPuntos = count;
       
       for (let i = 0; i < count; i++) {
         const pt = worldPoints[i].position;
@@ -126,7 +131,6 @@
 
     const addPointCloudPipeline = () => {
       const onxrloaded = () => {
-        // Habilitar nube de puntos en el controlador (API Oficial 8th Wall)
         window.XR8.XrController.configure({ enableWorldPoints: true });
         window.XR8.addCameraPipelineModule(pointCloudPipelineModule());
         log('Pipeline y nube de puntos configurados');
@@ -177,7 +181,6 @@
               if (nativeTHREE) {
                 initPointCloud(_scene, nativeTHREE);
 
-                // Forzar de nuevo la nube de puntos tras iniciar el sistema ECS
                 if (window.XR8) {
                   window.XR8.XrController.configure({ enableWorldPoints: true });
                 }
@@ -289,6 +292,7 @@
       }
     }
 
+    // Interceptor de la inicialización de ECS
     if (window.ecs) {
       const _i = ecs.application.init;
       ecs.application.init = c => {
@@ -296,12 +300,26 @@
           const obj = c.objects[k];
           if (obj.name === 'Loading Screen') delete c.objects[k];
           
+          // Suelo original: se mantiene como receptor de sombras (ShadowMaterial)
           if (obj.name === 'Ground') {
             obj.material = {
-              type: 'basic',
-              color: '#ff0000',
-              opacity: 0.5,
-              transparent: true
+              type: 'shadow',
+              color: '#000000',
+              opacity: 0.4
+            };
+
+            // Duplicado Visual: Plano rojo semitransparente superpuesto a 1mm (+0.001 en Y)
+            c.objects['ground-visual-debug'] = {
+              id: 'ground-visual-debug',
+              position: [obj.position[0], obj.position[1] + 0.001, obj.position[2]],
+              rotation: obj.rotation,
+              scale: obj.scale,
+              geometry: { type: 'plane', width: 1, height: 1 },
+              material: { type: 'basic', color: '#ff0000', opacity: 0.4, transparent: true },
+              parentId: obj.parentId,
+              components: {},
+              name: 'Ground Visual Debug',
+              order: obj.order + 0.001
             };
           }
 
