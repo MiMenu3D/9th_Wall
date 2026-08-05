@@ -1,4 +1,4 @@
-﻿// 9th Wall v2.26
+﻿// 9th Wall v2.27
 (()=>{
   var e={
     574(){
@@ -234,7 +234,7 @@
         // Cámara de Realidad Aumentada
         "52ba8a86-a459-4df8-b954-a570e85e0484": {
           "id": "52ba8a86-a459-4df8-b954-a570e85e0484",
-          "position": [0, 2, 3.211226375221431],
+          "position": [0, 0.30, 0.30],
           "rotation": [-0.0004637899966810532, 0.9978406073902779, -0.06529682289718859, -0.007087458033270938],
           "scale": [1.0000000000000002, 1, 1.0000000000000004],
           "geometry": null,
@@ -314,7 +314,7 @@
         // Plano del suelo (Ground)
         "bc7753ae-2b39-4f48-910a-7921b756487b": {
           "id": "bc7753ae-2b39-4f48-910a-7921b756487b",
-          "position": [0, 1.701, 0],
+          "position": [0, 0.001, 0],
           "rotation": [-0.7071068, 0, 0, 0.7071068],
           "scale": [5, 5, 5],
           "geometry": { "type": "plane", "width": 1, "height": 1 },
@@ -337,7 +337,7 @@
         // Plano Visual Rojo (Ground Visual Debug)
         "bc7753ae-2b39-4f48-910a-7921b756487c": {
           "id": "bc7753ae-2b39-4f48-910a-7921b756487c",
-          "position": [0, 1.700, 0],
+          "position": [0, 0, 0],
           "rotation": [-0.7071068, 0, 0, 0.7071068],
           "scale": [5, 5, 5],
           "geometry": { "type": "plane", "width": 1, "height": 1 },
@@ -353,7 +353,7 @@
         // Plano Ocultador (Hider)
         "17af117a-efce-48dd-857e-e383a3649c7b": {
           "id": "17af117a-efce-48dd-857e-e383a3649c7b",
-          "position": [0, 1.691, 0],
+          "position": [0, -0.001, 0],
           "rotation": [-0.707106799999999, 0, 0, 0.7071067623730954],
           "scale": [10, 10, 10],
           "geometry": { "type": "plane", "width": 1, "height": 1 },
