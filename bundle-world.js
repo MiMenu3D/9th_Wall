@@ -1,9 +1,26 @@
-﻿// 9th Wall v2.22
+﻿// 9th Wall v2.23
 (()=>{
   var e={
     574(){
       const e=()=>{
         XR8.addCameraPipelineModule(LandingPage.pipelineModule()),
+
+        // Registro oficial de nuestro módulo de puntos ANTES del arranque del motor
+        XR8.addCameraPipelineModule({
+          name: 'pointcloud-debugger-inner',
+          onStart: () => {
+            if (window.XR8) {
+              window.XR8.XrController.configure({ enableWorldPoints: true });
+            }
+          },
+          onUpdate: (e) => {
+            if (e.processCpuResult && e.processCpuResult.reality) {
+              // Exponemos las coordenadas del SLAM globalmente para el componente 3D
+              window.latestWorldPoints = e.processCpuResult.reality.worldPoints;
+            }
+          }
+        }),
+
         LandingPage.configure({
           mediaSrc:"./assets/preview.jpg"
         })
@@ -73,18 +90,13 @@
       }
     });
 
-    // Componente oficial para visualizar la nube de puntos (SLAM) de 8th Wall
+   // Componente oficial para visualizar la nube de puntos (SLAM) de 8th Wall
     e.registerComponent({
       name: "point-cloud-visualizer",
       add: (world, component) => {
         const scene = world.three.scene;
         const THREE_INSTANCE = window.THREE;
         if (!THREE_INSTANCE || !scene) return;
-
-        // Configuración oficial para habilitar la extracción de puntos
-        if (window.XR8) {
-          window.XR8.XrController.configure({ enableWorldPoints: true });
-        }
 
         const maxPoints = 500;
         const positionsArray = new Float32Array(maxPoints * 3);
@@ -97,51 +109,44 @@
         
         const material = new THREE_INSTANCE.PointsMaterial({
           color: 0xffcc00,       // Amarillo/Dorado
-          size: 0.2,            // Tamaño de los puntos (20cm)
-          sizeAttenuation: false,
-          transparent: false,
+          size: 8.0,             // Tamaño fijo de 8 píxeles
+          sizeAttenuation: false, // Fijo, visible independientemente de la distancia
           opacity: 1.0,
           depthWrite: false,     // Renderizar por encima del hider
           depthTest: false
         });
 
         const pointCloudMesh = new THREE_INSTANCE.Points(geometry, material);
-        pointCloudMesh.frustumCulled = false; // Evitar la ocultación automática de Three.js
+        pointCloudMesh.frustumCulled = false;
         scene.add(pointCloudMesh);
 
-        // Módulo oficial del pipeline para actualizar las coordenadas con datos del SLAM
-        const pipelineModule = {
-          name: 'pointcloud-debugger-inner',
-          onUpdate: (e) => {
-            const { processCpuResult } = e;
-            if (processCpuResult && processCpuResult.reality) {
-              const { worldPoints } = processCpuResult.reality;
-              if (worldPoints) {
-                const positions = pointCloudMesh.geometry.attributes.position.array;
-                const count = Math.min(worldPoints.length, maxPoints);
-                for (let k = 0; k < count; k++) {
-                  const pt = worldPoints[k].position;
-                  positions[k * 3] = pt.x;
-                  positions[k * 3 + 1] = pt.y;
-                  positions[k * 3 + 2] = pt.z;
-                }
-                for (let k = count; k < maxPoints; k++) {
-                  positions[k * 3] = 999999;
-                  positions[k * 3 + 1] = 999999;
-                  positions[k * 3 + 2] = 999999;
-                }
-                pointCloudMesh.geometry.attributes.position.needsUpdate = true;
-              }
+        // Bucle nativo sincronizado con el renderizado a 60 FPS
+        const actualizarPuntos = () => {
+          const worldPoints = window.latestWorldPoints;
+          if (worldPoints) {
+            const positions = pointCloudMesh.geometry.attributes.position.array;
+            const count = Math.min(worldPoints.length, maxPoints);
+            
+            for (let k = 0; k < count; k++) {
+              const pt = worldPoints[k].position;
+              positions[k * 3] = pt.x;
+              positions[k * 3 + 1] = pt.y;
+              positions[k * 3 + 2] = pt.z;
             }
+            for (let k = count; k < maxPoints; k++) {
+              positions[k * 3] = 999999;
+              positions[k * 3 + 1] = 999999;
+              positions[k * 3 + 2] = 999999;
+            }
+            pointCloudMesh.geometry.attributes.position.needsUpdate = true;
           }
+          requestAnimationFrame(actualizarPuntos);
         };
-
-        if (window.XR8) {
-          window.XR8.addCameraPipelineModule(pipelineModule);
-        }
+        
+        actualizarPuntos();
       }
     });
-
+    
     // Componente oficial para visualizar la Shadow Camera de la luz direccional
     e.registerComponent({
       name: "shadow-camera-helper",
