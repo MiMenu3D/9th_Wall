@@ -1,4 +1,4 @@
-﻿// 9th Wall v2.31
+﻿// 9th Wall v2.32
 (()=>{
   var e={
     574(){
@@ -35,6 +35,13 @@
     shadowCameraHelper: false,
     groundVisual: false
   });
+  // Controles del único modelo colocado. Ajusta estos valores en futuras pruebas.
+  const MODEL_GESTURES = Object.freeze({
+    dragSensitivity: 1.2,
+    minimumScale: 0.75,
+    maximumScale: 1.35,
+    rotationSensitivity: 4
+  });
   function a(o){
     var n=t[o];
     if(void 0!==n)return n.exports;
@@ -52,7 +59,8 @@
       }
     });
     const t=e.registerComponent({ name:"logo" }),
-    o="object-placed";
+    o="object-placed",
+    n="object-removed";
     e.registerComponent({
       name:"tap-to-place",
       schema:{ prefab:"eid" },
@@ -64,10 +72,46 @@
           d.setLocalPosition(i.data.worldPosition),
           d.set(e.Quaternion, e.math.quat.yRadians(Math.random()*Math.PI)),
           t.events.dispatch(a, o)
-        })
+        }).onEvent(o, "placed", { target:t.events.globalId }),
+        i("placed").onEvent(n, "initial", { target:t.events.globalId })
       }
     });
-    const n=e.defineQuery([t]);
+    e.registerComponent({
+      name:"model-gesture-controls",
+      stateMachine:({ world:t, eid:a, defineState:o })=>{
+        let isTwoFingerGesture=!1,
+        currentScale=1,
+        scaleAtGestureStart=1;
+        o("enabled").initial()
+          // Arrastre con un dedo: SCREEN_TOUCH_MOVE no tiene worldPosition, se usa el desplazamiento de pantalla.
+          .listen(a, e.input.SCREEN_TOUCH_MOVE, o=>{
+            if(isTwoFingerGesture||!o.data.change)return;
+            t.transform.translateWorld(a, {
+              x:o.data.change.x*MODEL_GESTURES.dragSensitivity,
+              z:o.data.change.y*MODEL_GESTURES.dragSensitivity
+            })
+          })
+          // Gesto de dos dedos: guarda la escala inicial para que cada pellizco tenga una referencia estable.
+          .listen(a, e.input.GESTURE_START, o=>{
+            if(2!==o.data.touchCount)return;
+            isTwoFingerGesture=!0,
+            scaleAtGestureStart=currentScale
+          })
+          .listen(a, e.input.GESTURE_MOVE, o=>{
+            if(2!==o.data.touchCount)return;
+            const n=o.data.startSpread>0?o.data.spread/o.data.startSpread:1;
+            currentScale=Math.max(MODEL_GESTURES.minimumScale, Math.min(MODEL_GESTURES.maximumScale, scaleAtGestureStart*n)),
+            e.Scale.set(t, a, { x:currentScale, y:currentScale, z:currentScale });
+
+            // El signo negativo hace que mover dos dedos a la derecha rote visualmente hacia la derecha.
+            t.transform.rotateSelf(a, e.math.quat.yRadians(-o.data.positionChange.x*MODEL_GESTURES.rotationSensitivity))
+          })
+          .listen(a, e.input.GESTURE_END, ()=>{
+            isTwoFingerGesture=!1
+          })
+      }
+    });
+    const r=e.defineQuery([t]);
     e.registerComponent({
       name:"reset-button",
       stateMachine:({ world:t, entity:a, defineState:i })=>{
@@ -91,7 +135,8 @@
             })
           })
         }).onExit(()=>{
-          n(t).forEach(e=>{ t.deleteEntity(e) })
+          r(t).forEach(e=>{ t.deleteEntity(e) }),
+          t.events.dispatch(t.events.globalId, n)
         })
       }
     });
@@ -186,6 +231,11 @@
             "92cc446e-2931-499b-9be0-0472f042433a": {
               "id": "92cc446e-2931-499b-9be0-0472f042433a",
               "name": "logo",
+              "parameters": {}
+            },
+            "model-gesture-controls-comp": {
+              "id": "model-gesture-controls-comp",
+              "name": "model-gesture-controls",
               "parameters": {}
             }
           },
