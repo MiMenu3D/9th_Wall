@@ -1,4 +1,4 @@
-﻿// 9th Wall v2.14
+﻿// 9th Wall v2.20
 (()=>{
   var e={
     574(){
@@ -73,6 +73,94 @@
       }
     });
 
+    // Componente oficial para visualizar la nube de puntos (SLAM) de 8th Wall
+    e.registerComponent({
+      name: "point-cloud-visualizer",
+      add: (world, component) => {
+        const scene = world.three.scene;
+        const THREE_INSTANCE = window.THREE;
+        if (!THREE_INSTANCE || !scene) return;
+
+        // Configuración oficial para habilitar la extracción de puntos
+        if (window.XR8) {
+          window.XR8.XrController.configure({ enableWorldPoints: true });
+        }
+
+        const maxPoints = 500;
+        const positionsArray = new Float32Array(maxPoints * 3);
+        for (let j = 0; j < maxPoints * 3; j++) {
+          positionsArray[j] = 999999;
+        }
+
+        const geometry = new THREE_INSTANCE.BufferGeometry();
+        geometry.setAttribute('position', new THREE_INSTANCE.BufferAttribute(positionsArray, 3));
+        
+        const material = new THREE_INSTANCE.PointsMaterial({
+          color: 0xffcc00,       // Amarillo/Dorado
+          size: 0.02,            // Tamaño de los puntos (2cm)
+          sizeAttenuation: true,
+          transparent: true,
+          opacity: 1.0,
+          depthWrite: false,     // Renderizar por encima del hider
+          depthTest: false
+        });
+
+        const pointCloudMesh = new THREE_INSTANCE.Points(geometry, material);
+        pointCloudMesh.frustumCulled = false; // Evitar la ocultación automática de Three.js
+        scene.add(pointCloudMesh);
+
+        // Módulo oficial del pipeline para actualizar las coordenadas con datos del SLAM
+        const pipelineModule = {
+          name: 'pointcloud-debugger-inner',
+          onUpdate: (e) => {
+            const { processCpuResult } = e;
+            if (processCpuResult && processCpuResult.reality) {
+              const { worldPoints } = processCpuResult.reality;
+              if (worldPoints) {
+                const positions = pointCloudMesh.geometry.attributes.position.array;
+                const count = Math.min(worldPoints.length, maxPoints);
+                for (let k = 0; k < count; k++) {
+                  const pt = worldPoints[k].position;
+                  positions[k * 3] = pt.x;
+                  positions[k * 3 + 1] = pt.y;
+                  positions[k * 3 + 2] = pt.z;
+                }
+                for (let k = count; k < maxPoints; k++) {
+                  positions[k * 3] = 999999;
+                  positions[k * 3 + 1] = 999999;
+                  positions[k * 3 + 2] = 999999;
+                }
+                pointCloudMesh.geometry.attributes.position.needsUpdate = true;
+              }
+            }
+          }
+        };
+
+        if (window.XR8) {
+          window.XR8.addCameraPipelineModule(pipelineModule);
+        }
+      }
+    });
+
+    // Componente oficial para visualizar la Shadow Camera de la luz direccional
+    e.registerComponent({
+      name: "shadow-camera-helper",
+      add: (world, component) => {
+        const scene = world.three.scene;
+        const THREE_INSTANCE = window.THREE;
+        if (!THREE_INSTANCE || !scene) return;
+
+        setTimeout(() => {
+          scene.traverse((node) => {
+            if (node.isDirectionalLight && node.shadow && node.shadow.camera) {
+              const helper = new THREE_INSTANCE.CameraHelper(node.shadow.camera);
+              scene.add(helper);
+            }
+          });
+        }, 2000);
+      }
+    });
+
     // --- AQUÍ ESTABA LA LÍNEA INFINITA (Formateada con saltos de línea) ---
     const i = {
       "objects": {
@@ -105,7 +193,13 @@
           "geometry": null,
           "material": null,
           "parentId": "84028e73-ee70-412d-b8d4-c09bf07c655c",
-          "components": {},
+          "components": {
+            "shadow-camera-helper-comp": {
+              "id": "shadow-camera-helper-comp",
+              "name": "shadow-camera-helper",
+              "parameters": {}
+            }
+          },
           "light": {
             "type": "directional",
             "shadowBias": 0,
@@ -141,7 +235,13 @@
           "geometry": null,
           "material": null,
           "parentId": "84028e73-ee70-412d-b8d4-c09bf07c655c",
-          "components": {},
+          "components": {
+            "point-cloud-visualizer-comp": {
+              "id": "point-cloud-visualizer-comp",
+              "name": "point-cloud-visualizer",
+              "parameters": {}
+            }
+          },
           "name": "Camera",
           "camera": {
             "type": "perspective",
@@ -209,7 +309,7 @@
         // Plano del suelo (Ground)
         "bc7753ae-2b39-4f48-910a-7921b756487b": {
           "id": "bc7753ae-2b39-4f48-910a-7921b756487b",
-          "position": [0, 0, 0],
+          "position": [0, 0.001, 0],
           "rotation": [-0.7071068, 0, 0, 0.7071068],
           "scale": [50, 50, 50],
           "geometry": { "type": "plane", "width": 1, "height": 1 },
@@ -228,6 +328,22 @@
           "order": 5.877553308364804,
           "shadow": { "receiveShadow": true }
         },
+
+        // Plano Visual Rojo (Ground Visual Debug)
+        "bc7753ae-2b39-4f48-910a-7921b756487c": {
+          "id": "bc7753ae-2b39-4f48-910a-7921b756487c",
+          "position": [0, 0, 0],
+          "rotation": [-0.7071068, 0, 0, 0.7071068],
+          "scale": [50, 50, 50],
+          "geometry": { "type": "plane", "width": 1, "height": 1 },
+          "material": { "type": "basic", "color": "#ff0000", "opacity": 0.2 },
+          "parentId": "84028e73-ee70-412d-b8d4-c09bf07c655c",
+          "components": {},
+          "name": "Ground Visual Debug",
+          "order": 5.878553308364804,
+          "shadow": { "receiveShadow": false }
+        },
+
 
         // Plano Ocultador (Hider)
         "17af117a-efce-48dd-857e-e383a3649c7b": {

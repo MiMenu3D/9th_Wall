@@ -1,4 +1,4 @@
-<!-- 9th Wall v2.19 -->
+<!-- 9th Wall v2.20 -->
 <html>
 <head>
   <meta charset="UTF-8">
@@ -18,8 +18,8 @@
     style="position:fixed;top:10px;right:10px;z-index:1000000;background:rgba(0,0,0,0.9);color:#0f0;font-family:monospace;font-size:12px;padding:8px;border-radius:4px;cursor:pointer;line-height:1.2;border:1px solid #0f0;">
     <div id="debugTitle">FPS: --</div>
     <div id="debugContent">
-      ar-world: v2.19<br>
-      bundle: v2.14
+      ar-world: v2.20<br>
+      bundle: v2.20
     </div>
   </div>
   <style>
@@ -58,106 +58,12 @@
     let envMode = 'hdr', envInterval = null;
     let _scene = null, _renderer = null;
 
-    // === GESTIÓN DE LA NUBE DE PUNTOS ===
-    let pointCloudMesh = null;
-    const maxPoints = 500;
-    const positionsArray = new Float32Array(maxPoints * 3);
-    
-    for (let i = 0; i < maxPoints * 3; i++) {
-      positionsArray[i] = 999999;
-    }
-
-    function initPointCloud(scene, THREE_INSTANCE) {
-      const geometry = new THREE_INSTANCE.BufferGeometry();
-      geometry.setAttribute('position', new THREE_INSTANCE.BufferAttribute(positionsArray, 3));
-      
-      const material = new THREE_INSTANCE.PointsMaterial({
-        color: 0xffcc00,       // Amarillo/Dorado
-        size: 0.05,            // 5 cm
-        sizeAttenuation: true,
-        transparent: true,
-        opacity: 1.0,
-        depthWrite: false,     // Forzar dibujado sobre la cámara
-        depthTest: false
-      });
-      
-      pointCloudMesh = new THREE_INSTANCE.Points(geometry, material);
-      pointCloudMesh.frustumCulled = false; // Desactivar descarte de renderizado nativo
-      scene.add(pointCloudMesh);
-      log('Nube de puntos inicializada');
-    }
-
-    function updatePointCloud(worldPoints) {
-      if (!pointCloudMesh || !worldPoints) return;
-      
-      const positions = pointCloudMesh.geometry.attributes.position.array;
-      const count = Math.min(worldPoints.length, maxPoints);
-      
-      for (let i = 0; i < count; i++) {
-        const pt = worldPoints[i].position;
-        positions[i * 3] = pt.x;
-        positions[i * 3 + 1] = pt.y;
-        positions[i * 3 + 2] = pt.z;
-      }
-      for (let i = count; i < maxPoints; i++) {
-        positions[i * 3] = 999999;
-        positions[i * 3 + 1] = 999999;
-        positions[i * 3 + 2] = 999999;
-      }
-      
-      pointCloudMesh.geometry.attributes.position.needsUpdate = true;
-    }
-
-    const pointCloudPipelineModule = () => {
-      return {
-        name: 'pointcloud-debugger',
-        onUpdate: (e) => {
-          const { processCpuResult } = e;
-          if (processCpuResult && processCpuResult.reality) {
-            const { worldPoints } = processCpuResult.reality;
-            if (worldPoints) {
-              updatePointCloud(worldPoints);
-            }
-          }
-        }
-      };
-    };
-
-    const addPointCloudPipeline = () => {
-      const onxrloaded = () => {
-        window.XR8.addCameraPipelineModule(pointCloudPipelineModule());
-        log('Pipeline de puntos acoplado');
-      };
-      if (window.XR8) {
-        onxrloaded();
-      } else {
-        window.addEventListener('xrloaded', onxrloaded);
-      }
-    };
-    addPointCloudPipeline();
-
-    // === GESTIÓN DE PRUEBAS VISUALES ===
-    function ejecutarPruebasVisuales(scene, THREE_INSTANCE) {
-      setTimeout(() => {
-        scene.traverse((node) => {
-          if (node.isDirectionalLight) {
-            if (node.shadow && node.shadow.camera) {
-              const helper = new THREE_INSTANCE.CameraHelper(node.shadow.camera);
-              scene.add(helper);
-              log('Caja de sombras activa');
-            } else {
-              log('Luz encontrada sin cámara de sombras');
-            }
-          }
-        });
-      }, 3000);
-    }
-
     document.getElementById('envToggle').addEventListener('click', (e) => {
       log('Button clicked');
       toggleEnv();
     });
 
+    // === ESTRATEGIA 03: Acoplamiento sobre el THREE Nativo del motor ===
     if (window.ecs) {
       window.ecs.registerComponent({
         name: 'scene-capturer',
@@ -167,49 +73,32 @@
               _scene = world.three.scene;
               _renderer = world.three.renderer;
               
+              // Buscamos el THREE nativo expuesto globalmente por el runtime de 8th Wall
               const nativeTHREE = window.THREE;
-              log('Captura exitosa: ' + (!!nativeTHREE));
+              log('Captura exitosa. Usando Three nativo: ' + (!!nativeTHREE));
               
               if (nativeTHREE) {
-                // Habilitamos oficialmente la nube de puntos nativa de 8th Wall
-                if (window.XR8) {
-                  window.XR8.XrController.configure({ enableWorldPoints: true });
-                }
-
-                initPointCloud(_scene, nativeTHREE);
-
-                // Añadir un plano visual rojo como hijo del suelo real (bc7753ae-2b39-4f48-910a-7921b756487b)
-                // Esto conserva el AO/ShadowMaterial original del padre intacto.
-                const groundObj = world.three.entityToObject.get("bc7753ae-2b39-4f48-910a-7921b756487b");
-                if (groundObj) {
-                  const visualPlaneGeom = new nativeTHREE.PlaneGeometry(1, 1);
-                  const visualPlaneMat = new nativeTHREE.MeshBasicMaterial({
-                    color: 0xff0000,
-                    transparent: true,
-                    opacity: 0.4,
-                    side: nativeTHREE.DoubleSide
-                  });
-                  const visualPlaneMesh = new nativeTHREE.Mesh(visualPlaneGeom, visualPlaneMat);
-                  visualPlaneMesh.position.z = 0.001; // Desfase micrométrico para evitar Z-fighting
-                  groundObj.add(visualPlaneMesh);
-                  log('Suelo visual rojo acoplado');
-                }
-
+                // Descargamos y registramos RGBELoader directamente en el THREE nativo
                 loadNativeRGBELoader(nativeTHREE).then((LoaderClass) => {
                   if (LoaderClass) {
                     initPMREMLogic(_scene, _renderer, nativeTHREE, LoaderClass);
+                  } else {
+                    log('Error: No se pudo instanciar el cargador.');
                   }
                 });
+              } else {
+                log('Error: window.THREE nativo no encontrado.');
               }
 
             } catch (err) {
-              log('Error: ' + err.message);
+              log('Error al capturar: ' + err.message);
             }
           }, 100);
         }
       });
     }
 
+    // Descarga dinámica de RGBELoader sobre la instancia nativa del motor
     function loadNativeRGBELoader(THREE_INSTANCE) {
       return new Promise((resolve) => {
         if (THREE_INSTANCE.RGBELoader) {
@@ -221,13 +110,14 @@
         fetch('https://unpkg.com/three@0.139.2/examples/js/loaders/RGBELoader.js')
           .then(res => res.text())
           .then(code => {
+            // Evaluamos el código del loader forzando el ámbito del THREE nativo de 8th Wall
             window.THREE = THREE_INSTANCE;
             (new Function(code))();
-            log('RGBELoader listo');
+            log('RGBELoader acoplado al Three nativo con éxito.');
             resolve(THREE_INSTANCE.RGBELoader);
           })
           .catch(err => {
-            log('Error RGBELoader: ' + err.message);
+            log('Error al descargar RGBELoader: ' + err.message);
             resolve(null);
           });
       });
@@ -235,22 +125,27 @@
 
     function initPMREMLogic(scene, renderer, THREE_INSTANCE, LoaderClass) {
       try {
+        // Inicializamos PMREM usando la clase nativa del motor de 8th Wall
         pmremGenerator = new THREE_INSTANCE.PMREMGenerator(renderer);
         pmremGenerator.compileEquirectangularShader();
+        log('PMREM compilado en motor nativo');
 
+        // Carga de textura de entorno HDR
         new LoaderClass().load('HDR/terrace_sea.hdr', (hdr) => {
           log('HDR cargado');
           hdr.mapping = THREE_INSTANCE.EquirectangularReflectionMapping;
           originalEnv = hdr;
           if (envMode === 'hdr') scene.environment = hdr;
         }, undefined, (err) => {
-          log('Error HDR: ' + err.message);
+          log('Error cargando HDR: ' + err.message);
         });
 
+        // Bucle para estimación de luz (Mantenemos intactos tus 50ms y optimizaciones)
         const waitForVideo = setInterval(() => {
           const video = document.querySelector('video');
           if (video && video.readyState >= 2) {
             clearInterval(waitForVideo);
+            log('Vídeo listo para estimación');
 
             const envCanvas = document.createElement('canvas');
             envCanvas.width = 64;
@@ -273,6 +168,7 @@
                   if (oldRT) oldRT.dispose(); 
                 }
 
+                // Estimación de exposición
                 const pixels = ctx.getImageData(0, 0, 64, 64).data;
                 let total = 0;
                 for (let i = 0; i < pixels.length; i += 4) {
@@ -280,21 +176,20 @@
                 }
                 const brightness = total / (pixels.length / 4);
                 smoothed += (brightness - smoothed) * 0.08;
-                renderer.exposure = 0.4 + (smoothed / 255) * 1.5;
+                renderer.exposure = 0.4 + (smoothed / 255) * 1.5; // Ajuste de exposición basado en brillo promedio. Valores anteriores 0.6 y 0.9 respectivamente.
               } catch (e) {
+                // Silencioso
               }
-            }, 50);
+            }, 50); // Refresco de 50ms original sin alterar
           }
         }, 500);
 
-        ejecutarPruebasVisuales(scene, THREE_INSTANCE);
-
       } catch (err) {
-        log('Error PMREM: ' + err.message);
+        log('Error PMREM nativo: ' + err.message);
       }
     }
 
-    // Interceptor de la inicialización de ECS (Modificaciones nativas antes de compilar)
+    // Interceptor de la inicialización de ECS (Mantiene la estructura original estable)
     if (window.ecs) {
       const _i = ecs.application.init;
       ecs.application.init = c => {
@@ -302,14 +197,15 @@
           const obj = c.objects[k];
           if (obj.name === 'Loading Screen') delete c.objects[k];
           
+          // Solución a la doble iluminación nativa:
           if (obj.name === 'Ambient Light') {
             if (obj.light) {
-              obj.light.intensity = 0;
+              obj.light.intensity = 0; // Apagamos la luz ambiental nativa por completo
             }
           }
           if (obj.name === 'Directional Light') {
             if (obj.light) {
-              obj.light.intensity = 0.00;
+              obj.light.intensity = 0.00; // Atenuamos la luz direccional para conservar sombras suaves
             }
           }
 
