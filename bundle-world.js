@@ -1,4 +1,4 @@
-﻿// 9th Wall v2.32
+﻿// 9th Wall v2.33
 (()=>{
   var e={
     574(){
@@ -37,7 +37,6 @@
   });
   // Controles del único modelo colocado. Ajusta estos valores en futuras pruebas.
   const MODEL_GESTURES = Object.freeze({
-    dragSensitivity: 1.2,
     minimumScale: 0.75,
     maximumScale: 1.35,
     rotationSensitivity: 4
@@ -80,25 +79,46 @@
       name:"model-gesture-controls",
       stateMachine:({ world:t, eid:a, defineState:o })=>{
         let isTwoFingerGesture=!1,
+        isModelTouchActive=!1,
+        dragPointerId=null,
+        dragPlaneY=0,
         currentScale=1,
         scaleAtGestureStart=1;
         o("enabled").initial()
-          // Arrastre con un dedo: SCREEN_TOUCH_MOVE no tiene worldPosition, se usa el desplazamiento de pantalla.
-          .listen(a, e.input.SCREEN_TOUCH_MOVE, o=>{
-            if(isTwoFingerGesture||!o.data.change)return;
-            t.transform.translateWorld(a, {
-              x:o.data.change.x*MODEL_GESTURES.dragSensitivity,
-              z:o.data.change.y*MODEL_GESTURES.dragSensitivity
-            })
+          // Sólo se manipula cuando el primer dedo empieza sobre el modelo o uno de sus hijos.
+          .listen(a, e.input.SCREEN_TOUCH_START, o=>{
+            const n=t.transform.getWorldPosition(a);
+            isModelTouchActive=!0,
+            dragPointerId=o.data.pointerId,
+            dragPlaneY=n.y
           })
-          // Gesto de dos dedos: guarda la escala inicial para que cada pellizco tenga una referencia estable.
-          .listen(a, e.input.GESTURE_START, o=>{
-            if(2!==o.data.touchCount)return;
+          // Arrastre exacto: proyecta el dedo sobre un plano a la altura de la mesa.
+          .listen(t.events.globalId, e.input.SCREEN_TOUCH_MOVE, o=>{
+            if(!isModelTouchActive||isTwoFingerGesture||o.data.pointerId!==dragPointerId)return;
+            const n=t.three.activeCamera,
+            i=window.THREE;
+            if(!n||!i)return;
+            const r=new i.Raycaster(),
+            d=new i.Vector2(o.data.position.x*2-1, 1-o.data.position.y*2),
+            s=new i.Plane(new i.Vector3(0, 1, 0), -dragPlaneY),
+            l=new i.Vector3();
+            r.setFromCamera(d, n);
+            if(r.ray.intersectPlane(s, l))t.transform.setWorldPosition(a, l)
+          })
+          .listen(t.events.globalId, e.input.SCREEN_TOUCH_END, o=>{
+            if(o.data.pointerId===dragPointerId){
+              isModelTouchActive=!1,
+              dragPointerId=null
+            }
+          })
+          // Los gestos se escuchan globalmente: el segundo dedo puede no tocar directamente el modelo.
+          .listen(t.events.globalId, e.input.GESTURE_START, o=>{
+            if(!isModelTouchActive||2!==o.data.touchCount)return;
             isTwoFingerGesture=!0,
             scaleAtGestureStart=currentScale
           })
-          .listen(a, e.input.GESTURE_MOVE, o=>{
-            if(2!==o.data.touchCount)return;
+          .listen(t.events.globalId, e.input.GESTURE_MOVE, o=>{
+            if(!isModelTouchActive||!isTwoFingerGesture||2!==o.data.touchCount)return;
             const n=o.data.startSpread>0?o.data.spread/o.data.startSpread:1;
             currentScale=Math.max(MODEL_GESTURES.minimumScale, Math.min(MODEL_GESTURES.maximumScale, scaleAtGestureStart*n)),
             e.Scale.set(t, a, { x:currentScale, y:currentScale, z:currentScale });
@@ -106,8 +126,8 @@
             // El signo negativo hace que mover dos dedos a la derecha rote visualmente hacia la derecha.
             t.transform.rotateSelf(a, e.math.quat.yRadians(-o.data.positionChange.x*MODEL_GESTURES.rotationSensitivity))
           })
-          .listen(a, e.input.GESTURE_END, ()=>{
-            isTwoFingerGesture=!1
+          .listen(t.events.globalId, e.input.GESTURE_END, o=>{
+            if(o.data.nextTouchCount<2)isTwoFingerGesture=!1
           })
       }
     });
