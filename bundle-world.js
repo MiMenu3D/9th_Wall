@@ -1,4 +1,4 @@
-﻿// 9th Wall v2.35
+﻿// 9th Wall v2.36
 (()=>{
   var e={
     574(){
@@ -94,14 +94,26 @@
         o("enabled").initial()
           // Sólo se manipula cuando el primer dedo empieza sobre el modelo o uno de sus hijos.
           .listen(a, e.input.SCREEN_TOUCH_START, o=>{
-            const n=t.transform.getWorldPosition(a);
+            const n=t.transform.getWorldPosition(a),
+            i=t.three.activeCamera,
+            r=window.THREE;
             isModelTouchActive=!0,
             dragPointerId=o.data.pointerId,
             activePointerIds.add(o.data.pointerId),
             dragPlaneY=n.y,
-            // Conserva el punto del modelo que se agarró, incluso si está en un borde.
-            dragOffsetX=o.data.worldPosition?n.x-o.data.worldPosition.x:0,
-            dragOffsetZ=o.data.worldPosition?n.z-o.data.worldPosition.z:0
+            dragOffsetX=0,
+            dragOffsetZ=0;
+            // Calcula el anclaje inicial en el mismo plano de mesa usado durante el arrastre.
+            if(!i||!r)return;
+            const d=new r.Raycaster(),
+            s=new r.Vector2(o.data.position.x*2-1, 1-o.data.position.y*2),
+            l=new r.Plane(new r.Vector3(0, 1, 0), -dragPlaneY),
+            c=new r.Vector3();
+            d.setFromCamera(s, i);
+            if(d.ray.intersectPlane(l, c)){
+              dragOffsetX=n.x-c.x,
+              dragOffsetZ=n.z-c.z
+            }
           })
           // Registra el segundo dedo aunque toque fuera del modelo.
           .listen(t.events.globalId, e.input.SCREEN_TOUCH_START, o=>{
@@ -173,7 +185,7 @@
         i("placed").onEvent(e.input.UI_CLICK, "resetting"),
         i("resetting").wait(1e3, "nothing-placed").onEnter(()=>{
           const a=e.math.vec3.zero();
-          n(t).forEach(o=>{
+          r(t).forEach(o=>{
             t.transform.getLocalPosition(o, a),
             e.PositionAnimation.set(t, o, {
               duration:1e3,
