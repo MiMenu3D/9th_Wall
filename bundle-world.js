@@ -1,4 +1,4 @@
-﻿// 9th Wall v2.33
+﻿// 9th Wall v2.34
 (()=>{
   var e={
     574(){
@@ -38,8 +38,10 @@
   // Controles del único modelo colocado. Ajusta estos valores en futuras pruebas.
   const MODEL_GESTURES = Object.freeze({
     minimumScale: 0.75,
-    maximumScale: 1.35,
-    rotationSensitivity: 4
+    maximumScale: 2.00,
+    rotationSensitivity: 4,
+    pinchActivationThreshold: 0.08,
+    rotationActivationThreshold: 0.025
   });
   function a(o){
     var n=t[o];
@@ -82,6 +84,9 @@
         isModelTouchActive=!1,
         dragPointerId=null,
         dragPlaneY=0,
+        activePointerIds=new Set(),
+        waitForAllTouchesToEnd=!1,
+        gestureMode="none",
         currentScale=1,
         scaleAtGestureStart=1;
         o("enabled").initial()
@@ -90,11 +95,16 @@
             const n=t.transform.getWorldPosition(a);
             isModelTouchActive=!0,
             dragPointerId=o.data.pointerId,
+            activePointerIds.add(o.data.pointerId),
             dragPlaneY=n.y
+          })
+          // Registra el segundo dedo aunque toque fuera del modelo.
+          .listen(t.events.globalId, e.input.SCREEN_TOUCH_START, o=>{
+            if(isModelTouchActive)activePointerIds.add(o.data.pointerId)
           })
           // Arrastre exacto: proyecta el dedo sobre un plano a la altura de la mesa.
           .listen(t.events.globalId, e.input.SCREEN_TOUCH_MOVE, o=>{
-            if(!isModelTouchActive||isTwoFingerGesture||o.data.pointerId!==dragPointerId)return;
+            if(!isModelTouchActive||isTwoFingerGesture||waitForAllTouchesToEnd||o.data.pointerId!==dragPointerId)return;
             const n=t.three.activeCamera,
             i=window.THREE;
             if(!n||!i)return;
@@ -106,25 +116,40 @@
             if(r.ray.intersectPlane(s, l))t.transform.setWorldPosition(a, l)
           })
           .listen(t.events.globalId, e.input.SCREEN_TOUCH_END, o=>{
-            if(o.data.pointerId===dragPointerId){
+            activePointerIds.delete(o.data.pointerId);
+            if(0===activePointerIds.size){
               isModelTouchActive=!1,
-              dragPointerId=null
+              dragPointerId=null,
+              waitForAllTouchesToEnd=!1,
+              gestureMode="none"
             }
           })
           // Los gestos se escuchan globalmente: el segundo dedo puede no tocar directamente el modelo.
           .listen(t.events.globalId, e.input.GESTURE_START, o=>{
             if(!isModelTouchActive||2!==o.data.touchCount)return;
             isTwoFingerGesture=!0,
+            waitForAllTouchesToEnd=!0,
+            gestureMode="none",
             scaleAtGestureStart=currentScale
           })
           .listen(t.events.globalId, e.input.GESTURE_MOVE, o=>{
             if(!isModelTouchActive||!isTwoFingerGesture||2!==o.data.touchCount)return;
-            const n=o.data.startSpread>0?o.data.spread/o.data.startSpread:1;
-            currentScale=Math.max(MODEL_GESTURES.minimumScale, Math.min(MODEL_GESTURES.maximumScale, scaleAtGestureStart*n)),
-            e.Scale.set(t, a, { x:currentScale, y:currentScale, z:currentScale });
-
-            // El signo negativo hace que mover dos dedos a la derecha rote visualmente hacia la derecha.
-            t.transform.rotateSelf(a, e.math.quat.yRadians(-o.data.positionChange.x*MODEL_GESTURES.rotationSensitivity))
+            const n=o.data.startSpread>0?Math.abs(o.data.spread-o.data.startSpread)/o.data.startSpread:0,
+            i=Math.abs(o.data.position.x-o.data.startPosition.x);
+            // El primer movimiento que supera su tolerancia elige un único modo para todo el gesto.
+            if("none"===gestureMode){
+              if(n>=MODEL_GESTURES.pinchActivationThreshold&&n/MODEL_GESTURES.pinchActivationThreshold>=i/MODEL_GESTURES.rotationActivationThreshold)gestureMode="scale";
+              else if(i>=MODEL_GESTURES.rotationActivationThreshold)gestureMode="rotate";
+              else return
+            }
+            if("scale"===gestureMode){
+              const n=o.data.startSpread>0?o.data.spread/o.data.startSpread:1;
+              currentScale=Math.max(MODEL_GESTURES.minimumScale, Math.min(MODEL_GESTURES.maximumScale, scaleAtGestureStart*n)),
+              e.Scale.set(t, a, { x:currentScale, y:currentScale, z:currentScale })
+            }else if("rotate"===gestureMode){
+              // Signo positivo: mover dos dedos a la derecha rota visualmente hacia la izquierda.
+              t.transform.rotateSelf(a, e.math.quat.yRadians(o.data.positionChange.x*MODEL_GESTURES.rotationSensitivity))
+            }
           })
           .listen(t.events.globalId, e.input.GESTURE_END, o=>{
             if(o.data.nextTouchCount<2)isTwoFingerGesture=!1
