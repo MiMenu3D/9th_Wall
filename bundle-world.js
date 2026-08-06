@@ -1,4 +1,4 @@
-﻿// 9th Wall v2.36
+﻿// 9th Wall v2.37
 (()=>{
   var e={
     574(){
@@ -62,10 +62,12 @@
     const t=e.registerComponent({ name:"logo" }),
     o="object-placed",
     n="object-removed";
+    let placementGroundEid=null;
     e.registerComponent({
       name:"tap-to-place",
       schema:{ prefab:"eid" },
       stateMachine:({ world:t, eid:a, schemaAttribute:n, defineState:i })=>{
+        placementGroundEid=a;
         i("initial").initial().listen(a, e.input.SCREEN_TOUCH_START, i=>{
           if(!i.data.worldPosition)return;
           const r=t.createEntity(n.get(a).prefab),
@@ -73,8 +75,8 @@
           d.setLocalPosition(i.data.worldPosition),
           d.set(e.Quaternion, e.math.quat.yRadians(Math.random()*Math.PI)),
           t.events.dispatch(a, o)
-        }).onEvent(o, "placed", { target:t.events.globalId }),
-        i("placed").onEvent(n, "initial", { target:t.events.globalId })
+        }).onEvent(o, "placed", { target:a }),
+        i("placed").onEvent(n, "initial", { target:a })
       }
     });
     e.registerComponent({
@@ -202,7 +204,7 @@
           })
         }).onExit(()=>{
           r(t).forEach(e=>{ t.deleteEntity(e) }),
-          t.events.dispatch(t.events.globalId, n)
+          null!==placementGroundEid&&t.events.dispatch(placementGroundEid, n)
         })
       }
     });
