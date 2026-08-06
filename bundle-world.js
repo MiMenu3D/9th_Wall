@@ -1,4 +1,4 @@
-﻿// 9th Wall v2.37
+﻿// 9th Wall v2.38
 (()=>{
   var e={
     574(){
@@ -59,6 +59,7 @@
         o("ready").onEnter(()=>{ e.Disabled.reset(t, a) })
       }
     });
+    
     const t=e.registerComponent({ name:"logo" }),
     o="object-placed",
     n="object-removed";
@@ -66,11 +67,11 @@
     e.registerComponent({
       name:"tap-to-place",
       schema:{ prefab:"eid" },
-      stateMachine:({ world:t, eid:a, schemaAttribute:n, defineState:i })=>{
+      stateMachine:({ world:t, eid:a, schemaAttribute:schemaAttr, defineState:i })=>{
         placementGroundEid=a;
         i("initial").initial().listen(a, e.input.SCREEN_TOUCH_START, i=>{
           if(!i.data.worldPosition)return;
-          const r=t.createEntity(n.get(a).prefab),
+          const r=t.createEntity(schemaAttr.get(a).prefab),
           d=t.getEntity(r);
           d.setLocalPosition(i.data.worldPosition),
           d.set(e.Quaternion, e.math.quat.yRadians(Math.random()*Math.PI)),
@@ -79,6 +80,7 @@
         i("placed").onEvent(n, "initial", { target:a })
       }
     });
+
     e.registerComponent({
       name:"model-gesture-controls",
       stateMachine:({ world:t, eid:a, defineState:o })=>{
