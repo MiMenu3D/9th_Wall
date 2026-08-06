@@ -1,4 +1,4 @@
-﻿// 9th Wall v2.34
+﻿// 9th Wall v2.35
 (()=>{
   var e={
     574(){
@@ -38,10 +38,10 @@
   // Controles del único modelo colocado. Ajusta estos valores en futuras pruebas.
   const MODEL_GESTURES = Object.freeze({
     minimumScale: 0.75,
-    maximumScale: 2.00,
+    maximumScale: 1.45,
     rotationSensitivity: 4,
-    pinchActivationThreshold: 0.08,
-    rotationActivationThreshold: 0.025
+    pinchActivationThreshold: 0.09,
+    rotationActivationThreshold: 0.020
   });
   function a(o){
     var n=t[o];
@@ -84,6 +84,8 @@
         isModelTouchActive=!1,
         dragPointerId=null,
         dragPlaneY=0,
+        dragOffsetX=0,
+        dragOffsetZ=0,
         activePointerIds=new Set(),
         waitForAllTouchesToEnd=!1,
         gestureMode="none",
@@ -96,7 +98,10 @@
             isModelTouchActive=!0,
             dragPointerId=o.data.pointerId,
             activePointerIds.add(o.data.pointerId),
-            dragPlaneY=n.y
+            dragPlaneY=n.y,
+            // Conserva el punto del modelo que se agarró, incluso si está en un borde.
+            dragOffsetX=o.data.worldPosition?n.x-o.data.worldPosition.x:0,
+            dragOffsetZ=o.data.worldPosition?n.z-o.data.worldPosition.z:0
           })
           // Registra el segundo dedo aunque toque fuera del modelo.
           .listen(t.events.globalId, e.input.SCREEN_TOUCH_START, o=>{
@@ -113,7 +118,11 @@
             s=new i.Plane(new i.Vector3(0, 1, 0), -dragPlaneY),
             l=new i.Vector3();
             r.setFromCamera(d, n);
-            if(r.ray.intersectPlane(s, l))t.transform.setWorldPosition(a, l)
+            if(r.ray.intersectPlane(s, l))t.transform.setWorldPosition(a, {
+              x:l.x+dragOffsetX,
+              y:dragPlaneY,
+              z:l.z+dragOffsetZ
+            })
           })
           .listen(t.events.globalId, e.input.SCREEN_TOUCH_END, o=>{
             activePointerIds.delete(o.data.pointerId);
