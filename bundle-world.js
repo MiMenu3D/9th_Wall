@@ -1,4 +1,4 @@
-﻿// 9th Wall v2.38
+﻿// 9th Wall v3.00 Fake PMREM+HDR
 (()=>{
   var e={
     574(){
@@ -17,6 +17,16 @@
             if (e.processCpuResult && e.processCpuResult.reality) {
               // Exponemos las coordenadas del SLAM globalmente para el componente 3D
               window.latestWorldPoints = e.processCpuResult.reality.worldPoints;
+            }
+          }
+        }),
+
+        // Capturador de estimación de luz nativo de 8th Wall
+        XR8.addCameraPipelineModule({
+          name: 'hdr-light-estimation-listener',
+          onUpdate: (e) => {
+            if (e.processCpuResult && e.processCpuResult.lighting) {
+              window.latestRawLighting = e.processCpuResult.lighting;
             }
           }
         }),
@@ -287,6 +297,82 @@
       }
     });
 
+    // --- FUNCIÓN DE INFLADO EXPONENCIAL 8-BIT A HDR ---
+    function inflateLuminance8Bit(val255) {
+      if (val255 <= 50) {
+        return val255 / 255.0;
+      }
+      const normAbove50 = (val255 - 50) / (255 - 50);
+      const multiplier = 1.0 + Math.pow(normAbove50, 2.2) * 3.8;
+      return (val255 / 255.0) * multiplier;
+    }
+
+    // --- COMPONENTE DE SUAVIZADO TEMPORAL Y PMREM (OPCIÓN A) ---
+    e.registerComponent({
+      name: "hdr-light-smoother",
+      add: (world, component) => {
+        const THREE_INSTANCE = window.THREE;
+        if (!THREE_INSTANCE) return;
+
+        let pmremGenerator = null;
+        let envRenderTarget = null;
+
+        let currentIntensity = 1.0;
+        let targetIntensity = 1.0;
+        let currentAmbient = 0.6;
+        let targetAmbient = 0.6;
+
+        const updateLightingLoop = () => {
+          const scene = world.three.scene;
+          const renderer = world.three.renderer;
+
+          if (scene) {
+            if (window.latestRawLighting) {
+              const l = window.latestRawLighting;
+              let val255 = 128;
+              if (typeof l.exposure === 'number') {
+                val255 = Math.min(255, Math.max(0, l.exposure * 255));
+              } else if (typeof l.brightness === 'number') {
+                val255 = Math.min(255, Math.max(0, l.brightness));
+              } else if (typeof l.intensity === 'number') {
+                val255 = Math.min(255, Math.max(0, l.intensity > 1 ? l.intensity : l.intensity * 255));
+              }
+
+              targetIntensity = inflateLuminance8Bit(val255);
+              targetAmbient = Math.max(0.15, targetIntensity * 0.35);
+            }
+
+            const lerpSpeed = 0.08;
+            currentIntensity += (targetIntensity - currentIntensity) * lerpSpeed;
+            currentAmbient += (targetAmbient - currentAmbient) * lerpSpeed;
+
+            scene.traverse((node) => {
+              if (node.isDirectionalLight) {
+                node.intensity = currentIntensity;
+              } else if (node.isAmbientLight) {
+                node.intensity = currentAmbient;
+              }
+            });
+
+            if (renderer) {
+              if (!pmremGenerator) {
+                pmremGenerator = new THREE_INSTANCE.PMREMGenerator(renderer);
+                pmremGenerator.compileCubemapShader();
+              }
+              if (pmremGenerator) {
+                if (envRenderTarget) envRenderTarget.dispose();
+                envRenderTarget = pmremGenerator.fromScene(scene);
+                scene.environment = envRenderTarget.texture;
+              }
+            }
+          }
+          requestAnimationFrame(updateLightingLoop);
+        };
+
+        updateLightingLoop();
+      }
+    });
+
     // --- AQUÍ ESTABA LA LÍNEA INFINITA (Formateada con saltos de línea) ---
     const i = {
       "objects": {
@@ -370,6 +456,11 @@
             "point-cloud-visualizer-comp": {
               "id": "point-cloud-visualizer-comp",
               "name": "point-cloud-visualizer",
+              "parameters": {}
+            },
+            "hdr-light-smoother-comp": {
+              "id": "hdr-light-smoother-comp",
+              "name": "hdr-light-smoother",
               "parameters": {}
             }
           },
