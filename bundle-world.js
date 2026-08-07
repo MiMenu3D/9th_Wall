@@ -1,4 +1,4 @@
-﻿// 9th Wall v3.02 PMREM exponencial
+﻿// 9th Wall v3.03 PMREM exponencial
 (()=>{
   var e={
     574(){
@@ -17,16 +17,6 @@
             if (e.processCpuResult && e.processCpuResult.reality) {
               // Exponemos las coordenadas del SLAM globalmente para el componente 3D
               window.latestWorldPoints = e.processCpuResult.reality.worldPoints;
-            }
-          }
-        }),
-
-        // Capturador de estimación de luz nativo de 8th Wall (Ubicación Oficial)
-        XR8.addCameraPipelineModule({
-          name: 'hdr-light-listener',
-          onUpdate: (e) => {
-            if (e.processCpuResult && e.processCpuResult.lighting) {
-              window.latestRawLighting = e.processCpuResult.lighting;
             }
           }
         }),
@@ -297,50 +287,54 @@
       }
     });
 
-    // --- COMPONENTE HDR LIGERO PARA MODO CAM ---
+    // --- INFLADO HDR Y SUAVIZADO LERG 60FPS SOBRE V2.38 ---
+    function inflateLuminance8Bit(val255) {
+      if (val255 <= 50) return val255 / 255.0;
+      const normAbove50 = (val255 - 50) / 205.0;
+      return (val255 / 255.0) * (1.0 + Math.pow(normAbove50, 2.2) * 3.8);
+    }
+
     e.registerComponent({
       name: "hdr-env-booster",
       add: (world, component) => {
-        let lastVal = -1;
+        let currentBoost = 1.0;
+        let targetBoost = 1.0;
+        let currentAmbient = 0.6;
+        let targetAmbient = 0.6;
+        let rawAmbient = 0.6;
 
         const updateLoop = () => {
           const scene = world.three.scene;
-          if (scene && window.latestRawLighting) {
-            const l = window.latestRawLighting;
-            let val255 = 128;
-            if (typeof l.exposure === 'number') val255 = Math.min(255, Math.max(0, l.exposure * 255));
-            else if (typeof l.intensity === 'number') val255 = Math.min(255, Math.max(0, l.intensity > 1 ? l.intensity : l.intensity * 255));
-            else if (typeof l.brightness === 'number') val255 = Math.min(255, Math.max(0, l.brightness));
 
-            // Solo actuar cuando haya un cambio de iluminación perceptible
-            if (Math.abs(val255 - lastVal) > 2) {
-              lastVal = val255;
-              
-              // Curva exponencial: 0-50 normal, 51-255 inflado progresivo hacia HDR
-              let boost = 1.0;
-              if (val255 > 50) {
-                const normAbove50 = (val255 - 50) / 205.0;
-                boost = 1.0 + Math.pow(normAbove50, 2.2) * 3.8;
+          if (scene) {
+            // 1. Detectar cuando v2.38 actualiza la luz ambiental (cada 200ms)
+            scene.traverse((node) => {
+              if (node.isAmbientLight) {
+                if (Math.abs(node.intensity - currentAmbient) > 0.001) {
+                  rawAmbient = node.intensity;
+                  const val255 = Math.min(255, Math.max(0, rawAmbient * 255));
+                  targetBoost = inflateLuminance8Bit(val255);
+                  targetAmbient = Math.max(0.15, rawAmbient * targetBoost);
+                }
               }
+            });
 
-              scene.traverse((node) => {
-                // 1. Amplificar reflejos PMREM en materiales PBR
-                if (node.isMesh && node.material) {
-                  const mats = Array.isArray(node.material) ? node.material : [node.material];
-                  mats.forEach((m) => {
-                    m.envMapIntensity = boost;
-                  });
-                }
-                // 2. Amplificar luz ambiental
-                else if (node.isAmbientLight) {
-                  node.intensity = Math.max(0.2, (val255 / 255.0) * boost * 0.6);
-                }
-                // 3. Amplificar luz direccional
-                else if (node.isDirectionalLight) {
-                  node.intensity = Math.max(0.5, boost);
-                }
-              });
-            }
+            // 2. Interpolación suave (Lerp a 60 FPS) para eliminar saltitos
+            const lerpSpeed = 0.08;
+            currentBoost += (targetBoost - currentBoost) * lerpSpeed;
+            currentAmbient += (targetAmbient - currentAmbient) * lerpSpeed;
+
+            // 3. Aplicar reflejos HDR y luz suavizada
+            scene.traverse((node) => {
+              if (node.isMesh && node.material) {
+                const mats = Array.isArray(node.material) ? node.material : [node.material];
+                mats.forEach((m) => {
+                  m.envMapIntensity = currentBoost;
+                });
+              } else if (node.isAmbientLight) {
+                node.intensity = currentAmbient;
+              }
+            });
           }
           requestAnimationFrame(updateLoop);
         };
@@ -348,7 +342,7 @@
       }
     });
 
-    // --- ESTRUCTURA DE LA ESCENA ---
+    // --- AQUÍ ESTABA LA LÍNEA INFINITA (Formateada con saltos de línea) ---
     const i = {
       "objects": {
 
@@ -397,7 +391,7 @@
             "shadowBias": 0,
             "shadowRadius": 2,
             "followCamera": false,
-            "shadowCamera": [-1, 1, 1, -1, 0.5, 200]
+            "shadowCamera": [-1, 1, 1, -1, 0.5, 200] // <-- AQUÍ ESTÁ LA SHADOW CAMERA
           },
           "name": "Directional Light",
           "order": 0.6785011504707911
@@ -412,7 +406,13 @@
           "geometry": null,
           "material": null,
           "parentId": "84028e73-ee70-412d-b8d4-c09bf07c655c",
-          "components": {},
+          "components": {
+            "hdr-env-booster-comp": {
+              "id": "hdr-env-booster-comp",
+              "name": "hdr-env-booster",
+              "parameters": {}
+            }
+          },
           "light": { "type": "ambient", "intensity": 1 },
           "name": "Ambient Light",
           "order": 1.2491958667939822
@@ -431,11 +431,6 @@
             "point-cloud-visualizer-comp": {
               "id": "point-cloud-visualizer-comp",
               "name": "point-cloud-visualizer",
-              "parameters": {}
-            },
-            "hdr-env-booster-comp": {
-              "id": "hdr-env-booster-comp",
-              "name": "hdr-env-booster",
               "parameters": {}
             }
           },
@@ -521,7 +516,7 @@
               }
             }
           },
-          "name": "Ground",
+          "name": "Ground", // <-- ESTO ES EL GROUND
           "order": 5.877553308364804,
           "shadow": { "receiveShadow": true }
         },
@@ -540,6 +535,7 @@
           "order": 5.878553308364804,
           "shadow": { "receiveShadow": false }
         },
+
 
         // Plano Ocultador (Hider)
         "17af117a-efce-48dd-857e-e383a3649c7b": {
@@ -638,7 +634,7 @@
               }
             }
           },
-          "name": "Model",
+          "name": "Model", // <-- ESTO ES EL MODELO 3D
           "order": 1.1209803013844988,
           "gltfModel": {
             "src": { "type": "asset", "asset": "assets/8-jewel.glb" },
