@@ -1,4 +1,4 @@
-﻿// 9th Wall v3.03 PMREM exponencial
+﻿// 9th Wall v3.04 PMREM exponencial
 (()=>{
   var e={
     574(){
@@ -297,42 +297,15 @@
     e.registerComponent({
       name: "hdr-env-booster",
       add: (world, component) => {
-        let currentBoost = 1.0;
-        let targetBoost = 1.0;
-        let currentAmbient = 0.6;
-        let targetAmbient = 0.6;
-        let rawAmbient = 0.6;
-
         const updateLoop = () => {
           const scene = world.three.scene;
-
           if (scene) {
-            // 1. Detectar cuando v2.38 actualiza la luz ambiental (cada 200ms)
-            scene.traverse((node) => {
-              if (node.isAmbientLight) {
-                if (Math.abs(node.intensity - currentAmbient) > 0.001) {
-                  rawAmbient = node.intensity;
-                  const val255 = Math.min(255, Math.max(0, rawAmbient * 255));
-                  targetBoost = inflateLuminance8Bit(val255);
-                  targetAmbient = Math.max(0.15, rawAmbient * targetBoost);
-                }
-              }
-            });
-
-            // 2. Interpolación suave (Lerp a 60 FPS) para eliminar saltitos
-            const lerpSpeed = 0.08;
-            currentBoost += (targetBoost - currentBoost) * lerpSpeed;
-            currentAmbient += (targetAmbient - currentAmbient) * lerpSpeed;
-
-            // 3. Aplicar reflejos HDR y luz suavizada
             scene.traverse((node) => {
               if (node.isMesh && node.material) {
                 const mats = Array.isArray(node.material) ? node.material : [node.material];
                 mats.forEach((m) => {
-                  m.envMapIntensity = currentBoost;
+                  m.envMapIntensity = 3.8;
                 });
-              } else if (node.isAmbientLight) {
-                node.intensity = currentAmbient;
               }
             });
           }
