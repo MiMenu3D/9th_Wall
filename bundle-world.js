@@ -1,4 +1,4 @@
-﻿// 9th Wall v3.01 Fake PMREM+HDR
+﻿// 9th Wall v3.02 PMREM exponencial
 (()=>{
   var e={
     574(){
@@ -17,6 +17,16 @@
             if (e.processCpuResult && e.processCpuResult.reality) {
               // Exponemos las coordenadas del SLAM globalmente para el componente 3D
               window.latestWorldPoints = e.processCpuResult.reality.worldPoints;
+            }
+          }
+        }),
+
+        // Capturador de estimación de luz nativo de 8th Wall (Ubicación Oficial)
+        XR8.addCameraPipelineModule({
+          name: 'hdr-light-listener',
+          onUpdate: (e) => {
+            if (e.processCpuResult && e.processCpuResult.lighting) {
+              window.latestRawLighting = e.processCpuResult.lighting;
             }
           }
         }),
@@ -287,18 +297,7 @@
       }
     });
 
-    // --- ESCUCHADOR Y COMPONENTE HDR LIGERO PARA MODO CAM ---
-    if (window.XR8) {
-      XR8.addCameraPipelineModule({
-        name: 'hdr-light-listener',
-        onUpdate: (e) => {
-          if (e.processCpuResult && e.processCpuResult.lighting) {
-            window.latestRawLighting = e.processCpuResult.lighting;
-          }
-        }
-      });
-    }
-
+    // --- COMPONENTE HDR LIGERO PARA MODO CAM ---
     e.registerComponent({
       name: "hdr-env-booster",
       add: (world, component) => {
@@ -311,12 +310,13 @@
             let val255 = 128;
             if (typeof l.exposure === 'number') val255 = Math.min(255, Math.max(0, l.exposure * 255));
             else if (typeof l.intensity === 'number') val255 = Math.min(255, Math.max(0, l.intensity > 1 ? l.intensity : l.intensity * 255));
+            else if (typeof l.brightness === 'number') val255 = Math.min(255, Math.max(0, l.brightness));
 
-            // Solo actuar si hay un cambio real para no saturar la CPU
+            // Solo actuar cuando haya un cambio de iluminación perceptible
             if (Math.abs(val255 - lastVal) > 2) {
               lastVal = val255;
               
-              // Curva exponencial: 0-50 normal, 51-255 inflado progresivo
+              // Curva exponencial: 0-50 normal, 51-255 inflado progresivo hacia HDR
               let boost = 1.0;
               if (val255 > 50) {
                 const normAbove50 = (val255 - 50) / 205.0;
@@ -324,13 +324,20 @@
               }
 
               scene.traverse((node) => {
-                // 1. Inflar los reflejos del PMREM en el material PBR (da los brillos especulares)
+                // 1. Amplificar reflejos PMREM en materiales PBR
                 if (node.isMesh && node.material) {
-                  node.material.envMapIntensity = boost;
+                  const mats = Array.isArray(node.material) ? node.material : [node.material];
+                  mats.forEach((m) => {
+                    m.envMapIntensity = boost;
+                  });
                 }
-                // 2. Inflar la luz ambiental (la única luz que sí afecta a tu escena)
+                // 2. Amplificar luz ambiental
                 else if (node.isAmbientLight) {
                   node.intensity = Math.max(0.2, (val255 / 255.0) * boost * 0.6);
+                }
+                // 3. Amplificar luz direccional
+                else if (node.isDirectionalLight) {
+                  node.intensity = Math.max(0.5, boost);
                 }
               });
             }
@@ -341,7 +348,7 @@
       }
     });
 
-    // --- AQUÍ ESTABA LA LÍNEA INFINITA (Formateada con saltos de línea) ---
+    // --- ESTRUCTURA DE LA ESCENA ---
     const i = {
       "objects": {
 
@@ -390,7 +397,7 @@
             "shadowBias": 0,
             "shadowRadius": 2,
             "followCamera": false,
-            "shadowCamera": [-1, 1, 1, -1, 0.5, 200] // <-- AQUÍ ESTÁ LA SHADOW CAMERA
+            "shadowCamera": [-1, 1, 1, -1, 0.5, 200]
           },
           "name": "Directional Light",
           "order": 0.6785011504707911
@@ -514,7 +521,7 @@
               }
             }
           },
-          "name": "Ground", // <-- ESTO ES EL GROUND
+          "name": "Ground",
           "order": 5.877553308364804,
           "shadow": { "receiveShadow": true }
         },
@@ -533,7 +540,6 @@
           "order": 5.878553308364804,
           "shadow": { "receiveShadow": false }
         },
-
 
         // Plano Ocultador (Hider)
         "17af117a-efce-48dd-857e-e383a3649c7b": {
@@ -632,7 +638,7 @@
               }
             }
           },
-          "name": "Model", // <-- ESTO ES EL MODELO 3D
+          "name": "Model",
           "order": 1.1209803013844988,
           "gltfModel": {
             "src": { "type": "asset", "asset": "assets/8-jewel.glb" },
