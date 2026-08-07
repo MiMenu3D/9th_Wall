@@ -1,4 +1,4 @@
-﻿// 9th Wall v3.04 PMREM exponencial
+﻿// 9th Wall v3.05 PMREM exponencial
 (()=>{
   var e={
     574(){
@@ -298,14 +298,19 @@
       name: "hdr-env-booster",
       add: (world, component) => {
         const updateLoop = () => {
+          const renderer = world.three.renderer;
           const scene = world.three.scene;
+
+          // 1. Amplificar la exposición PBR global de la tarjeta gráfica
+          if (renderer) {
+            renderer.toneMappingExposure = 2.2;
+          }
+
+          // 2. Amplificar la luz ambiental de la escena
           if (scene) {
             scene.traverse((node) => {
-              if (node.isMesh && node.material) {
-                const mats = Array.isArray(node.material) ? node.material : [node.material];
-                mats.forEach((m) => {
-                  m.envMapIntensity = 3.8;
-                });
+              if (node.isAmbientLight) {
+                node.intensity = 1.8;
               }
             });
           }
