@@ -1,4 +1,4 @@
-﻿// 9th Wall v3.00 Fake PMREM+HDR
+﻿// 9th Wall v3.01 Fake PMREM+HDR
 (()=>{
   var e={
     574(){
@@ -17,16 +17,6 @@
             if (e.processCpuResult && e.processCpuResult.reality) {
               // Exponemos las coordenadas del SLAM globalmente para el componente 3D
               window.latestWorldPoints = e.processCpuResult.reality.worldPoints;
-            }
-          }
-        }),
-
-        // Capturador de estimación de luz nativo de 8th Wall
-        XR8.addCameraPipelineModule({
-          name: 'hdr-light-estimation-listener',
-          onUpdate: (e) => {
-            if (e.processCpuResult && e.processCpuResult.lighting) {
-              window.latestRawLighting = e.processCpuResult.lighting;
             }
           }
         }),
@@ -297,79 +287,57 @@
       }
     });
 
-    // --- FUNCIÓN DE INFLADO EXPONENCIAL 8-BIT A HDR ---
-    function inflateLuminance8Bit(val255) {
-      if (val255 <= 50) {
-        return val255 / 255.0;
-      }
-      const normAbove50 = (val255 - 50) / (255 - 50);
-      const multiplier = 1.0 + Math.pow(normAbove50, 2.2) * 3.8;
-      return (val255 / 255.0) * multiplier;
+    // --- ESCUCHADOR Y COMPONENTE HDR LIGERO PARA MODO CAM ---
+    if (window.XR8) {
+      XR8.addCameraPipelineModule({
+        name: 'hdr-light-listener',
+        onUpdate: (e) => {
+          if (e.processCpuResult && e.processCpuResult.lighting) {
+            window.latestRawLighting = e.processCpuResult.lighting;
+          }
+        }
+      });
     }
 
-    // --- COMPONENTE DE SUAVIZADO TEMPORAL Y PMREM (OPCIÓN A) ---
     e.registerComponent({
-      name: "hdr-light-smoother",
+      name: "hdr-env-booster",
       add: (world, component) => {
-        const THREE_INSTANCE = window.THREE;
-        if (!THREE_INSTANCE) return;
+        let lastVal = -1;
 
-        let pmremGenerator = null;
-        let envRenderTarget = null;
-
-        let currentIntensity = 1.0;
-        let targetIntensity = 1.0;
-        let currentAmbient = 0.6;
-        let targetAmbient = 0.6;
-
-        const updateLightingLoop = () => {
+        const updateLoop = () => {
           const scene = world.three.scene;
-          const renderer = world.three.renderer;
+          if (scene && window.latestRawLighting) {
+            const l = window.latestRawLighting;
+            let val255 = 128;
+            if (typeof l.exposure === 'number') val255 = Math.min(255, Math.max(0, l.exposure * 255));
+            else if (typeof l.intensity === 'number') val255 = Math.min(255, Math.max(0, l.intensity > 1 ? l.intensity : l.intensity * 255));
 
-          if (scene) {
-            if (window.latestRawLighting) {
-              const l = window.latestRawLighting;
-              let val255 = 128;
-              if (typeof l.exposure === 'number') {
-                val255 = Math.min(255, Math.max(0, l.exposure * 255));
-              } else if (typeof l.brightness === 'number') {
-                val255 = Math.min(255, Math.max(0, l.brightness));
-              } else if (typeof l.intensity === 'number') {
-                val255 = Math.min(255, Math.max(0, l.intensity > 1 ? l.intensity : l.intensity * 255));
+            // Solo actuar si hay un cambio real para no saturar la CPU
+            if (Math.abs(val255 - lastVal) > 2) {
+              lastVal = val255;
+              
+              // Curva exponencial: 0-50 normal, 51-255 inflado progresivo
+              let boost = 1.0;
+              if (val255 > 50) {
+                const normAbove50 = (val255 - 50) / 205.0;
+                boost = 1.0 + Math.pow(normAbove50, 2.2) * 3.8;
               }
 
-              targetIntensity = inflateLuminance8Bit(val255);
-              targetAmbient = Math.max(0.15, targetIntensity * 0.35);
-            }
-
-            const lerpSpeed = 0.08;
-            currentIntensity += (targetIntensity - currentIntensity) * lerpSpeed;
-            currentAmbient += (targetAmbient - currentAmbient) * lerpSpeed;
-
-            scene.traverse((node) => {
-              if (node.isDirectionalLight) {
-                node.intensity = currentIntensity;
-              } else if (node.isAmbientLight) {
-                node.intensity = currentAmbient;
-              }
-            });
-
-            if (renderer) {
-              if (!pmremGenerator) {
-                pmremGenerator = new THREE_INSTANCE.PMREMGenerator(renderer);
-                pmremGenerator.compileCubemapShader();
-              }
-              if (pmremGenerator) {
-                if (envRenderTarget) envRenderTarget.dispose();
-                envRenderTarget = pmremGenerator.fromScene(scene);
-                scene.environment = envRenderTarget.texture;
-              }
+              scene.traverse((node) => {
+                // 1. Inflar los reflejos del PMREM en el material PBR (da los brillos especulares)
+                if (node.isMesh && node.material) {
+                  node.material.envMapIntensity = boost;
+                }
+                // 2. Inflar la luz ambiental (la única luz que sí afecta a tu escena)
+                else if (node.isAmbientLight) {
+                  node.intensity = Math.max(0.2, (val255 / 255.0) * boost * 0.6);
+                }
+              });
             }
           }
-          requestAnimationFrame(updateLightingLoop);
+          requestAnimationFrame(updateLoop);
         };
-
-        updateLightingLoop();
+        updateLoop();
       }
     });
 
@@ -458,9 +426,9 @@
               "name": "point-cloud-visualizer",
               "parameters": {}
             },
-            "hdr-light-smoother-comp": {
-              "id": "hdr-light-smoother-comp",
-              "name": "hdr-light-smoother",
+            "hdr-env-booster-comp": {
+              "id": "hdr-env-booster-comp",
+              "name": "hdr-env-booster",
               "parameters": {}
             }
           },
