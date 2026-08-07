@@ -1,4 +1,4 @@
-﻿// 9th Wall v3.05 PMREM exponencial
+﻿// 9th Wall v3.06 PMREM exponencial
 (()=>{
   var e={
     574(){
@@ -294,23 +294,57 @@
       return (val255 / 255.0) * (1.0 + Math.pow(normAbove50, 2.2) * 3.8);
     }
 
+    // --- COMPONENTE HDR DINÁMICO (SUELO 0.6 + EXPONENCIAL + LERP) ---
+    function inflateLuminance8Bit(val255) {
+      if (val255 <= 50) return val255 / 255.0;
+      const normAbove50 = (val255 - 50) / 205.0;
+      return (val255 / 255.0) * (1.0 + Math.pow(normAbove50, 2.2) * 3.8);
+    }
+
     e.registerComponent({
       name: "hdr-env-booster",
       add: (world, component) => {
+        let currentAmbient = 0.6;
+        let targetAmbient = 0.6;
+        let currentExposure = 1.0;
+        let targetExposure = 1.0;
+        let rawAmbient = 0.6;
+
         const updateLoop = () => {
-          const renderer = world.three.renderer;
           const scene = world.three.scene;
+          const renderer = world.three.renderer;
 
-          // 1. Amplificar la exposición PBR global de la tarjeta gráfica
-          if (renderer) {
-            renderer.toneMappingExposure = 2.2;
-          }
-
-          // 2. Amplificar la luz ambiental de la escena
           if (scene) {
+            // 1. Leer actualización de luz de la cámara (v2.38)
             scene.traverse((node) => {
               if (node.isAmbientLight) {
-                node.intensity = 1.8;
+                if (Math.abs(node.intensity - currentAmbient) > 0.005) {
+                  rawAmbient = node.intensity;
+                }
+              }
+            });
+
+            // 2. Calcular inflado dinámico
+            const val255 = Math.min(255, Math.max(0, rawAmbient * 255));
+            const boost = inflateLuminance8Bit(val255);
+
+            // Suelo MÍNIMO asegurado en 0.6 para no perder la protección en penumbra
+            targetAmbient = Math.max(0.6, rawAmbient * boost * 1.1);
+            // Exposición graduada dinámicamente entre 1.0 (normal) y ~1.8 (máximo brillo)
+            targetExposure = Math.max(1.0, 1.0 + (boost - 1.0) * 0.35);
+
+            // 3. Interpolación suave (Lerp a 60 FPS)
+            const lerpSpeed = 0.08;
+            currentAmbient += (targetAmbient - currentAmbient) * lerpSpeed;
+            currentExposure += (targetExposure - currentExposure) * lerpSpeed;
+
+            // 4. Aplicar a la lente y a la luz de la habitación
+            if (renderer) {
+              renderer.toneMappingExposure = currentExposure;
+            }
+            scene.traverse((node) => {
+              if (node.isAmbientLight) {
+                node.intensity = currentAmbient;
               }
             });
           }
