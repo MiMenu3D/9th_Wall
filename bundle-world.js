@@ -1,4 +1,4 @@
-﻿// 9th Wall v3.06 PMREM exponencial
+﻿// 9th Wall v3.07 PMREM exponencial
 (()=>{
   var e={
     574(){
@@ -304,11 +304,11 @@
     e.registerComponent({
       name: "hdr-env-booster",
       add: (world, component) => {
-        let currentAmbient = 0.6;
+        let currentAmbient = 0.2;
         let targetAmbient = 0.6;
-        let currentExposure = 1.0;
+        let currentExposure = 0.2;
         let targetExposure = 1.0;
-        let rawAmbient = 0.6;
+        let rawAmbient = 0.2;
 
         const updateLoop = () => {
           const scene = world.three.scene;
@@ -318,7 +318,7 @@
             // 1. Leer actualización de luz de la cámara (v2.38)
             scene.traverse((node) => {
               if (node.isAmbientLight) {
-                if (Math.abs(node.intensity - currentAmbient) > 0.005) {
+                if (Math.abs(node.intensity - currentAmbient) > 0.015) {
                   rawAmbient = node.intensity;
                 }
               }
@@ -329,7 +329,7 @@
             const boost = inflateLuminance8Bit(val255);
 
             // Suelo MÍNIMO asegurado en 0.6 para no perder la protección en penumbra
-            targetAmbient = Math.max(0.6, rawAmbient * boost * 1.1);
+            targetAmbient = Math.max(0.2, rawAmbient * boost * 1.6);
             // Exposición graduada dinámicamente entre 1.0 (normal) y ~1.8 (máximo brillo)
             targetExposure = Math.max(1.0, 1.0 + (boost - 1.0) * 0.35);
 
