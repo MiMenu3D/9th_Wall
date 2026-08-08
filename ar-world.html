@@ -1,4 +1,4 @@
-<!-- 9th Wall v2.34 -->
+<!-- 9th Wall v2.35 -->
 <html>
 <head>
   <meta charset="UTF-8">
@@ -18,7 +18,7 @@
     style="position:fixed;top:10px;right:10px;z-index:1000000;background:rgba(0,0,0,0.9);color:#0f0;font-family:monospace;font-size:12px;padding:8px;border-radius:4px;cursor:pointer;line-height:1.2;border:1px solid #0f0;">
     <div id="debugTitle">FPS: --</div>
     <div id="debugContent">
-      ar-world: v2.34<br>
+      ar-world: v2.35<br>
       bundle: v2.40
     </div>
   </div>
@@ -72,15 +72,15 @@
             try {
               _scene = world.three.scene;
               _renderer = world.three.renderer;
-
-              // ACTIVACIÓN DEL TONE MAPPING NATIVO
-              _renderer.toneMapping = nativeTHREE.ACESFilmicToneMapping;
               
               // Buscamos el THREE nativo expuesto globalmente por el runtime de 8th Wall
               const nativeTHREE = window.THREE;
               log('Captura exitosa. Usando Three nativo: ' + (!!nativeTHREE));
               
               if (nativeTHREE) {
+                // === ACTIVACIÓN SEGURA DEL TONE MAPPING ===
+                _renderer.toneMapping = nativeTHREE.ACESFilmicToneMapping;
+
                 // Descargamos y registramos RGBELoader directamente en el THREE nativo
                 loadNativeRGBELoader(nativeTHREE).then((LoaderClass) => {
                   if (LoaderClass) {
