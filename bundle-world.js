@@ -1,4 +1,4 @@
-﻿// 9th Wall v3.06 PMREM exponencial
+﻿// 9th Wall v3.10 PMREM exponencial
 (()=>{
   var e={
     574(){
@@ -318,7 +318,7 @@
             // 1. Leer actualización de luz de la cámara (v2.38)
             scene.traverse((node) => {
               if (node.isAmbientLight) {
-                if (Math.abs(node.intensity - currentAmbient) > 0.005) {
+                if (Math.abs(node.intensity - currentAmbient) > 0.008) {
                   rawAmbient = node.intensity;
                 }
               }
@@ -401,12 +401,39 @@
           "light": {
             "type": "directional",
             "shadowBias": 0,
-            "shadowRadius": 2,
+            "shadowRadius": 3,
             "followCamera": false,
-            "shadowCamera": [-1, 1, 1, -1, 0.5, 200] // <-- AQUÍ ESTÁ LA SHADOW CAMERA
+            "shadowCamera": [-1, 1, 1, -1, 0.5, 50] // <-- AQUÍ ESTÁ LA SHADOW CAMERA
           },
           "name": "Directional Light",
           "order": 0.6785011504707911
+        },
+
+        // Luz direccional2 y ShadowCamera2
+        "492cfe2c-9334-4a9c-a48a-be80132af9fc": {
+          "id": "492cfe2c-9334-4a9c-a48a-be80132af9fc",
+          "position": [50, 25, 50],
+          "rotation": [0, 0, 0, 1],
+          "scale": [1, 1, 1],
+          "geometry": null,
+          "material": null,
+          "parentId": "84028e73-ee70-412d-b8d4-c09bf07c655c",
+          "components": {
+            "shadow-camera-helper-comp2": {
+              "id": "shadow-camera-helper-comp2",
+              "name": "shadow-camera-helper2",
+              "parameters": {}
+            }
+          },
+          "light": {
+            "type": "directional",
+            "shadowBias": 0,
+            "shadowRadius": 3,
+            "followCamera": false,
+            "shadowCamera": [-1, 1, 1, -1, 0.5, 50] // <-- AQUÍ ESTÁ LA SHADOW CAMERA
+          },
+          "name": "Directional Light2",
+          "order": 0.6785011504707912
         },
 
         // Luz Ambiental
