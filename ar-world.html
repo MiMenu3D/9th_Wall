@@ -1,4 +1,4 @@
-<!-- 9th Wall v2.31 -->
+<!-- 9th Wall v2.31 luzdireccionaltocada -->
 <html>
 <head>
   <meta charset="UTF-8">
@@ -18,8 +18,8 @@
     style="position:fixed;top:10px;right:10px;z-index:1000000;background:rgba(0,0,0,0.9);color:#0f0;font-family:monospace;font-size:12px;padding:8px;border-radius:4px;cursor:pointer;line-height:1.2;border:1px solid #0f0;">
     <div id="debugTitle">FPS: --</div>
     <div id="debugContent">
-      ar-world: v2.31<br>
-      bundle: v3.10
+      ar-world: v2.31x<br>
+      bundle: v3.06
     </div>
   </div>
   <style>
@@ -223,7 +223,7 @@
           }
           if (obj.name === 'Directional Light') {
             if (obj.light) {
-              obj.light.intensity = 0.00; // Atenuamos la luz direccional para conservar sombras suaves
+              obj.light.intensity = 1.00; // Atenuamos la luz direccional para conservar sombras suaves
             }
           }
 
