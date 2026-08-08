@@ -1,4 +1,4 @@
-<!-- 9th Wall v2.35 -->
+<!-- 9th Wall v2.41 -->
 <html>
 <head>
   <meta charset="UTF-8">
@@ -181,7 +181,9 @@
                 }
                 const brightness = total / (pixels.length / 4);
                 smoothed += (brightness - smoothed) * 0.08;
-                renderer.toneMappingExposure = 0.4 + (smoothed / 255) * 1.5; // Ajuste de exposición basado en brillo promedio. Valores anteriores 0.6 y 0.9 respectivamente.
+
+                // LUZ PMREM LIGHT Ajuste de exposición basado en brillo promedio. Valores anteriores 0.4 y 1.5 respectivamente.
+                renderer.toneMappingExposure = 0.6 + (smoothed / 255) * 5.5; 
               } catch (e) {
                 // Silencioso
               }
