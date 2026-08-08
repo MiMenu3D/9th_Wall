@@ -183,7 +183,7 @@
                 smoothed += (brightness - smoothed) * 0.08;
 
                 // LUZ PMREM LIGHT Ajuste de exposición basado en brillo promedio. Valores anteriores 0.4 y 1.5 respectivamente.
-                renderer.toneMappingExposure = 3.6 + (smoothed / 255) * 0.5; 
+                renderer.toneMappingExposure = 0.6 + (smoothed / 255) * 1.9; 
               } catch (e) {
                 // Silencioso
               }
