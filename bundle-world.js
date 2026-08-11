@@ -1,4 +1,4 @@
-﻿// 9th Wall v2.61
+﻿// 9th Wall v2.62
 (()=>{
   var e={
     574(){
@@ -334,7 +334,7 @@
             "shadowBias": 0.0001, // Previene artefactos de sombras a baja resolución (shadow acne)
             "shadowRadius": 2,
             "followCamera": false,
-            "shadowCamera": [-10, 10, 10,-10, 3, 5] // Versión anterior: 0.3, 0.3, 0.3, 0.3, 0.4, 1 COMPROBADO: NO AFECTA A RENDIMIENTO NI ASPECTO
+            "shadowCamera": [-10, 10, 10,-10, 3, 5] // Versión anterior: 0.3, 0.3, 0.3, 0.3, 0.4, 1
           },
           "name": "Directional Light",
           "order": 0.6785011504707911
@@ -344,8 +344,8 @@
         "52ba8a86-a459-4df8-b954-a570e85e0484": {
           "id": "52ba8a86-a459-4df8-b954-a570e85e0484",
           "position": [0, 0.30, 0.30],
-          "rotation": [0, 0, 0, 0], // Decimales raros, limpiados a 0, a ver.
-          "scale": [1, 1, 1],  // Decimales raros, limpiados a 1, a ver.
+          "rotation": [-0.0004637899966810532, 0.9978406073902779, -0.06529682289718859, -0.007087458033270938],
+          "scale": [1.0000000000000002, 1, 1.0000000000000004],
           "geometry": null,
           "material": null,
           "parentId": "84028e73-ee70-412d-b8d4-c09bf07c655c",
@@ -424,8 +424,8 @@
         "bc7753ae-2b39-4f48-910a-7921b756487b": {
           "id": "bc7753ae-2b39-4f48-910a-7921b756487b",
           "position": [0, 0.001, 0],
-          "rotation": [-0, 0, 0, 0],  // Decimales raros, limpiados a 0, a ver.
-          "scale": [5, 5, 5], // Antes: 2, 2, 2 - COMPROBADO: NO AFECTA A RENDIMIENTO NI ASPECTO
+          "rotation": [-0.7071068, 0, 0, 0.7071068],
+          "scale": [5, 5, 5], // Antes: 2, 2, 2
           "geometry": { "type": "plane", "width": 1, "height": 1 },
           "material": { "type": "shadow", "color": "#000000", "opacity": 0.4 },
           "parentId": "84028e73-ee70-412d-b8d4-c09bf07c655c",
