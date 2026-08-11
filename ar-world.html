@@ -1,4 +1,4 @@
-<!-- 9th Wall v2.58 -->
+<!-- 9th Wall v2.57 -->
 <html>
 <head>
   <meta charset="UTF-8">
@@ -109,12 +109,12 @@
                       node.shadow.mapSize.width = 128; // <-- Modificar a mano aquí para pruebas (p.ej. 512, 256)
                       node.shadow.mapSize.height = 128; // <-- Modificar a mano aquí para pruebas (p.ej. 512, 256)
                       if (node.shadow.camera) {
-                        node.shadow.camera.left = -0.3;
-                        node.shadow.camera.right = 0.3;
-                        node.shadow.camera.top = 0.3;
-                        node.shadow.camera.bottom = -0.3;
+                        node.shadow.camera.left = -5;
+                        node.shadow.camera.right = 5;
+                        node.shadow.camera.top = 5;
+                        node.shadow.camera.bottom = -5;
                         node.shadow.camera.near = 0.5;
-                        node.shadow.camera.far = 2;
+                        node.shadow.camera.far = 10;
                         node.shadow.camera.updateProjectionMatrix();
                       }
                       // Desechamos el mapa de sombras anterior para que Three.js lo regenere con la nueva resolución
