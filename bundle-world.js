@@ -1,4 +1,4 @@
-﻿// 9th Wall v2.59
+﻿// 9th Wall v2.60
 (()=>{
   var e={
     574(){
@@ -425,7 +425,7 @@
           "id": "bc7753ae-2b39-4f48-910a-7921b756487b",
           "position": [0, 0.001, 0],
           "rotation": [-0.7071068, 0, 0, 0.7071068],
-          "scale": [2, 2, 2],
+          "scale": [0.5, 0.5, 0.5], // Antes: 2, 2, 2
           "geometry": { "type": "plane", "width": 1, "height": 1 },
           "material": { "type": "shadow", "color": "#000000", "opacity": 0.4 },
           "parentId": "84028e73-ee70-412d-b8d4-c09bf07c655c",
