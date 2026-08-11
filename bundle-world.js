@@ -1,4 +1,4 @@
-﻿// 9th Wall v2.51
+﻿// 9th Wall v2.52
 (()=>{
   var e={
     574(){
@@ -315,7 +315,7 @@
         // Luz direccional, ShadowCamera y tamaño de Shadow Map ajustados
         "492cfe2c-9334-4a9c-a48a-be80132af9fb": {
           "id": "492cfe2c-9334-4a9c-a48a-be80132af9fb",
-          "position": [0, 15, 0],
+          "position": [0, 1, 0],
           "rotation": [0, 0, 0, 1],
           "scale": [1, 1, 1],
           "geometry": null,
@@ -333,7 +333,7 @@
             "shadowBias": 0.0001, // Previene artefactos de sombras a baja resolución (shadow acne)
             "shadowRadius": 5,
             "followCamera": false,
-            "shadowCamera": [-0.75, 0.75, 0.75, -0.75, 0.1, 1], // Volumen óptimo para platos (1.5m)
+            "shadowCamera": [-10,10,10,-10,0.5,200], // Volumen óptimo para platos (1.5m)
             "shadowMapSizeWidth": 1024,   // Reducción drástica para optimizar GPU en móviles
             "shadowMapSizeHeight": 1024
           },
