@@ -1,4 +1,4 @@
-﻿// 9th Wall v2.58
+﻿// 9th Wall v2.57
 (()=>{
   var e={
     574(){
@@ -334,7 +334,7 @@
             "shadowBias": 0.0001, // Previene artefactos de sombras a baja resolución (shadow acne)
             "shadowRadius": 2,
             "followCamera": false,
-            "shadowCamera": [-3,3,3,-3,0.4,1] // Versión anterior: 0.3, 0.3, 0.3, 0.3, 0.4, 1
+            "shadowCamera": [-0.3,0.3,0.3,-0.3,0.4,1] // Versión anterior: 0.3, 0.3, 0.3, 0.3, 0.4, 1
           },
           "name": "Directional Light",
           "order": 0.6785011504707911
