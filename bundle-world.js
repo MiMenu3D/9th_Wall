@@ -1,4 +1,4 @@
-﻿// 9th Wall v2.63
+﻿// 9th Wall v2.64
 (()=>{
   var e={
     574(){
@@ -332,7 +332,7 @@
           "light": {
             "type": "directional",
             "shadowBias": 0.0001, // Previene artefactos de sombras a baja resolución (shadow acne)
-            "shadowRadius": 5,
+            "shadowRadius": 20,
             "followCamera": false,
             "shadowCamera": [-10, 10, 10,-10, 3, 5] // Versión anterior: 0.3, 0.3, 0.3, 0.3, 0.4, 1
           },
