@@ -34,10 +34,11 @@
   // Leemos de forma nativa el estado del interruptor debug persistido en sessionStorage
   const IS_DEBUG = sessionStorage.getItem("debug_features") === "true";
   
+  // Nube de puntos SLAM activa en Debug; Shadow Camera Helper y Ground Visual desactivados para no entorpecer
   const DEBUG_VISUALS = Object.freeze({
     slamPointCloud: IS_DEBUG,
-    shadowCameraHelper: IS_DEBUG,
-    groundVisual: IS_DEBUG
+    shadowCameraHelper: false,
+    groundVisual: false
   });
 
   // Controles del único modelo colocado.
@@ -312,7 +313,7 @@
           "prefab": true
         },
 
-        // Luz direccional, ShadowCamera y tamaño de Shadow Map ajustados
+        // Luz direccional y ShadowCamera (Restaurada la estructura original del bundle)
         "492cfe2c-9334-4a9c-a48a-be80132af9fb": {
           "id": "492cfe2c-9334-4a9c-a48a-be80132af9fb",
           "position": [0, 1, 0],
@@ -333,15 +334,13 @@
             "shadowBias": 0.0001, // Previene artefactos de sombras a baja resolución (shadow acne)
             "shadowRadius": 2,
             "followCamera": false,
-            "shadowCamera": [-1,1,1,-1,0.5,2], // Volumen óptimo para platos (1.5m)
-            "shadowMapSizeWidth": 1024,   // Reducción drástica para optimizar GPU en móviles
-            "shadowMapSizeHeight": 1024
+            "shadowCamera": [-1,1,1,-1,0.5,2] // Volumen óptimo para platos (1.5m)
           },
           "name": "Directional Light",
           "order": 0.6785011504707911
         },
 
-        // Cámara de Realidad Aumentada
+        // Camera de Realidad Aumentada
         "52ba8a86-a459-4df8-b954-a570e85e0484": {
           "id": "52ba8a86-a459-4df8-b954-a570e85e0484",
           "position": [0, 0.30, 0.30],

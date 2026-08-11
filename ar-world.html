@@ -1,4 +1,4 @@
-<!-- 9th Wall v2.42 -->
+<!-- 9th Wall v2.55 -->
 <html>
 <head>
   <meta charset="UTF-8">
@@ -18,7 +18,7 @@
     style="position:fixed;top:10px;right:10px;z-index:1000000;background:rgba(0,0,0,0.9);color:#0f0;font-family:monospace;font-size:12px;padding:8px;border-radius:4px;cursor:pointer;line-height:1.2;border:1px solid #0f0;">
     <div id="debugTitle">FPS: --</div>
     <div id="debugContent">
-      ar-world: v2.42<br>
+      ar-world: v2.55<br>
       bundle: v2.55
     </div>
   </div>
@@ -29,7 +29,12 @@
 
   <button id="envToggle"
     style="position:fixed;bottom:20px;left:20px;z-index:1000000;padding:12px 16px;border-radius:12px;border:1px solid white;background:rgba(0,0,0,0.7);color:white;font-size:14px;pointer-events:auto !important;">
-    Env: HDR
+    Env: CAM
+  </button>
+
+  <button id="debugToggle"
+    style="position:fixed;bottom:20px;left:130px;z-index:1000000;padding:12px 16px;border-radius:12px;border:1px solid white;background:rgba(0,0,0,0.7);color:white;font-size:14px;pointer-events:auto !important;">
+    Debug: OFF
   </button>
 
   <script>
@@ -55,13 +60,28 @@
     };
 
     let pmremGenerator = null, cameraRT = null, originalEnv = null;
-    let envMode = 'hdr', envInterval = null;
+    let envMode = 'cam'; // Iniciamos por defecto en CAM ya que el HDR está inactivo para optimizar
+    let envInterval = null;
     let _scene = null, _renderer = null;
 
     document.getElementById('envToggle').addEventListener('click', (e) => {
       log('Button clicked');
       toggleEnv();
     });
+
+    // Control de persistencia y lógica del botón Debug
+    const isDebugActive = sessionStorage.getItem("debug_features") === "true";
+    const debugToggleBtn = document.getElementById('debugToggle');
+    if (debugToggleBtn) {
+      debugToggleBtn.innerText = isDebugActive ? "Debug: ON" : "Debug: OFF";
+      debugToggleBtn.style.borderColor = isDebugActive ? "#0f0" : "white";
+      debugToggleBtn.style.color = isDebugActive ? "#0f0" : "white";
+      
+      debugToggleBtn.addEventListener('click', () => {
+        sessionStorage.setItem("debug_features", isDebugActive ? "false" : "true");
+        window.location.reload();
+      });
+    }
 
     // === Acoplamiento sobre el THREE Nativo del motor ===
     if (window.ecs) {
@@ -80,6 +100,31 @@
               if (nativeTHREE) {
                 // === ACTIVACIÓN SEGURA DEL TONE MAPPING ===
                 _renderer.toneMapping = nativeTHREE.ACESFilmicToneMapping;
+
+                // === FORZAR RESOLUCIÓN Y FRUSTUM DE SOMBRAS NATIVAS (Único punto de control de sombras) ===
+                _scene.traverse((node) => {
+                  if (node.isDirectionalLight) {
+                    log('Luz direccional localizada. Inicializando sombra a 1024px...');
+                    if (node.shadow) {
+                      node.shadow.mapSize.width = 1024; // <-- Modificar a mano aquí para pruebas (p.ej. 512, 256)
+                      node.shadow.mapSize.height = 1024; // <-- Modificar a mano aquí para pruebas (p.ej. 512, 256)
+                      if (node.shadow.camera) {
+                        node.shadow.camera.left = -1;
+                        node.shadow.camera.right = 1;
+                        node.shadow.camera.top = 1;
+                        node.shadow.camera.bottom = -1;
+                        node.shadow.camera.near = 0.5;
+                        node.shadow.camera.far = 2;
+                        node.shadow.camera.updateProjectionMatrix();
+                      }
+                      // Desechamos el mapa de sombras anterior para que Three.js lo regenere con la nueva resolución
+                      if (node.shadow.map) {
+                        node.shadow.map.dispose();
+                        node.shadow.map = null;
+                      }
+                    }
+                  }
+                });
 
                 // Descargamos y registramos RGBELoader directamente en el THREE nativo
                 loadNativeRGBELoader(nativeTHREE).then((LoaderClass) => {
@@ -133,15 +178,22 @@
         pmremGenerator.compileEquirectangularShader();
         log('PMREM compilado en motor nativo');
 
-        // Carga de textura de entorno HDR
-        new LoaderClass().load('HDR/terrace_sea.hdr', (hdr) => {
-          log('HDR cargado');
-          hdr.mapping = THREE_INSTANCE.EquirectangularReflectionMapping;
-          originalEnv = hdr;
-          if (envMode === 'hdr') scene.environment = hdr;
-        }, undefined, (err) => {
-          log('Error cargando HDR: ' + err.message);
-        });
+        // === CONTROL DE CARGA DEL HDR (Configuración manual) ===
+        const LOAD_HDR = false; // Cambiar a true para reactivar la descarga y uso del entorno HDR
+        
+        if (LOAD_HDR) {
+          log('Cargando textura de entorno HDR...');
+          new LoaderClass().load('HDR/terrace_sea.hdr', (hdr) => {
+            log('HDR cargado');
+            hdr.mapping = THREE_INSTANCE.EquirectangularReflectionMapping;
+            originalEnv = hdr;
+            if (envMode === 'hdr') scene.environment = hdr;
+          }, undefined, (err) => {
+            log('Error cargando HDR: ' + err.message);
+          });
+        } else {
+          log('HDR desactivado (LOAD_HDR = false)');
+        }
 
         // Separamos la estimación de luz del PMREM para reducir el trabajo de GPU.
         const waitForVideo = setInterval(() => {
@@ -260,9 +312,22 @@
         envMode = 'off';
         if (btn) btn.innerText = 'Env: OFF';
       } else {
-        if (originalEnv) _scene.environment = originalEnv;
-        envMode = 'hdr';
-        if (btn) btn.innerText = 'Env: HDR';
+        if (originalEnv) {
+          _scene.environment = originalEnv;
+          envMode = 'hdr';
+          if (btn) btn.innerText = 'Env: HDR';
+        } else {
+          // Si el HDR está inactivo, saltamos directamente a CAM (si está listo) o a OFF
+          if (cameraRT) {
+            _scene.environment = cameraRT.texture;
+            envMode = 'cam';
+            if (btn) btn.innerText = 'Env: CAM';
+          } else {
+            _scene.environment = null;
+            envMode = 'off';
+            if (btn) btn.innerText = 'Env: OFF';
+          }
+        }
       }
 
       log('Entorno cambiado a: ' + envMode.toUpperCase());
