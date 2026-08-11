@@ -1,4 +1,4 @@
-﻿// 9th Wall v2.50
+﻿// 9th Wall v2.51
 (()=>{
   var e={
     574(){
@@ -333,9 +333,9 @@
             "shadowBias": 0.0001, // Previene artefactos de sombras a baja resolución (shadow acne)
             "shadowRadius": 5,
             "followCamera": false,
-            "shadowCamera": [-0.75, 0.75, 0.75, -0.75, 0.1, 50], // Volumen óptimo para platos (1.5m)
-            "shadowMapSizeWidth": 256,   // Reducción drástica para optimizar GPU en móviles
-            "shadowMapSizeHeight": 256
+            "shadowCamera": [-0.75, 0.75, 0.75, -0.75, 0.1, 1], // Volumen óptimo para platos (1.5m)
+            "shadowMapSizeWidth": 1024,   // Reducción drástica para optimizar GPU en móviles
+            "shadowMapSizeHeight": 1024
           },
           "name": "Directional Light",
           "order": 0.6785011504707911
