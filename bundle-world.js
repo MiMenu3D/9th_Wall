@@ -1,4 +1,4 @@
-﻿// 9th Wall v2.54
+﻿// 9th Wall v2.55
 (()=>{
   var e={
     574(){
@@ -334,8 +334,8 @@
             "shadowRadius": 2,
             "followCamera": false,
             "shadowCamera": [-1,1,1,-1,0.5,2], // Volumen óptimo para platos (1.5m)
-            "shadowMapSizeWidth": 64,   // Reducción drástica para optimizar GPU en móviles
-            "shadowMapSizeHeight": 64
+            "shadowMapSizeWidth": 1024,   // Reducción drástica para optimizar GPU en móviles
+            "shadowMapSizeHeight": 1024
           },
           "name": "Directional Light",
           "order": 0.6785011504707911
