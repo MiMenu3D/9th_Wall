@@ -1,4 +1,4 @@
-﻿// 9th Wall v2.58
+﻿// 9th Wall v2.57
 (()=>{
   var e={
     574(){
@@ -43,8 +43,8 @@
 
   // Controles del único modelo colocado.
   const MODEL_GESTURES = Object.freeze({
-    minimumScale: 0.85,
-    maximumScale: 1.65,
+    minimumScale: 0.75,
+    maximumScale: 1.45,
     rotationSensitivity: 4,
     pinchActivationThreshold: 0.09,
     rotationActivationThreshold: 0.020
@@ -334,7 +334,7 @@
             "shadowBias": 0.0001, // Previene artefactos de sombras a baja resolución (shadow acne)
             "shadowRadius": 2,
             "followCamera": false,
-            "shadowCamera": [-1,1,1,-1,0.5,10] // Volumen óptimo para platos (1.5m)
+            "shadowCamera": [-0.3,0.3,0.3,-0.3,0.4,1] // Volumen óptimo para platos (1.5m)
           },
           "name": "Directional Light",
           "order": 0.6785011504707911
