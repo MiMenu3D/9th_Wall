@@ -1,4 +1,4 @@
-<!-- 9th Wall v2.42 -->
+<!-- 9th Wall v2.50 -->
 <html>
 <head>
   <meta charset="UTF-8">
@@ -10,7 +10,6 @@
   <script src="https://cdn.jsdelivr.net/npm/@8thwall/engine-binary@1/dist/xr.js" async crossorigin="anonymous" data-preload-chunks="slam"></script>
   <!-- 8th Wall landing page (splash screen) -->
   <script src="https://cdn.jsdelivr.net/npm/@8thwall/landing-page@1/dist/landing-page.js" crossorigin="anonymous"></script>
-  <!-- Three.js — needed for PMREM + Light Estimation -->
 </head>
 <body>
 
@@ -30,6 +29,11 @@
   <button id="envToggle"
     style="position:fixed;bottom:20px;left:20px;z-index:1000000;padding:12px 16px;border-radius:12px;border:1px solid white;background:rgba(0,0,0,0.7);color:white;font-size:14px;pointer-events:auto !important;">
     Env: HDR
+  </button>
+
+  <button id="debugToggle"
+    style="position:fixed;bottom:20px;left:130px;z-index:1000000;padding:12px 16px;border-radius:12px;border:1px solid white;background:rgba(0,0,0,0.7);color:white;font-size:14px;pointer-events:auto !important;">
+    Debug: OFF
   </button>
 
   <script>
@@ -63,6 +67,20 @@
       toggleEnv();
     });
 
+    // Control de persistencia y lógica del botón Debug
+    const isDebugActive = sessionStorage.getItem("debug_features") === "true";
+    const debugToggleBtn = document.getElementById('debugToggle');
+    if (debugToggleBtn) {
+      debugToggleBtn.innerText = isDebugActive ? "Debug: ON" : "Debug: OFF";
+      debugToggleBtn.style.borderColor = isDebugActive ? "#0f0" : "white";
+      debugToggleBtn.style.color = isDebugActive ? "#0f0" : "white";
+      
+      debugToggleBtn.addEventListener('click', () => {
+        sessionStorage.setItem("debug_features", isDebugActive ? "false" : "true");
+        window.location.reload();
+      });
+    }
+
     // === Acoplamiento sobre el THREE Nativo del motor ===
     if (window.ecs) {
       window.ecs.registerComponent({
@@ -80,6 +98,32 @@
               if (nativeTHREE) {
                 // === ACTIVACIÓN SEGURA DEL TONE MAPPING ===
                 _renderer.toneMapping = nativeTHREE.ACESFilmicToneMapping;
+
+                // === FORZAR RESOLUCIÓN Y AJUSTE DE FRUSTUM DE SOMBRAS NATIVAS ===
+                _scene.traverse((node) => {
+                  if (node.isDirectionalLight) {
+                    log('Luz direccional localizada. Ajustando sombra a 256px...');
+                    if (node.shadow) {
+                      node.shadow.mapSize.width = 256;
+                      node.shadow.mapSize.height = 256;
+                      if (node.shadow.camera) {
+                        // Frustum acotado a 1.5 metros totales (perfecto para un plato de 26cm)
+                        node.shadow.camera.left = -0.75;
+                        node.shadow.camera.right = 0.75;
+                        node.shadow.camera.top = 0.75;
+                        node.shadow.camera.bottom = -0.75;
+                        node.shadow.camera.near = 0.1;
+                        node.shadow.camera.far = 50;
+                        node.shadow.camera.updateProjectionMatrix();
+                      }
+                      // Desechamos el mapa de sombras anterior para que Three.js lo regenere a 256x256
+                      if (node.shadow.map) {
+                        node.shadow.map.dispose();
+                        node.shadow.map = null;
+                      }
+                    }
+                  }
+                });
 
                 // Descargamos y registramos RGBELoader directamente en el THREE nativo
                 loadNativeRGBELoader(nativeTHREE).then((LoaderClass) => {
@@ -182,8 +226,8 @@
                 const brightness = total / (pixels.length / 4);
                 smoothed += (brightness - smoothed) * 0.08;
 
-                // LUZ PMREM LIGHT Ajuste de exposición basado en brillo promedio. Valores anteriores 0.4 y 1.5 respectivamente.
-                renderer.toneMappingExposure = 0.6 + (smoothed / 255) * 1.9; 
+                // LUZ PMREM LIGHT Ajuste de exposición basado en brillo promedio.
+                renderer.toneMappingExposure = 0.7 + (smoothed / 255) * 1.6; 
               } catch (e) {
                 // Silencioso
               }
@@ -221,7 +265,7 @@
           if (obj.name === 'Loading Screen') delete c.objects[k];
           
           // Solución a la doble iluminación nativa:
-            if (obj.name === 'Directional Light') {
+          if (obj.name === 'Directional Light') {
             if (obj.light) {
               obj.light.intensity = 0.00; // Atenuamos la luz direccional para conservar sombras suaves
             }

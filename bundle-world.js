@@ -1,15 +1,16 @@
-﻿// 9th Wall v2.41
+﻿// 9th Wall v2.50
 (()=>{
   var e={
     574(){
       const e=()=>{
         XR8.addCameraPipelineModule(LandingPage.pipelineModule()),
 
-        // Registro oficial de nuestro módulo de puntos ANTES del arranque del motor
+        // Registro del módulo de puntos condicionado de forma estricta por el estado debug
         DEBUG_VISUALS.slamPointCloud && XR8.addCameraPipelineModule({
           name: 'pointcloud-debugger-inner',
           onStart: () => {
             if (window.XR8) {
+              // Habilitamos la extracción de características de puntos únicamente si la depuración está activa
               window.XR8.XrController.configure({ enableWorldPoints: true });
             }
           },
@@ -29,13 +30,17 @@
     }
   },
   t={};
-  // Change any value to true to restore that debug visualization.
+  
+  // Leemos de forma nativa el estado del interruptor debug persistido en sessionStorage
+  const IS_DEBUG = sessionStorage.getItem("debug_features") === "true";
+  
   const DEBUG_VISUALS = Object.freeze({
-    slamPointCloud: false,
-    shadowCameraHelper: false,
-    groundVisual: false
+    slamPointCloud: IS_DEBUG,
+    shadowCameraHelper: IS_DEBUG,
+    groundVisual: IS_DEBUG
   });
-  // Controles del único modelo colocado. Ajusta estos valores en futuras pruebas.
+
+  // Controles del único modelo colocado.
   const MODEL_GESTURES = Object.freeze({
     minimumScale: 0.75,
     maximumScale: 1.45,
@@ -96,7 +101,6 @@
         currentScale=1,
         scaleAtGestureStart=1;
         o("enabled").initial()
-          // Sólo se manipula cuando el primer dedo empieza sobre el modelo o uno de sus hijos.
           .listen(a, e.input.SCREEN_TOUCH_START, o=>{
             const n=t.transform.getWorldPosition(a),
             i=t.three.activeCamera,
@@ -107,7 +111,6 @@
             dragPlaneY=n.y,
             dragOffsetX=0,
             dragOffsetZ=0;
-            // Calcula el anclaje inicial en el mismo plano de mesa usado durante el arrastre.
             if(!i||!r)return;
             const d=new r.Raycaster(),
             s=new r.Vector2(o.data.position.x*2-1, 1-o.data.position.y*2),
@@ -119,11 +122,9 @@
               dragOffsetZ=n.z-c.z
             }
           })
-          // Registra el segundo dedo aunque toque fuera del modelo.
           .listen(t.events.globalId, e.input.SCREEN_TOUCH_START, o=>{
             if(isModelTouchActive)activePointerIds.add(o.data.pointerId)
           })
-          // Arrastre exacto: proyecta el dedo sobre un plano a la altura de la mesa.
           .listen(t.events.globalId, e.input.SCREEN_TOUCH_MOVE, o=>{
             if(!isModelTouchActive||isTwoFingerGesture||waitForAllTouchesToEnd||o.data.pointerId!==dragPointerId)return;
             const n=t.three.activeCamera,
@@ -149,7 +150,6 @@
               gestureMode="none"
             }
           })
-          // Los gestos se escuchan globalmente: el segundo dedo puede no tocar directamente el modelo.
           .listen(t.events.globalId, e.input.GESTURE_START, o=>{
             if(!isModelTouchActive||2!==o.data.touchCount)return;
             isTwoFingerGesture=!0,
@@ -161,7 +161,6 @@
             if(!isModelTouchActive||!isTwoFingerGesture||2!==o.data.touchCount)return;
             const n=o.data.startSpread>0?Math.abs(o.data.spread-o.data.startSpread)/o.data.startSpread:0,
             i=Math.abs(o.data.position.x-o.data.startPosition.x);
-            // El primer movimiento que supera su tolerancia elige un único modo para todo el gesto.
             if("none"===gestureMode){
               if(n>=MODEL_GESTURES.pinchActivationThreshold&&n/MODEL_GESTURES.pinchActivationThreshold>=i/MODEL_GESTURES.rotationActivationThreshold)gestureMode="scale";
               else if(i>=MODEL_GESTURES.rotationActivationThreshold)gestureMode="rotate";
@@ -172,7 +171,6 @@
               currentScale=Math.max(MODEL_GESTURES.minimumScale, Math.min(MODEL_GESTURES.maximumScale, scaleAtGestureStart*n)),
               e.Scale.set(t, a, { x:currentScale, y:currentScale, z:currentScale })
             }else if("rotate"===gestureMode){
-              // Signo positivo: mover dos dedos a la derecha rota visualmente hacia la izquierda.
               t.transform.rotateSelf(a, e.math.quat.yRadians(o.data.positionChange.x*MODEL_GESTURES.rotationSensitivity))
             }
           })
@@ -211,7 +209,7 @@
       }
     });
 
-   // Componente oficial para visualizar la nube de puntos (SLAM) de 8th Wall
+   // Componente oficial para visualizar la nube de puntos (SLAM) de 8th Wall (Solo activo en debug)
     e.registerComponent({
       name: "point-cloud-visualizer",
       add: (world, component) => {
@@ -230,10 +228,10 @@
         
         const material = new THREE_INSTANCE.PointsMaterial({
           color: 0xffcc00,       // Amarillo/Dorado
-          size: 0.002,             // Tamaño fijo de 8 píxeles
-          sizeAttenuation: true, // NoFijo, visible independientemente de la distancia
+          size: 0.002,             
+          sizeAttenuation: true, 
           opacity: 1.0,
-          depthWrite: true,     // Renderizar por encima del hider
+          depthWrite: true,     
           depthTest: false
         });
 
@@ -268,7 +266,7 @@
       }
     });
     
-    // Componente oficial para visualizar la Shadow Camera de la luz direccional
+    // Componente oficial para visualizar la Shadow Camera de la luz direccional (Solo activo en debug)
     e.registerComponent({
       name: "shadow-camera-helper",
       add: (world, component) => {
@@ -287,7 +285,6 @@
       }
     });
 
-    // --- AQUÍ ESTABA LA LÍNEA INFINITA (Formateada con saltos de línea) ---
     const i = {
       "objects": {
 
@@ -315,7 +312,7 @@
           "prefab": true
         },
 
-        // Luz direccional y ShadowCamera
+        // Luz direccional, ShadowCamera y tamaño de Shadow Map ajustados
         "492cfe2c-9334-4a9c-a48a-be80132af9fb": {
           "id": "492cfe2c-9334-4a9c-a48a-be80132af9fb",
           "position": [0, 15, 0],
@@ -333,10 +330,12 @@
           },
           "light": {
             "type": "directional",
-            "shadowBias": 0,
+            "shadowBias": 0.0001, // Previene artefactos de sombras a baja resolución (shadow acne)
             "shadowRadius": 5,
             "followCamera": false,
-            "shadowCamera": [-0.5, 0.5, 0.5, -0.5, 0.50, 100] // <-- AQUÍ ESTÁ LA SHADOW CAMERA
+            "shadowCamera": [-0.75, 0.75, 0.75, -0.75, 0.1, 50], // Volumen óptimo para platos (1.5m)
+            "shadowMapSizeWidth": 256,   // Reducción drástica para optimizar GPU en móviles
+            "shadowMapSizeHeight": 256
           },
           "name": "Directional Light",
           "order": 0.6785011504707911
@@ -440,7 +439,7 @@
               }
             }
           },
-          "name": "Ground", // <-- ESTO ES EL GROUND
+          "name": "Ground",
           "order": 5.877553308364804,
           "shadow": { "receiveShadow": true }
         },
@@ -558,7 +557,7 @@
               }
             }
           },
-          "name": "Model", // <-- ESTO ES EL MODELO 3D
+          "name": "Model",
           "order": 1.1209803013844988,
           "gltfModel": {
             "src": { "type": "asset", "asset": "assets/8-jewel.glb" },
@@ -676,6 +675,8 @@
         asset: _models[parseInt(_idx)]
       };
     }
+    
+    // Eliminación física y absoluta de los componentes de depuración si están inactivos
     if (!DEBUG_VISUALS.slamPointCloud) {
       delete i.objects["52ba8a86-a459-4df8-b954-a570e85e0484"].components["point-cloud-visualizer-comp"];
     }
