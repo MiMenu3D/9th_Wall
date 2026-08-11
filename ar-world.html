@@ -1,4 +1,4 @@
-<!-- 9th Wall v2.50 -->
+<!-- 9th Wall v2.51 -->
 <html>
 <head>
   <meta charset="UTF-8">
@@ -102,10 +102,10 @@
                 // === FORZAR RESOLUCIÓN Y AJUSTE DE FRUSTUM DE SOMBRAS NATIVAS ===
                 _scene.traverse((node) => {
                   if (node.isDirectionalLight) {
-                    log('Luz direccional localizada. Ajustando sombra a 256px...');
+                    log('Luz direccional localizada. Ajustando sombra a 1024px...');
                     if (node.shadow) {
-                      node.shadow.mapSize.width = 256;
-                      node.shadow.mapSize.height = 256;
+                      node.shadow.mapSize.width = 1024;
+                      node.shadow.mapSize.height = 1024;
                       if (node.shadow.camera) {
                         // Frustum acotado a 1.5 metros totales (perfecto para un plato de 26cm)
                         node.shadow.camera.left = -0.75;
@@ -113,10 +113,10 @@
                         node.shadow.camera.top = 0.75;
                         node.shadow.camera.bottom = -0.75;
                         node.shadow.camera.near = 0.1;
-                        node.shadow.camera.far = 50;
+                        node.shadow.camera.far = 1;
                         node.shadow.camera.updateProjectionMatrix();
                       }
-                      // Desechamos el mapa de sombras anterior para que Three.js lo regenere a 256x256
+                      // Desechamos el mapa de sombras anterior para que Three.js lo regenere a 1024x1024
                       if (node.shadow.map) {
                         node.shadow.map.dispose();
                         node.shadow.map = null;
@@ -227,7 +227,7 @@
                 smoothed += (brightness - smoothed) * 0.08;
 
                 // LUZ PMREM LIGHT Ajuste de exposición basado en brillo promedio.
-                renderer.toneMappingExposure = 0.7 + (smoothed / 255) * 1.6; 
+                renderer.toneMappingExposure = 0.7 + (smoothed / 255) * 1.2; 
               } catch (e) {
                 // Silencioso
               }
