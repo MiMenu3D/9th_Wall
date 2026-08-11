@@ -1,4 +1,4 @@
-<!-- 9th Wall v2.60 -->
+<!-- 9th Wall v2.61 -->
 <html>
 <head>
   <meta charset="UTF-8">
@@ -18,7 +18,7 @@
     style="position:fixed;top:10px;right:10px;z-index:1000000;background:rgba(0,0,0,0.9);color:#0f0;font-family:monospace;font-size:12px;padding:8px;border-radius:4px;cursor:pointer;line-height:1.2;border:1px solid #0f0;">
     <div id="debugTitle">FPS: --</div>
     <div id="debugContent">
-      ar-world: v2.60<br>
+      ar-world: v2.61<br>
       bundle: v2.62
     </div>
   </div>
@@ -113,8 +113,8 @@
                         node.shadow.camera.right = 0.35; // Antes 1
                         node.shadow.camera.top = 0.35; // Antes 1
                         node.shadow.camera.bottom = -0.35; // Antes -1
-                        node.shadow.camera.near = 0.1; // Antes 0.1
-                        node.shadow.camera.far = 20; // Antes 1
+                        node.shadow.camera.near = 2; // Antes 0.1
+                        node.shadow.camera.far = 5; // Antes 2
                         node.shadow.camera.updateProjectionMatrix();
                       }
                       // Desechamos el mapa de sombras anterior para que Three.js lo regenere con la nueva resolución
