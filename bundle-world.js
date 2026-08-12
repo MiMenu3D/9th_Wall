@@ -1,4 +1,4 @@
-﻿// 9th Wall v2.68 (limpieza+segunda luz direccional)
+﻿// 9th Wall v2.70
 (() => {
   var e = {
     574() {
@@ -216,7 +216,7 @@
         const THREE_INSTANCE = window.THREE;
         if (!THREE_INSTANCE || !scene) return;
 
-        const maxPoints = 200; // Por defecto: 500
+        const maxPoints = 500;
         const positionsArray = new Float32Array(maxPoints * 3);
         for (let j = 0; j < maxPoints * 3; j++) {
           positionsArray[j] = 999999;
@@ -227,7 +227,7 @@
 
         const material = new THREE_INSTANCE.PointsMaterial({
           color: 0xffcc00,       // Amarillo/Dorado
-          size: 0.007, // Antes: 0.002
+          size: 0.002,
           sizeAttenuation: true,
           opacity: 1.0,
           depthWrite: true,
@@ -313,10 +313,10 @@
           "order": 0.6785011504707911
         },
 
-        // Segunda Luz Direccional (v2.67) - Configurada para pruebas de rendimiento de sombras gemelas
+        // Segunda Luz Direccional (v2.70) - Con parámetros personalizados expuestos directamente en el JSON
         "2e6e118c-32b4-4b55-a28a-78dfdf649fb1": {
           "id": "2e6e118c-32b4-4b55-a28a-78dfdf649fb1",
-          "position": [2, 1, -2],
+          "position": [2, 1, 1.5],
           "rotation": [0, 0, 0, 1],
           "scale": [1, 1, 1],
           "geometry": null,
@@ -326,11 +326,13 @@
           "light": {
             "type": "directional",
             "shadowBias": 0.0001,
-            "shadowRadius": 1,
+            "shadowRadius": 1, // Sombra definida nativa
             "followCamera": false,
-            "shadowCamera": [-10, 10, 10, -10, 3, 5]
+            "shadowCamera": [-10, 10, 10, -10, 3, 5],
+            "active": true,       // INTERRUPTOR: true para existir, false para desaparecer del mapa
+            "shadowOpacity": 0.2  // INTENSIDAD DE SOMBRA (AO sutil): Rango entre 0.0 y 1.0
           },
-          "name": "Directional Light",
+          "name": "Directional Light 2", // Nombre exclusivo para que el script la controle independientemente
           "order": 0.6795011504707911
         },
 
