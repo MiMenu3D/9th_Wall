@@ -1,4 +1,4 @@
-<!-- 9th Wall v2.82 -->
+<!-- 9th Wall v2.83 -->
 <html>
 <head>
   <meta charset="UTF-8">
@@ -18,8 +18,8 @@
     style="position:fixed;top:10px;right:10px;z-index:1000000;background:rgba(0,0,0,0.9);color:#0f0;font-family:monospace;font-size:12px;padding:8px;border-radius:4px;cursor:pointer;line-height:1.2;border:1px solid #0f0;">
     <div id="debugTitle">FPS: --</div>
     <div id="debugContent">
-      ar-world: v2.80<br>
-      bundle: v2.80
+      ar-world: v2.83<br>
+      bundle: v2.83
     </div>
   </div>
   <style>
@@ -117,7 +117,7 @@
                 // === ACTIVACIÓN SEGURA DEL TONE MAPPING ===
                 _renderer.toneMapping = nativeTHREE.ACESFilmicToneMapping;
 
-                // === FORZAR RESOLUCIÓN Y FRUSTUM DE SOMBRAS NATIVAS (Único punto de control de sombras) ===
+                // === FORZAR RESOLUCIÓN Y FRUSTUM DE SOMBRAS NATIVAS (Único punto de control de sombras - Restaurado frustum de v2.68) ===
                 _scene.traverse((node) => {
                   if (node.isDirectionalLight) {
                     log('Luz direccional localizada (' + node.name + '). Inicializando sombra...');
@@ -127,13 +127,12 @@
                       node.shadow.mapSize.width = 512; 
                       node.shadow.mapSize.height = 512; 
                       if (node.shadow.camera) {
-                        node.shadow.camera.left = -0.5; 
-                        node.shadow.camera.right = 0.5; 
-                        node.shadow.camera.top = 0.5; 
-                        node.shadow.camera.bottom = -0.5; 
-                        node.shadow.camera.near = 0.1; 
-                        // Para la luz inclinada que se proyecta lejana, el far debe ser de 4.0
-                        node.shadow.camera.far = (node.name === "Directional Light 2" || (node.parent && node.parent.name === "Directional Light 2")) ? 4.0 : 2.0;
+                        node.shadow.camera.left = -0.35; // Antes -0.35
+                        node.shadow.camera.right = 0.35; // Antes 0.35
+                        node.shadow.camera.top = 0.35; // Antes 0.35
+                        node.shadow.camera.bottom = -0.35; // Antes -0.35
+                        node.shadow.camera.near = 0.1; // Antes 0.1
+                        node.shadow.camera.far = 5; // Antes 2
                         node.shadow.camera.updateProjectionMatrix();
                       }
                       // Desechamos el mapa de sombras anterior para que Three.js lo regenere con la nueva resolución
@@ -284,20 +283,32 @@
                 // LUZ PMREM LIGHT Ajuste de exposición basado en brillo promedio (Modificado a 1.4)
                 renderer.toneMappingExposure = 0.6 + (smoothed / 255) * 1.4; 
 
-                // === LÓGICA DE CONTROL Y TRANSICIÓN DE LA SEGUNDA LUZ (v2.79) ===
+                // === LÓGICA DE CONTROL Y TRANSICIÓN DE LA SEGUNDA LUZ (v2.80) ===
                 let secondLight = null;
                 let modelNode = null;
                 const activeCam = arCamera || (_world && _world.three ? _world.three.activeCamera : null);
 
                 if (_scene) {
+                  const dirLights = [];
                   _scene.traverse((node) => {
-                    if (node.isDirectionalLight && (node.name === "Directional Light 2" || (node.parent && node.parent.name === "Directional Light 2"))) {
-                      secondLight = node;
+                    if (node.isDirectionalLight) {
+                      dirLights.push(node);
+                      // Detección robusta buscando por ID de entidad (UUID), nombre legible y jerarquía de contenedor
+                      if (node.name === "2e6e118c-32b4-4b55-a28a-78dfdf649fb1" || 
+                          node.name === "Directional Light 2" || 
+                          (node.parent && (node.parent.name === "2e6e118c-32b4-4b55-a28a-78dfdf649fb1" || node.parent.name === "Directional Light 2"))) {
+                        secondLight = node;
+                      }
                     }
                     if (node.name === "Model") {
                       modelNode = node;
                     }
                   });
+
+                  // Fallback por índice si la identificación por nombre falla en el árbol de Three.js
+                  if (!secondLight && dirLights.length >= 2) {
+                    secondLight = dirLights[1];
+                  }
                 }
 
                 if (secondLight) {
