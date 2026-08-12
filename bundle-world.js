@@ -327,7 +327,7 @@
           "light": {
             "type": "directional",
             "shadowBias": 0.0001,
-            "shadowRadius": 1, // Sombra definida nativa
+            "shadowRadius": 2, // Sombra definida nativa
             "followCamera": false,
             "shadowCamera": [-10, 10, 10, -10, 3, 5],
             "active": true,       // INTERRUPTOR: true para existir, false para desaparecer
