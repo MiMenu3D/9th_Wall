@@ -1,4 +1,4 @@
-﻿// 9th Wall v2.67 (limpieza+segunda luz direccional)
+﻿// 9th Wall v2.68 (limpieza+segunda luz direccional)
 (() => {
   var e = {
     574() {
@@ -316,7 +316,7 @@
         // Segunda Luz Direccional (v2.67) - Configurada para pruebas de rendimiento de sombras gemelas
         "2e6e118c-32b4-4b55-a28a-78dfdf649fb1": {
           "id": "2e6e118c-32b4-4b55-a28a-78dfdf649fb1",
-          "position": [2, 1, 1.5],
+          "position": [2, 1, 3],
           "rotation": [0, 0, 0, 1],
           "scale": [1, 1, 1],
           "geometry": null,
@@ -326,7 +326,7 @@
           "light": {
             "type": "directional",
             "shadowBias": 0.0001,
-            "shadowRadius": 8,
+            "shadowRadius": 2,
             "followCamera": false,
             "shadowCamera": [-10, 10, 10, -10, 3, 5]
           },
