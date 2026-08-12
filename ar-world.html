@@ -1,4 +1,4 @@
-<!-- 9th Wall v2.76 -->
+<!-- 9th Wall v2.77 -->
 <html>
 <head>
   <meta charset="UTF-8">
@@ -10,6 +10,7 @@
   <script src="https://cdn.jsdelivr.net/npm/@8thwall/engine-binary@1/dist/xr.js" async crossorigin="anonymous" data-preload-chunks="slam"></script>
   <!-- 8th Wall landing page (splash screen) -->
   <script src="https://cdn.jsdelivr.net/npm/@8thwall/landing-page@1/dist/landing-page.js" crossorigin="anonymous"></script>
+  <!-- Three.js — needed for PMREM + Light Estimation -->
 </head>
 <body>
 
@@ -17,8 +18,8 @@
     style="position:fixed;top:10px;right:10px;z-index:1000000;background:rgba(0,0,0,0.9);color:#0f0;font-family:monospace;font-size:12px;padding:8px;border-radius:4px;cursor:pointer;line-height:1.2;border:1px solid #0f0;">
     <div id="debugTitle">FPS: --</div>
     <div id="debugContent">
-      ar-world: v2.75<br>
-      bundle: v2.75
+      ar-world: v2.77<br>
+      bundle: v2.77
     </div>
   </div>
   <style>
@@ -59,19 +60,22 @@
     };
 
     let pmremGenerator = null, cameraRT = null, originalEnv = null;
-    let envMode = 'cam'; 
+    let envMode = 'cam'; // Iniciamos por defecto en CAM ya que el HDR está inactivo para optimizar
     let envInterval = null;
     let _scene = null, _renderer = null;
 
-    // === ESTADO Y VARIABLES GLOBALES (v2.75) ===
-    let _world = null;                     
-    let arCamera = null;                   
-    let secondLightShadowOpacity = 0.8;    
+    // === ESTADO Y VARIABLES GLOBALES (v2.77) ===
+    let _world = null;                     // Almacena la instancia global de ECS
+    let arCamera = null;                   // Almacena de forma segura la cámara tridimensional real
+    let secondLightShadowOpacity = 0.8;    // Configurado dinámicamente desde el JSON de bundle-world (fijado a 0.8)
 
+    // Variables de control de la transición sutil de recolocación (cada 2 segundos)
     let lastTransitionTime = 0;
-    let transitionState = 'idle';          
-    let targetLightPos = null;             
-    let currentLightIntensityFactor = 0.0; 
+    let transitionState = 'idle';          // Estados: 'idle', 'fade-down', 'fade-up'
+    let targetLightPos = null;             // Posición de destino de la luz
+    let currentLightIntensityFactor = 0.0; // Multiplicador de intensidad transicional (de 0.0 a 1.0)
+    
+    // Almacena cromáticamente el tinte de la zona más brillante
     let targetLightRGB = { r: 1.0, g: 1.0, b: 1.0 }; 
 
     document.getElementById('envToggle').addEventListener('click', (e) => {
@@ -79,6 +83,7 @@
       toggleEnv();
     });
 
+    // Control de persistencia y lógica del botón Debug
     const isDebugActive = sessionStorage.getItem("debug_features") === "true";
     const debugToggleBtn = document.getElementById('debugToggle');
     if (debugToggleBtn) {
@@ -92,6 +97,7 @@
       });
     }
 
+    // === Acoplamiento sobre el THREE Nativo del motor ===
     if (window.ecs) {
       window.ecs.registerComponent({
         name: 'scene-capturer',
@@ -99,40 +105,45 @@
           setTimeout(() => {
             try {
               _world = world;
-              arCamera = world.three.activeCamera;
+              arCamera = world.three.activeCamera; // Almacenamos de forma limpia la cámara nativa
               _scene = world.three.scene;
               _renderer = world.three.renderer;
               
+              // Buscamos el THREE nativo expuesto globalmente por el runtime de 8th Wall
               const nativeTHREE = window.THREE;
               log('Captura exitosa. Usando Three nativo: ' + (!!nativeTHREE));
               
               if (nativeTHREE) {
+                // Instanciamos el vector tridimensional de destino de forma segura
                 if (!targetLightPos) targetLightPos = new nativeTHREE.Vector3();
 
+                // === ACTIVACIÓN SEGURA DEL TONE MAPPING ===
                 _renderer.toneMapping = nativeTHREE.ACESFilmicToneMapping;
 
+                // === FORZAR RESOLUCIÓN Y FRUSTUM DE SOMBRAS NATIVAS (Único punto de control de sombras) ===
                 _scene.traverse((node) => {
                   if (node.isDirectionalLight) {
                     log('Luz direccional localizada (' + node.name + '). Inicializando sombra...');
-                    node.castShadow = true; // ACTIVACIÓN DE SOMBRAS EN THREE NATIVO
-                    
                     if (node.shadow) {
                       node.shadow.mapSize.width = 512; 
                       node.shadow.mapSize.height = 512; 
                       if (node.shadow.camera) {
-                        node.shadow.camera.left = -0.5; 
-                        node.shadow.camera.right = 0.5; 
-                        node.shadow.camera.top = 0.5; 
-                        node.shadow.camera.bottom = -0.5; 
+                        node.shadow.camera.left = -0.35; 
+                        node.shadow.camera.right = 0.35; 
+                        node.shadow.camera.top = 0.35; 
+                        node.shadow.camera.bottom = -0.35; 
                         node.shadow.camera.near = 0.1; 
-                        node.shadow.camera.far = 2.5;
+                        // Con la distancia ajustada a 1 metro, un far de 2.0 es más que suficiente y optimiza la precisión
+                        node.shadow.camera.far = 2.0;
                         node.shadow.camera.updateProjectionMatrix();
                       }
+                      // Desechamos el mapa de sombras anterior para que Three.js lo regenere con la nueva resolución
                       if (node.shadow.map) {
                         node.shadow.map.dispose();
                         node.shadow.map = null;
                       }
 
+                      // === APLICAR OPACIDAD PERSONALIZADA INDIVIDUAL (AO SUTIL) ===
                       if (node.name === "Directional Light 2") {
                         node.shadow.intensity = secondLightShadowOpacity;
                         log('Opacidad de sombra aplicada a Luz 2: ' + secondLightShadowOpacity);
@@ -141,6 +152,7 @@
                   }
                 });
 
+                // Descargamos y registramos RGBELoader directamente en el THREE nativo
                 loadNativeRGBELoader(nativeTHREE).then((LoaderClass) => {
                   if (LoaderClass) {
                     initPMREMLogic(_scene, _renderer, nativeTHREE, LoaderClass);
@@ -160,6 +172,7 @@
       });
     }
 
+    // Descarga dinámica de RGBELoader sobre la instancia nativa del motor
     function loadNativeRGBELoader(THREE_INSTANCE) {
       return new Promise((resolve) => {
         if (THREE_INSTANCE.RGBELoader) {
@@ -171,6 +184,7 @@
         fetch('https://unpkg.com/three@0.139.2/examples/js/loaders/RGBELoader.js')
           .then(res => res.text())
           .then(code => {
+            // Evaluamos el código del loader forzando el ámbito del THREE nativo de 8th Wall
             window.THREE = THREE_INSTANCE;
             (new Function(code))();
             log('RGBELoader acoplado al Three nativo con éxito.');
@@ -185,26 +199,36 @@
 
     function initPMREMLogic(scene, renderer, THREE_INSTANCE, LoaderClass) {
       try {
+        // Inicializamos PMREM usando la clase nativa del motor de 8th Wall
         pmremGenerator = new THREE_INSTANCE.PMREMGenerator(renderer);
         pmremGenerator.compileEquirectangularShader();
         log('PMREM compilado en motor nativo');
 
-        const LOAD_HDR = false;
+        // === CONTROL DE CARGA DEL HDR (Configuración manual) ===
+        const LOAD_HDR = false; // Cambiar a true para reactivar la descarga y uso del entorno HDR
         
         if (LOAD_HDR) {
+          log('Cargando textura de entorno HDR...');
           new LoaderClass().load('HDR/terrace_sea.hdr', (hdr) => {
+            log('HDR cargado');
             hdr.mapping = THREE_INSTANCE.EquirectangularReflectionMapping;
             originalEnv = hdr;
             if (envMode === 'hdr') scene.environment = hdr;
+          }, undefined, (err) => {
+            log('Error cargando HDR: ' + err.message);
           });
+        } else {
+          log('HDR desactivado (LOAD_HDR = false)');
         }
 
+        // Separamos la estimación de luz del PMREM para reducir el trabajo de GPU.
         const waitForVideo = setInterval(() => {
           const video = document.querySelector('video');
           if (video && video.readyState >= 2) {
             clearInterval(waitForVideo);
             log('Vídeo listo para estimación');
 
+            // Refresco del Light Estimation: brillo medio para la exposición.
             const lightEstimationSize = 16;
             const lightEstimationInterval = 50;
             const lightCanvas = document.createElement('canvas');
@@ -212,6 +236,7 @@
             lightCanvas.height = lightEstimationSize;
             const lightCtx = lightCanvas.getContext('2d');
 
+            // Configuración del PMREM: reflejos de los materiales desde la cámara.
             const pmremSize = 64;
             const pmremInterval = 200;
             const pmremCanvas = document.createElement('canvas');
@@ -222,6 +247,7 @@
             const pmremCtx = pmremCanvas.getContext('2d');
             let smoothed = 120;
 
+            // Refresco del Light Estimation: lectura ligera del brillo de la cámara.
             envInterval = setInterval(() => {
               try {
                 if (!video || video.readyState < 2) return;
@@ -229,22 +255,26 @@
                 const pixels = lightCtx.getImageData(0, 0, lightEstimationSize, lightEstimationSize).data;
                 let total = 0;
                 let maxBrightness = -1;
-                
-                // Puntos predeterminados al centro si no hay focos destacados
-                let brightX = 4; // Terrenos superiores del canvas
-                let brightY = 8; // Centro horizontal del canvas
+                let brightX = 2; // Default dentro del tercio superior
+                let brightY = 8; // Default centro horizontal
 
-                for (let y = 0; y < lightEstimationSize; y++) {
-                  for (let x = 0; x < lightEstimationSize; x++) {
-                    const idx = (y * lightEstimationSize + x) * 4;
+                // Limitamos la detección de la luz más intensa al tercio superior (x < 5) de la pantalla física
+                const maxSearchX = Math.floor(lightEstimationSize / 3); // 16 / 3 = 5
+
+                for (let x = 0; x < lightEstimationSize; x++) {
+                  for (let y = 0; y < lightEstimationSize; y++) {
+                    const idx = (x * lightEstimationSize + y) * 4;
                     const r = pixels[idx];
                     const g = pixels[idx + 1];
                     const b = pixels[idx + 2];
-                    const val = 0.299 * r + 0.587 * g + 0.114 * b;
-                    total += val;
+                    const val = 0.299 * r + 0.587 * g + 0.114 * b; // Luminancia relativa
+                    total += val; // Promedio general para el Tone Mapping de la escena
 
-                    // Mapeo corregido: x < 10 escanea el 60% superior de la pantalla vertical del móvil
-                    if (x < 10 && val > maxBrightness) {
+                    // === MATRIZ DE TRADUCCIÓN DE ROTACIÓN DEL SENSOR (90º CCW) ===
+                    // Mapea las coordenadas físicas del fotograma nativo horizontal del sensor (x, y) 
+                    // a la visualización vertical en pantalla de retrato (screenX, screenY)
+                    // Búsqueda restringida al tercio superior real de la pantalla del móvil (x < 5)
+                    if (x < maxSearchX && val > maxBrightness) {
                       maxBrightness = val;
                       brightX = x;
                       brightY = y;
@@ -255,8 +285,10 @@
                 const brightness = total / (pixels.length / 4);
                 smoothed += (brightness - smoothed) * 0.08;
 
-                renderer.toneMappingExposure = 0.6 + (smoothed / 255) * 1.9; 
+                // LUZ PMREM LIGHT Ajuste de exposición basado en brillo promedio.
+                renderer.toneMappingExposure = 0.6 + (smoothed / 255) * 1.45; // ORI 1.9
 
+                // === LÓGICA DE CONTROL Y TRANSICIÓN DE LA SEGUNDA LUZ (v2.77) ===
                 let secondLight = null;
                 let modelNode = null;
                 const activeCam = arCamera || (_world && _world.three ? _world.three.activeCamera : null);
@@ -278,6 +310,7 @@
                     if (!targetLightPos) targetLightPos = new nativeTHREE.Vector3();
                     const now = performance.now();
 
+                    // 1. SI EL MODELO SE ELIMINA (RESET): Apagamos todo y reiniciamos
                     if (!modelNode) {
                       transitionState = 'idle';
                       currentLightIntensityFactor = 0.0;
@@ -287,6 +320,7 @@
                       const modelPos = new nativeTHREE.Vector3();
                       modelNode.getWorldPosition(modelPos);
 
+                      // Aseguramos que el target de la luz direccional apunte siempre al modelo de la mesa
                       if (secondLight.target) {
                         if (!secondLight.target.parent && _scene) {
                           _scene.add(secondLight.target);
@@ -295,35 +329,57 @@
                         secondLight.target.updateMatrixWorld();
                       }
 
-                      // === CORRECCIÓN DE TRADUCCIÓN A NDC PANTALLA ===
-                      // brightY (0..15) se mapea a X horizontal (-1 a +1)
-                      // brightX (0..15) se mapea a Y vertical (+1 a -1)
+                      // === TRADUCIMOS LAS COORDENADAS DEL SENSOR DETECTADAS A NDC DE PANTALLA ===
                       const ndcX = (brightY / (lightEstimationSize - 1)) * 2 - 1;
                       const ndcY = 1 - (brightX / (lightEstimationSize - 1)) * 2;
 
                       let candidatePos = null;
                       if (activeCam) {
+                        // Obtenemos la posición real en el mundo de la cámara AR
                         const camWorldPos = new nativeTHREE.Vector3();
                         activeCam.getWorldPosition(camWorldPos);
 
                         const vector = new nativeTHREE.Vector3(ndcX, ndcY, 0.5);
                         vector.unproject(activeCam);
                         
+                        // Calculamos la dirección real restando la posición de mundo de la cámara
                         const dir = vector.sub(camWorldPos).normalize();
                         
+                        // === RESTRICCIÓN DE HEMISFERIO SUPERIOR (v2.77) ===
+                        // Garantiza que la luz provenga siempre desde arriba (techo/cielo)
                         dir.y = Math.abs(dir.y);
-                        if (dir.y < 0.5) dir.y = 0.5; 
-                        dir.normalize(); 
+                        if (dir.y < 0.3) dir.y = 0.3; // Ángulo vertical mínimo
+                        dir.normalize(); // Volvemos a normalizar el vector de dirección
 
+                        // === RESTRICCIÓN DE DISTANCIA MÁXIMA DE 1 METRO (v2.77) ===
                         candidatePos = new nativeTHREE.Vector3()
                           .copy(modelPos)
                           .addScaledVector(dir, 1.0);
 
-                        if (candidatePos.y < 0.3) candidatePos.y = 0.3;
-                        if (candidatePos.y > 1.0) candidatePos.y = 1.0;
+                        // === RESTRICCIÓN DE ALTURA: Mínimo 30 cm, Máximo 1.0 metro (v2.77) ===
+                        const groundY = 0.0;
+                        if (candidatePos.y < groundY + 0.3) {
+                          candidatePos.y = groundY + 0.3;
+                        }
+                        if (candidatePos.y > groundY + 1.0) {
+                          candidatePos.y = groundY + 1.0;
+                        }
+
+                        // === RESTRICCIÓN DE DISTANCIA HORIZONTAL (MÁXIMO 2.0 METROS) ===
+                        const maxDistXZ = 2.0;
+                        const dx = candidatePos.x - modelPos.x;
+                        const dz = candidatePos.z - modelPos.z;
+                        const distXZ = Math.sqrt(dx * dx + dz * dz);
+                        if (distXZ > maxDistXZ) {
+                          const factor = maxDistXZ / distXZ;
+                          candidatePos.x = modelPos.x + dx * factor;
+                          candidatePos.z = modelPos.z + dz * factor;
+                        }
                       }
 
+                      // 2. MÁQUINA DE ESTADOS PARA LA TRANSICIÓN SUTIL (CADA 2 SEGUNDOS)
                       if (transitionState === 'idle') {
+                        // Posicionado instantáneo la primera vez que se monta el modelo
                         if (currentLightIntensityFactor === 0.0) {
                           if (candidatePos) {
                             secondLight.position.copy(candidatePos);
@@ -331,15 +387,18 @@
                             currentLightIntensityFactor = 1.0;
                             lastTransitionTime = now;
                             
+                            // Extraemos y guardamos el color exacto del píxel brillante de referencia (v2.77)
                             const colorIdx = (brightX * lightEstimationSize + brightY) * 4;
                             targetLightRGB.r = pixels[colorIdx] / 255;
                             targetLightRGB.g = pixels[colorIdx + 1] / 255;
                             targetLightRGB.b = pixels[colorIdx + 2] / 255;
                           }
                         } else if (now - lastTransitionTime > 2000) {
+                          // Pasados 2 segundos, si la luz se ha movido significativamente (> 15 cm), cambiamos
                           if (candidatePos && secondLight.position.distanceTo(candidatePos) > 0.15) {
                             targetLightPos.copy(candidatePos);
                             
+                            // Capturamos el color del nuevo foco de luz
                             const colorIdx = (brightX * lightEstimationSize + brightY) * 4;
                             targetLightRGB.r = pixels[colorIdx] / 255;
                             targetLightRGB.g = pixels[colorIdx + 1] / 255;
@@ -352,12 +411,15 @@
                       }
 
                       if (transitionState === 'fade-down') {
-                        currentLightIntensityFactor -= 0.1;
+                        currentLightIntensityFactor -= 0.1; // Se apaga de forma progresiva en 500ms (~10 frames)
                         if (currentLightIntensityFactor <= 0.0) {
                           currentLightIntensityFactor = 0.0;
                           
+                          // Teletransportamos la luz en un único fotograma al nuevo punto
                           secondLight.position.copy(targetLightPos);
                           secondLight.updateMatrixWorld();
+                          
+                          // Aplicamos cromáticamente el color teñido al sol artificial (v2.77)
                           secondLight.color.setRGB(targetLightRGB.r, targetLightRGB.g, targetLightRGB.b);
 
                           transitionState = 'fade-up';
@@ -365,22 +427,23 @@
                       }
 
                       if (transitionState === 'fade-up') {
-                        currentLightIntensityFactor += 0.1;
+                        currentLightIntensityFactor += 0.1; // Se enciende de forma progresiva en 500ms (~10 frames)
                         if (currentLightIntensityFactor >= 1.0) {
                           currentLightIntensityFactor = 1.0;
                           transitionState = 'idle';
-                          lastTransitionTime = now;
+                          lastTransitionTime = now; // Reiniciamos el temporizador
                         }
                       }
 
+                      // 3. OPTIMIZACIÓN ACTIVA DE GPU: Desactivar sombras si la luz está casi apagada en la transición
                       if (currentLightIntensityFactor < 0.05) {
                         secondLight.castShadow = false;
                       } else {
                         secondLight.castShadow = true;
                       }
 
-                      // === INTENSIDAD AUMENTADA PARA GENERACIÓN CLARA DE SOMBRAS ===
-                      secondLight.intensity = (0.8 + (smoothed / 255) * 1.2) * currentLightIntensityFactor;
+                      // ASOCIACIÓN DE INTENSIDAD LIGADA AL ESTIMATION PERO SUAVIZADA (Luminancia * 0.5 * factor de transición)
+                      secondLight.intensity = (smoothed / 255) * 0.5 * currentLightIntensityFactor;
                     }
                   }
                 }
@@ -390,6 +453,7 @@
               }
             }, lightEstimationInterval);
 
+            // Refresco del PMREM: actualización de reflejos menos frecuente.
             setInterval(() => {
               try {
                 if (!video || video.readyState < 2 || !pmremGenerator) return;
@@ -412,6 +476,7 @@
       }
     }
 
+    // Interceptor de la inicialización de ECS (Mantiene la estructura original estable)
     if (window.ecs) {
       const _i = ecs.application.init;
       ecs.application.init = c => {
@@ -419,21 +484,25 @@
           const obj = c.objects[k];
           if (obj.name === 'Loading Screen') delete c.objects[k];
           
+          // === COMPORTAMIENTO INTERRUPTOR DE EXISTENCIA SEGUNDA LUZ (v2.77) ===
           if (obj.name === 'Directional Light 2') {
             if (obj.light) {
+              // Si está inactiva en el JSON del bundle, la eliminamos físicamente
               if (obj.light.active === false) {
                 delete c.objects[k];
                 continue;
               }
+              // Si está activa, leemos el parámetro de opacidad personalizado para aplicarlo en Three (fijado a 0.8)
               if (obj.light.shadowOpacity !== undefined) {
                 secondLightShadowOpacity = obj.light.shadowOpacity;
               }
             }
           }
 
+          // Solución a la doble iluminación nativa:
           if (obj.name === 'Directional Light') {
             if (obj.light) {
-              obj.light.intensity = 0.00; 
+              obj.light.intensity = 0.00; // Atenuamos la luz direccional principal para conservar sombras suaves
             }
           }
 
@@ -475,6 +544,7 @@
           envMode = 'hdr';
           if (btn) btn.innerText = 'Env: HDR';
         } else {
+          // Si el HDR está inactivo, saltamos directamente a CAM (si está listo) o a OFF
           if (cameraRT) {
             _scene.environment = cameraRT.texture;
             envMode = 'cam';
