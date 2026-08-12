@@ -1,4 +1,4 @@
-﻿// 9th Wall v2.70
+﻿// 9th Wall v2.71
 (() => {
   var e = {
     574() {
@@ -330,7 +330,7 @@
             "followCamera": false,
             "shadowCamera": [-10, 10, 10, -10, 3, 5],
             "active": true,       // INTERRUPTOR: true para existir, false para desaparecer del mapa
-            "shadowOpacity": 0.2  // INTENSIDAD DE SOMBRA (AO sutil): Rango entre 0.0 y 1.0
+            "shadowOpacity": 0.7  // INTENSIDAD DE SOMBRA (AO sutil): Rango entre 0.0 y 1.0
           },
           "name": "Directional Light 2", // Nombre exclusivo para que el script la controle independientemente
           "order": 0.6795011504707911
