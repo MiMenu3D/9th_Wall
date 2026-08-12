@@ -1,4 +1,4 @@
-<!-- 9th Wall v2.77 -->
+<!-- 9th Wall v2.72 -->
 <html>
 <head>
   <meta charset="UTF-8">
@@ -18,8 +18,8 @@
     style="position:fixed;top:10px;right:10px;z-index:1000000;background:rgba(0,0,0,0.9);color:#0f0;font-family:monospace;font-size:12px;padding:8px;border-radius:4px;cursor:pointer;line-height:1.2;border:1px solid #0f0;">
     <div id="debugTitle">FPS: --</div>
     <div id="debugContent">
-      ar-world: v2.77<br>
-      bundle: v2.77
+      ar-world: v2.72<br>
+      bundle: v2.72
     </div>
   </div>
   <style>
@@ -64,19 +64,16 @@
     let envInterval = null;
     let _scene = null, _renderer = null;
 
-    // === ESTADO Y VARIABLES GLOBALES (v2.77) ===
+    // === ESTADO Y VARIABLES GLOBALES (v2.72) ===
     let _world = null;                     // Almacena la instancia global de ECS
     let arCamera = null;                   // Almacena de forma segura la cámara tridimensional real
-    let secondLightShadowOpacity = 0.8;    // Configurado dinámicamente desde el JSON de bundle-world (fijado a 0.8)
+    let secondLightShadowOpacity = 0.2;    // Configurado dinámicamente desde el JSON de bundle-world
 
     // Variables de control de la transición sutil de recolocación (cada 2 segundos)
     let lastTransitionTime = 0;
     let transitionState = 'idle';          // Estados: 'idle', 'fade-down', 'fade-up'
     let targetLightPos = null;             // Posición de destino de la luz
     let currentLightIntensityFactor = 0.0; // Multiplicador de intensidad transicional (de 0.0 a 1.0)
-    
-    // Almacena cromáticamente el tinte de la zona más brillante
-    let targetLightRGB = { r: 1.0, g: 1.0, b: 1.0 }; 
 
     document.getElementById('envToggle').addEventListener('click', (e) => {
       log('Button clicked');
@@ -133,8 +130,8 @@
                         node.shadow.camera.top = 0.35; 
                         node.shadow.camera.bottom = -0.35; 
                         node.shadow.camera.near = 0.1; 
-                        // Con la distancia ajustada a 1 metro, un far de 2.0 es más que suficiente y optimiza la precisión
-                        node.shadow.camera.far = 2.0;
+                        // Para la luz inclinada que se proyecta lejana, el far debe ser de 4.0
+                        node.shadow.camera.far = (node.name === "Directional Light 2") ? 4.0 : 2.0;
                         node.shadow.camera.updateProjectionMatrix();
                       }
                       // Desechamos el mapa de sombras anterior para que Three.js lo regenere con la nueva resolución
@@ -255,26 +252,23 @@
                 const pixels = lightCtx.getImageData(0, 0, lightEstimationSize, lightEstimationSize).data;
                 let total = 0;
                 let maxBrightness = -1;
-                let brightX = 2; // Default dentro del tercio superior
-                let brightY = 8; // Default centro horizontal
+                let brightX = 0;
+                let brightY = 0;
 
-                // Limitamos la detección de la luz más intensa al tercio superior (x < 5) de la pantalla física
-                const maxSearchX = Math.floor(lightEstimationSize / 3); // 16 / 3 = 5
+                // Limitamos la detección de la luz más intensa al tercio superior (y < 5)
+                const maxSearchY = Math.floor(lightEstimationSize / 3); // 16 / 3 = 5
 
-                for (let x = 0; x < lightEstimationSize; x++) {
-                  for (let y = 0; y < lightEstimationSize; y++) {
-                    const idx = (x * lightEstimationSize + y) * 4;
+                for (let y = 0; y < lightEstimationSize; y++) {
+                  for (let x = 0; x < lightEstimationSize; x++) {
+                    const idx = (y * lightEstimationSize + x) * 4;
                     const r = pixels[idx];
                     const g = pixels[idx + 1];
                     const b = pixels[idx + 2];
                     const val = 0.299 * r + 0.587 * g + 0.114 * b; // Luminancia relativa
                     total += val; // Promedio general para el Tone Mapping de la escena
 
-                    // === MATRIZ DE TRADUCCIÓN DE ROTACIÓN DEL SENSOR (90º CCW) ===
-                    // Mapea las coordenadas físicas del fotograma nativo horizontal del sensor (x, y) 
-                    // a la visualización vertical en pantalla de retrato (screenX, screenY)
-                    // Búsqueda restringida al tercio superior real de la pantalla del móvil (x < 5)
-                    if (x < maxSearchX && val > maxBrightness) {
+                    // Búsqueda restringida al tercio superior de la pantalla
+                    if (y < maxSearchY && val > maxBrightness) {
                       maxBrightness = val;
                       brightX = x;
                       brightY = y;
@@ -286,9 +280,9 @@
                 smoothed += (brightness - smoothed) * 0.08;
 
                 // LUZ PMREM LIGHT Ajuste de exposición basado en brillo promedio.
-                renderer.toneMappingExposure = 0.6 + (smoothed / 255) * 1.45; // ORI 1.9
+                renderer.toneMappingExposure = 0.6 + (smoothed / 255) * 1.9; 
 
-                // === LÓGICA DE CONTROL Y TRANSICIÓN DE LA SEGUNDA LUZ (v2.77) ===
+                // === LÓGICA DE CONTROL Y TRANSICIÓN DE LA SEGUNDA LUZ (v2.72) ===
                 let secondLight = null;
                 let modelNode = null;
                 const activeCam = arCamera || (_world && _world.three ? _world.three.activeCamera : null);
@@ -329,51 +323,24 @@
                         secondLight.target.updateMatrixWorld();
                       }
 
-                      // === TRADUCIMOS LAS COORDENADAS DEL SENSOR DETECTADAS A NDC DE PANTALLA ===
-                      const ndcX = (brightY / (lightEstimationSize - 1)) * 2 - 1;
-                      const ndcY = 1 - (brightX / (lightEstimationSize - 1)) * 2;
+                      // Calcular la posición candidata actual según la zona de luz máxima (Tercio superior)
+                      const ndcX = (brightX / (lightEstimationSize - 1)) * 2 - 1;
+                      const ndcY = 1 - (brightY / (lightEstimationSize - 1)) * 2;
 
                       let candidatePos = null;
                       if (activeCam) {
-                        // Obtenemos la posición real en el mundo de la cámara AR
-                        const camWorldPos = new nativeTHREE.Vector3();
-                        activeCam.getWorldPosition(camWorldPos);
-
                         const vector = new nativeTHREE.Vector3(ndcX, ndcY, 0.5);
                         vector.unproject(activeCam);
+                        const dir = vector.sub(activeCam.position).normalize();
                         
-                        // Calculamos la dirección real restando la posición de mundo de la cámara
-                        const dir = vector.sub(camWorldPos).normalize();
-                        
-                        // === RESTRICCIÓN DE HEMISFERIO SUPERIOR (v2.77) ===
-                        // Garantiza que la luz provenga siempre desde arriba (techo/cielo)
-                        dir.y = Math.abs(dir.y);
-                        if (dir.y < 0.3) dir.y = 0.3; // Ángulo vertical mínimo
-                        dir.normalize(); // Volvemos a normalizar el vector de dirección
-
-                        // === RESTRICCIÓN DE DISTANCIA MÁXIMA DE 1 METRO (v2.77) ===
+                        // Colocamos el sol artificial a 1.5 metros del modelo en la dirección de la luz
                         candidatePos = new nativeTHREE.Vector3()
                           .copy(modelPos)
-                          .addScaledVector(dir, 1.0);
+                          .addScaledVector(dir, 1.5);
 
-                        // === RESTRICCIÓN DE ALTURA: Mínimo 30 cm, Máximo 1.0 metro (v2.77) ===
-                        const groundY = 0.0;
-                        if (candidatePos.y < groundY + 0.3) {
-                          candidatePos.y = groundY + 0.3;
-                        }
-                        if (candidatePos.y > groundY + 1.0) {
-                          candidatePos.y = groundY + 1.0;
-                        }
-
-                        // === RESTRICCIÓN DE DISTANCIA HORIZONTAL (MÁXIMO 2.0 METROS) ===
-                        const maxDistXZ = 2.0;
-                        const dx = candidatePos.x - modelPos.x;
-                        const dz = candidatePos.z - modelPos.z;
-                        const distXZ = Math.sqrt(dx * dx + dz * dz);
-                        if (distXZ > maxDistXZ) {
-                          const factor = maxDistXZ / distXZ;
-                          candidatePos.x = modelPos.x + dx * factor;
-                          candidatePos.z = modelPos.z + dz * factor;
+                        // Garantizamos una altura mínima sobre el plato de 30 cm en el eje vertical (y)
+                        if (candidatePos.y < 0.3) {
+                          candidatePos.y = 0.3;
                         }
                       }
 
@@ -386,24 +353,11 @@
                             secondLight.updateMatrixWorld();
                             currentLightIntensityFactor = 1.0;
                             lastTransitionTime = now;
-                            
-                            // Extraemos y guardamos el color exacto del píxel brillante de referencia (v2.77)
-                            const colorIdx = (brightX * lightEstimationSize + brightY) * 4;
-                            targetLightRGB.r = pixels[colorIdx] / 255;
-                            targetLightRGB.g = pixels[colorIdx + 1] / 255;
-                            targetLightRGB.b = pixels[colorIdx + 2] / 255;
                           }
                         } else if (now - lastTransitionTime > 2000) {
                           // Pasados 2 segundos, si la luz se ha movido significativamente (> 15 cm), cambiamos
                           if (candidatePos && secondLight.position.distanceTo(candidatePos) > 0.15) {
                             targetLightPos.copy(candidatePos);
-                            
-                            // Capturamos el color del nuevo foco de luz
-                            const colorIdx = (brightX * lightEstimationSize + brightY) * 4;
-                            targetLightRGB.r = pixels[colorIdx] / 255;
-                            targetLightRGB.g = pixels[colorIdx + 1] / 255;
-                            targetLightRGB.b = pixels[colorIdx + 2] / 255;
-
                             transitionState = 'fade-down';
                           }
                           lastTransitionTime = now;
@@ -414,14 +368,9 @@
                         currentLightIntensityFactor -= 0.1; // Se apaga de forma progresiva en 500ms (~10 frames)
                         if (currentLightIntensityFactor <= 0.0) {
                           currentLightIntensityFactor = 0.0;
-                          
                           // Teletransportamos la luz en un único fotograma al nuevo punto
                           secondLight.position.copy(targetLightPos);
                           secondLight.updateMatrixWorld();
-                          
-                          // Aplicamos cromáticamente el color teñido al sol artificial (v2.77)
-                          secondLight.color.setRGB(targetLightRGB.r, targetLightRGB.g, targetLightRGB.b);
-
                           transitionState = 'fade-up';
                         }
                       }
@@ -484,7 +433,7 @@
           const obj = c.objects[k];
           if (obj.name === 'Loading Screen') delete c.objects[k];
           
-          // === COMPORTAMIENTO INTERRUPTOR DE EXISTENCIA SEGUNDA LUZ (v2.77) ===
+          // === COMPORTAMIENTO INTERRUPTOR DE EXISTENCIA SEGUNDA LUZ (v2.72) ===
           if (obj.name === 'Directional Light 2') {
             if (obj.light) {
               // Si está inactiva en el JSON del bundle, la eliminamos físicamente
@@ -492,7 +441,7 @@
                 delete c.objects[k];
                 continue;
               }
-              // Si está activa, leemos el parámetro de opacidad personalizado para aplicarlo en Three (fijado a 0.8)
+              // Si está activa, leemos el parámetro de opacidad personalizado para aplicarlo en Three
               if (obj.light.shadowOpacity !== undefined) {
                 secondLightShadowOpacity = obj.light.shadowOpacity;
               }
