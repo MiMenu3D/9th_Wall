@@ -1,4 +1,4 @@
-<!-- 9th Wall v2.72 -->
+<!-- 9th Wall v2.78 -->
 <html>
 <head>
   <meta charset="UTF-8">
@@ -18,8 +18,8 @@
     style="position:fixed;top:10px;right:10px;z-index:1000000;background:rgba(0,0,0,0.9);color:#0f0;font-family:monospace;font-size:12px;padding:8px;border-radius:4px;cursor:pointer;line-height:1.2;border:1px solid #0f0;">
     <div id="debugTitle">FPS: --</div>
     <div id="debugContent">
-      ar-world: v2.72<br>
-      bundle: v2.72
+      ar-world: v2.78<br>
+      bundle: v2.78
     </div>
   </div>
   <style>
@@ -64,7 +64,7 @@
     let envInterval = null;
     let _scene = null, _renderer = null;
 
-    // === ESTADO Y VARIABLES GLOBALES (v2.72) ===
+    // === ESTADO Y VARIABLES GLOBALES (v2.78) ===
     let _world = null;                     // Almacena la instancia global de ECS
     let arCamera = null;                   // Almacena de forma segura la cámara tridimensional real
     let secondLightShadowOpacity = 0.2;    // Configurado dinámicamente desde el JSON de bundle-world
@@ -279,10 +279,10 @@
                 const brightness = total / (pixels.length / 4);
                 smoothed += (brightness - smoothed) * 0.08;
 
-                // LUZ PMREM LIGHT Ajuste de exposición basado en brillo promedio.
-                renderer.toneMappingExposure = 0.6 + (smoothed / 255) * 1.9; 
+                // LUZ PMREM LIGHT Ajuste de exposición basado en brillo promedio (Modificado a 1.4)
+                renderer.toneMappingExposure = 0.6 + (smoothed / 255) * 1.4; 
 
-                // === LÓGICA DE CONTROL Y TRANSICIÓN DE LA SEGUNDA LUZ (v2.72) ===
+                // === LÓGICA DE CONTROL Y TRANSICIÓN DE LA SEGUNDA LUZ (v2.78) ===
                 let secondLight = null;
                 let modelNode = null;
                 const activeCam = arCamera || (_world && _world.three ? _world.three.activeCamera : null);
@@ -329,18 +329,35 @@
 
                       let candidatePos = null;
                       if (activeCam) {
+                        const camWorldPos = new nativeTHREE.Vector3();
+                        activeCam.getWorldPosition(camWorldPos);
+
                         const vector = new nativeTHREE.Vector3(ndcX, ndcY, 0.5);
                         vector.unproject(activeCam);
-                        const dir = vector.sub(activeCam.position).normalize();
+                        const dir = vector.sub(camWorldPos).normalize();
                         
-                        // Colocamos el sol artificial a 1.5 metros del modelo en la dirección de la luz
+                        // Posicionamos el foco emisor en el espacio proyectado desde la cámara
                         candidatePos = new nativeTHREE.Vector3()
-                          .copy(modelPos)
-                          .addScaledVector(dir, 1.5);
+                          .copy(camWorldPos)
+                          .addScaledVector(dir, 1.2);
 
-                        // Garantizamos una altura mínima sobre el plato de 30 cm en el eje vertical (y)
+                        // Garantizamos una altura entre 30 cm y 1.0 m respecto al plano del suelo
                         if (candidatePos.y < 0.3) {
                           candidatePos.y = 0.3;
+                        }
+                        if (candidatePos.y > 1.0) {
+                          candidatePos.y = 1.0;
+                        }
+
+                        // Restricción horizontal XZ
+                        const maxDistXZ = 2.0;
+                        const dx = candidatePos.x - modelPos.x;
+                        const dz = candidatePos.z - modelPos.z;
+                        const distXZ = Math.sqrt(dx * dx + dz * dz);
+                        if (distXZ > maxDistXZ) {
+                          const factor = maxDistXZ / distXZ;
+                          candidatePos.x = modelPos.x + dx * factor;
+                          candidatePos.z = modelPos.z + dz * factor;
                         }
                       }
 
@@ -391,8 +408,8 @@
                         secondLight.castShadow = true;
                       }
 
-                      // ASOCIACIÓN DE INTENSIDAD LIGADA AL ESTIMATION PERO SUAVIZADA (Luminancia * 0.5 * factor de transición)
-                      secondLight.intensity = (smoothed / 255) * 0.5 * currentLightIntensityFactor;
+                      // ASOCIACIÓN DE INTENSIDAD LIGADA AL ESTIMATION PERO SUAVIZADA (Multiplicador fijado a 0.25)
+                      secondLight.intensity = (smoothed / 255) * 0.25 * currentLightIntensityFactor;
                     }
                   }
                 }
@@ -433,7 +450,7 @@
           const obj = c.objects[k];
           if (obj.name === 'Loading Screen') delete c.objects[k];
           
-          // === COMPORTAMIENTO INTERRUPTOR DE EXISTENCIA SEGUNDA LUZ (v2.72) ===
+          // === COMPORTAMIENTO INTERRUPTOR DE EXISTENCIA SEGUNDA LUZ (v2.78) ===
           if (obj.name === 'Directional Light 2') {
             if (obj.light) {
               // Si está inactiva en el JSON del bundle, la eliminamos físicamente

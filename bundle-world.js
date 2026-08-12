@@ -1,4 +1,4 @@
-﻿// 9th Wall v2.72
+﻿// 9th Wall v2.78
 (() => {
   var e = {
     574() {
@@ -313,7 +313,7 @@
           "order": 0.6785011504707911
         },
 
-        // Segunda Luz Direccional (v2.72) - Con parámetros de control condicionado e intensidad individual de sombra
+        // Segunda Luz Direccional (v2.78) - Con parámetros de control condicionado e intensidad individual de sombra
         "2e6e118c-32b4-4b55-a28a-78dfdf649fb1": {
           "id": "2e6e118c-32b4-4b55-a28a-78dfdf649fb1",
           "position": [2, 1, 1.5],
@@ -326,11 +326,11 @@
           "light": {
             "type": "directional",
             "shadowBias": 0.0001,
-            "shadowRadius": 1, // Sombra definida nativa
+            "shadowRadius": 2, // Sombra definida nativa
             "followCamera": false,
             "shadowCamera": [-10, 10, 10, -10, 3, 5],
             "active": true,       // INTERRUPTOR: true para existir, false para desaparecer
-            "shadowOpacity": 0.8  // INTENSIDAD DE SOMBRA (AO sutil): Rango entre 0.0 y 1.0
+            "shadowOpacity": 0.9  // INTENSIDAD DE SOMBRA. ORI 0.8 Y ANTERIOR 0.2
           },
           "name": "Directional Light 2", // Nombre exclusivo para control dinámico en HTML
           "order": 0.6795011504707911
