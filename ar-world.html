@@ -1,4 +1,4 @@
-<!-- 9th Wall v2.70 -->
+<!-- 9th Wall v2.71 -->
 <html>
 <head>
   <meta charset="UTF-8">
@@ -264,7 +264,7 @@
                 smoothed += (brightness - smoothed) * 0.08;
 
                 // LUZ PMREM LIGHT Ajuste de exposición basado en brillo promedio.
-                renderer.toneMappingExposure = 0.6 + (smoothed / 255) * 1.9; 
+                renderer.toneMappingExposure = 0.6 + (smoothed / 255) * 1.5; // ORI 1.9, sin segunda luz aún
 
                 // === LOGICA DE CONTROL DE LA SEGUNDA LUZ (v2.70) ===
                 let secondLight = null;
@@ -286,8 +286,8 @@
                 }
 
                 if (secondLight) {
-                  // A. ASOCIACIÓN DE LUMINANCIA LIGADA AL ESTIMATION PERO SUAVIZADA (Light Estimation * 0.5)
-                  secondLight.intensity = (smoothed / 255) * 0.5;
+                  // A. ASOCIACIÓN DE LUMINANCIA-LUZ LIGADA AL ESTIMATION PERO SUAVIZADA (Light Estimation ORI * 0.5)
+                  secondLight.intensity = (smoothed / 255) * 0.25;
 
                   // B. COLOCACIÓN ESPACIAL EN EL PUNTO MÁS BRILLANTE (FIJA UNA VEZ COLOCADO EL MODELO)
                   if (modelNode && activeCam && !lightLocked) {
