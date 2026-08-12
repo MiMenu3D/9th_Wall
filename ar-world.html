@@ -1,4 +1,4 @@
-<!-- 9th Wall v2.81 -->
+<!-- 9th Wall v2.67 -->
 <html>
 <head>
   <meta charset="UTF-8">
@@ -18,8 +18,8 @@
     style="position:fixed;top:10px;right:10px;z-index:1000000;background:rgba(0,0,0,0.9);color:#0f0;font-family:monospace;font-size:12px;padding:8px;border-radius:4px;cursor:pointer;line-height:1.2;border:1px solid #0f0;">
     <div id="debugTitle">FPS: --</div>
     <div id="debugContent">
-      ar-world: v2.81<br>
-      bundle: v2.81
+      ar-world: v2.66<br>
+      bundle: v2.63
     </div>
   </div>
   <style>
@@ -64,17 +64,6 @@
     let envInterval = null;
     let _scene = null, _renderer = null;
 
-    // === ESTADO Y VARIABLES GLOBALES (v2.79) ===
-    let _world = null;                     // Almacena la instancia global de ECS
-    let arCamera = null;                   // Almacena de forma segura la cámara tridimensional real
-    let secondLightShadowOpacity = 0.2;    // Configurado dinámicamente desde el JSON de bundle-world
-
-    // Variables de control de la transición sutil de recolocación (cada 2 segundos)
-    let lastTransitionTime = 0;
-    let transitionState = 'idle';          // Estados: 'idle', 'fade-down', 'fade-up'
-    let targetLightPos = null;             // Posición de destino de la luz
-    let currentLightIntensityFactor = 0.0; // Multiplicador de intensidad transicional (de 0.0 a 1.0)
-
     document.getElementById('envToggle').addEventListener('click', (e) => {
       log('Button clicked');
       toggleEnv();
@@ -101,8 +90,6 @@
         add: (world, component) => {
           setTimeout(() => {
             try {
-              _world = world;
-              arCamera = world.three.activeCamera; // Almacenamos de forma limpia la cámara nativa
               _scene = world.three.scene;
               _renderer = world.three.renderer;
               
@@ -111,21 +98,16 @@
               log('Captura exitosa. Usando Three nativo: ' + (!!nativeTHREE));
               
               if (nativeTHREE) {
-                // Instanciamos el vector tridimensional de destino de forma segura
-                if (!targetLightPos) targetLightPos = new nativeTHREE.Vector3();
-
                 // === ACTIVACIÓN SEGURA DEL TONE MAPPING ===
                 _renderer.toneMapping = nativeTHREE.ACESFilmicToneMapping;
 
-                // === FORZAR RESOLUCIÓN Y FRUSTUM DE SOMBRAS NATIVAS (Único punto de control de sombras - Restaurado frustum de v2.68) ===
+                // === FORZAR RESOLUCIÓN Y FRUSTUM DE SOMBRAS NATIVAS (Único punto de control de sombras) ===
                 _scene.traverse((node) => {
                   if (node.isDirectionalLight) {
-                    log('Luz direccional localizada (' + node.name + '). Inicializando sombra...');
-                    node.castShadow = true; // ACTIVACIÓN EXPLÍCITA DE SOMBRAS EN THREE NATIVO
-                    
+                    log('Luz direccional localizada. Inicializando sombra a 64px...');
                     if (node.shadow) {
-                      node.shadow.mapSize.width = 512; 
-                      node.shadow.mapSize.height = 512; 
+                      node.shadow.mapSize.width = 512; // <-- Modificar a mano aquí para pruebas (p.ej. 512, 256) -- Antes 128
+                      node.shadow.mapSize.height = 512; // <-- Modificar a mano aquí para pruebas (p.ej. 512, 256) -- Antes 128
                       if (node.shadow.camera) {
                         node.shadow.camera.left = -0.35; // Antes -0.35
                         node.shadow.camera.right = 0.35; // Antes 0.35
@@ -139,12 +121,6 @@
                       if (node.shadow.map) {
                         node.shadow.map.dispose();
                         node.shadow.map = null;
-                      }
-
-                      // === APLICAR OPACIDAD PERSONALIZADA INDIVIDUAL (AO SUTIL) ===
-                      if (node.name === "Directional Light 2" || (node.parent && node.parent.name === "Directional Light 2")) {
-                        node.shadow.intensity = secondLightShadowOpacity;
-                        log('Opacidad de sombra aplicada a Luz 2: ' + secondLightShadowOpacity);
                       }
                     }
                   }
@@ -252,172 +228,14 @@
                 lightCtx.drawImage(video, 0, 0, lightEstimationSize, lightEstimationSize);
                 const pixels = lightCtx.getImageData(0, 0, lightEstimationSize, lightEstimationSize).data;
                 let total = 0;
-                let maxBrightness = -1;
-                let brightX = 2; // Fila (eje vertical de la pantalla, tercio superior)
-                let brightY = 8; // Columna (eje horizontal de la pantalla, centro)
-
-                // Limitamos la detección de las filas al tercio superior (x < 5) de la pantalla física
-                const maxSearchX = Math.floor(lightEstimationSize / 3); // 16 / 3 = 5
-
-                for (let x = 0; x < lightEstimationSize; x++) {
-                  for (let y = 0; y < lightEstimationSize; y++) {
-                    const idx = (x * lightEstimationSize + y) * 4;
-                    const r = pixels[idx];
-                    const g = pixels[idx + 1];
-                    const b = pixels[idx + 2];
-                    const val = 0.299 * r + 0.587 * g + 0.114 * b; // Luminancia relativa
-                    total += val; // Promedio general para el Tone Mapping de la escena
-
-                    // Búsqueda restringida al tercio superior (filas x < 5, columnas y de 0 a 15)
-                    if (x < maxSearchX && val > maxBrightness) {
-                      maxBrightness = val;
-                      brightX = x; // Fila (vertical)
-                      brightY = y; // Columna (horizontal)
-                    }
-                  }
+                for (let i = 0; i < pixels.length; i += 4) {
+                  total += (pixels[i] + pixels[i + 1] + pixels[i + 2]) / 3;
                 }
-
                 const brightness = total / (pixels.length / 4);
                 smoothed += (brightness - smoothed) * 0.08;
 
-                // LUZ PMREM LIGHT Ajuste de exposición basado en brillo promedio (Modificado a 1.4)
-                renderer.toneMappingExposure = 0.6 + (smoothed / 255) * 1.4; 
-
-                // === LÓGICA DE CONTROL Y TRANSICIÓN DE LA SEGUNDA LUZ (v2.80) ===
-                let secondLight = null;
-                let modelNode = null;
-                const activeCam = arCamera || (_world && _world.three ? _world.three.activeCamera : null);
-
-                if (_scene) {
-                  _scene.traverse((node) => {
-                    // Detección jerárquica robusta del nodo DirectionalLight nativo dentro del contenedor de la entidad
-                    if (node.isDirectionalLight && (node.name === "Directional Light 2" || (node.parent && node.parent.name === "Directional Light 2"))) {
-                      secondLight = node;
-                    }
-                    if (node.name === "Model") {
-                      modelNode = node;
-                    }
-                  });
-                }
-
-                if (secondLight) {
-                  const nativeTHREE = window.THREE;
-                  if (nativeTHREE) {
-                    if (!targetLightPos) targetLightPos = new nativeTHREE.Vector3();
-                    const now = performance.now();
-
-                    // 1. SI EL MODELO SE ELIMINA (RESET): Apagamos todo y reiniciamos
-                    if (!modelNode) {
-                      transitionState = 'idle';
-                      currentLightIntensityFactor = 0.0;
-                      secondLight.intensity = 0.0;
-                      secondLight.castShadow = false;
-                    } else {
-                      const modelPos = new nativeTHREE.Vector3();
-                      modelNode.getWorldPosition(modelPos);
-
-                      // Aseguramos que el target de la luz direccional apunte siempre al modelo de la mesa
-                      if (secondLight.target) {
-                        if (!secondLight.target.parent && _scene) {
-                          _scene.add(secondLight.target);
-                        }
-                        secondLight.target.position.copy(modelPos);
-                        secondLight.target.updateMatrixWorld();
-                      }
-
-                      // === TRADUCCIÓN A NDC PANTALLA CORREGIDA ===
-                      // brightY (columnas 0..15) -> ndcX (-1 a +1, izquierda a derecha)
-                      // brightX (filas 0..4) -> ndcY (+1 a +0.47, tercio superior)
-                      const ndcX = (brightY / (lightEstimationSize - 1)) * 2 - 1;
-                      const ndcY = 1 - (brightX / (lightEstimationSize - 1)) * 2;
-
-                      let candidatePos = null;
-                      if (activeCam) {
-                        const camWorldPos = new nativeTHREE.Vector3();
-                        activeCam.getWorldPosition(camWorldPos);
-
-                        const vector = new nativeTHREE.Vector3(ndcX, ndcY, 0.5);
-                        vector.unproject(activeCam);
-                        const dir = vector.sub(camWorldPos).normalize();
-                        
-                        // Posicionamos el foco emisor a 1.2 metros de la cámara en la dirección real proyectada
-                        candidatePos = new nativeTHREE.Vector3()
-                          .copy(camWorldPos)
-                          .addScaledVector(dir, 1.2);
-
-                        // Garantizamos una altura entre 30 cm y 1.0 m respecto al plano del suelo
-                        if (candidatePos.y < 0.3) {
-                          candidatePos.y = 0.3;
-                        }
-                        if (candidatePos.y > 1.0) {
-                          candidatePos.y = 1.0;
-                        }
-
-                        // Restricción horizontal XZ (máximo 2.0m respecto al modelo)
-                        const maxDistXZ = 2.0;
-                        const dx = candidatePos.x - modelPos.x;
-                        const dz = candidatePos.z - modelPos.z;
-                        const distXZ = Math.sqrt(dx * dx + dz * dz);
-                        if (distXZ > maxDistXZ) {
-                          const factor = maxDistXZ / distXZ;
-                          candidatePos.x = modelPos.x + dx * factor;
-                          candidatePos.z = modelPos.z + dz * factor;
-                        }
-                      }
-
-                      // 2. MÁQUINA DE ESTADOS PARA LA TRANSICIÓN SUTIL (CADA 2 SEGUNDOS)
-                      if (transitionState === 'idle') {
-                        // Posicionado instantáneo la primera vez que se monta el modelo
-                        if (currentLightIntensityFactor === 0.0) {
-                          if (candidatePos) {
-                            secondLight.position.copy(candidatePos);
-                            secondLight.updateMatrixWorld();
-                            currentLightIntensityFactor = 1.0;
-                            lastTransitionTime = now;
-                          }
-                        } else if (now - lastTransitionTime > 2000) {
-                          // Pasados 2 segundos, si la luz se ha movido significativamente (> 15 cm), cambiamos
-                          if (candidatePos && secondLight.position.distanceTo(candidatePos) > 0.15) {
-                            targetLightPos.copy(candidatePos);
-                            transitionState = 'fade-down';
-                          }
-                          lastTransitionTime = now;
-                        }
-                      }
-
-                      if (transitionState === 'fade-down') {
-                        currentLightIntensityFactor -= 0.1; // Se apaga de forma progresiva en 500ms (~10 frames)
-                        if (currentLightIntensityFactor <= 0.0) {
-                          currentLightIntensityFactor = 0.0;
-                          // Teletransportamos la luz en un único fotograma al nuevo punto
-                          secondLight.position.copy(targetLightPos);
-                          secondLight.updateMatrixWorld();
-                          transitionState = 'fade-up';
-                        }
-                      }
-
-                      if (transitionState === 'fade-up') {
-                        currentLightIntensityFactor += 0.1; // Se enciende de forma progresiva en 500ms (~10 frames)
-                        if (currentLightIntensityFactor >= 1.0) {
-                          currentLightIntensityFactor = 1.0;
-                          transitionState = 'idle';
-                          lastTransitionTime = now; // Reiniciamos el temporizador
-                        }
-                      }
-
-                      // 3. OPTIMIZACIÓN ACTIVA DE GPU: Desactivar sombras si la luz está casi apagada en la transición
-                      if (currentLightIntensityFactor < 0.05) {
-                        secondLight.castShadow = false;
-                      } else {
-                        secondLight.castShadow = true;
-                      }
-
-                      // ASOCIACIÓN DE INTENSIDAD LIGADA AL ESTIMATION PERO SUAVIZADA (Multiplicador fijado a 0.25)
-                      secondLight.intensity = (smoothed / 255) * 0.25 * currentLightIntensityFactor;
-                    }
-                  }
-                }
-
+                // LUZ PMREM LIGHT Ajuste de exposición basado en brillo promedio. Valores anteriores 0.4 y 1.5 respectivamente.
+                renderer.toneMappingExposure = 0.6 + (smoothed / 255) * 1.9; 
               } catch (e) {
                 // Silencioso
               }
@@ -454,25 +272,10 @@
           const obj = c.objects[k];
           if (obj.name === 'Loading Screen') delete c.objects[k];
           
-          // === COMPORTAMIENTO INTERRUPTOR DE EXISTENCIA SEGUNDA LUZ (v2.79) ===
-          if (obj.name === 'Directional Light 2') {
-            if (obj.light) {
-              // Si está inactiva en el JSON del bundle, la eliminamos físicamente
-              if (obj.light.active === false) {
-                delete c.objects[k];
-                continue;
-              }
-              // Si está activa, leemos el parámetro de opacidad personalizado para aplicarlo en Three
-              if (obj.light.shadowOpacity !== undefined) {
-                secondLightShadowOpacity = obj.light.shadowOpacity;
-              }
-            }
-          }
-
           // Solución a la doble iluminación nativa:
           if (obj.name === 'Directional Light') {
             if (obj.light) {
-              obj.light.intensity = 0.00; // Atenuamos la luz direccional principal para conservar sombras suaves
+              obj.light.intensity = 0.00; // Atenuamos la luz direccional para conservar sombras suaves
             }
           }
 
