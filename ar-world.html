@@ -1,4 +1,4 @@
-<!-- 9th Wall v2.66 -->
+<!-- 9th Wall v2.67 -->
 <html>
 <head>
   <meta charset="UTF-8">
@@ -273,7 +273,7 @@
           if (obj.name === 'Loading Screen') delete c.objects[k];
           
           // Solución a la doble iluminación nativa:
-            if (obj.name === 'Directional Light') {
+          if (obj.name === 'Directional Light') {
             if (obj.light) {
               obj.light.intensity = 0.00; // Atenuamos la luz direccional para conservar sombras suaves
             }
