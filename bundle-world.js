@@ -1,22 +1,19 @@
-﻿// 9th Wall v2.75
+﻿// 9th Wall v2.76
 (() => {
   var e = {
     574() {
       const e = () => {
         XR8.addCameraPipelineModule(LandingPage.pipelineModule()),
 
-        // Registro del módulo de puntos condicionado de forma estricta por el estado debug
         DEBUG_VISUALS.slamPointCloud && XR8.addCameraPipelineModule({
           name: 'pointcloud-debugger-inner',
           onStart: () => {
             if (window.XR8) {
-              // Habilitamos la extracción de características de puntos únicamente si la depuración está activa
               window.XR8.XrController.configure({ enableWorldPoints: true });
             }
           },
           onUpdate: (e) => {
             if (e.processCpuResult && e.processCpuResult.reality) {
-              // Exponemos las coordenadas del SLAM globalmente para el componente 3D
               window.latestWorldPoints = e.processCpuResult.reality.worldPoints;
             }
           }
@@ -31,15 +28,12 @@
   },
   t = {};
 
-  // Leemos de forma nativa el estado del interruptor debug persistido en sessionStorage
   const IS_DEBUG = sessionStorage.getItem("debug_features") === "true";
 
-  // Nube de puntos SLAM activa en Debug
   const DEBUG_VISUALS = Object.freeze({
     slamPointCloud: IS_DEBUG
   });
 
-  // Controles del único modelo colocado.
   const MODEL_GESTURES = Object.freeze({
     minimumScale: 0.75,
     maximumScale: 1.45,
@@ -208,7 +202,6 @@
       }
     });
 
-    // Componente oficial para visualizar la nube de puntos (SLAM) de 8th Wall (Solo activo en debug)
     e.registerComponent({
       name: "point-cloud-visualizer",
       add: (world, component) => {
@@ -226,7 +219,7 @@
         geometry.setAttribute('position', new THREE_INSTANCE.BufferAttribute(positionsArray, 3));
 
         const material = new THREE_INSTANCE.PointsMaterial({
-          color: 0xffcc00,       // Amarillo/Dorado
+          color: 0xffcc00,       
           size: 0.002,
           sizeAttenuation: true,
           opacity: 1.0,
@@ -238,7 +231,6 @@
         pointCloudMesh.frustumCulled = false;
         scene.add(pointCloudMesh);
 
-        // Bucle nativo sincronizado con el renderizado a 60 FPS
         const actualizarPuntos = () => {
           const worldPoints = window.latestWorldPoints;
           if (worldPoints) {
@@ -268,7 +260,6 @@
     const i = {
       "objects": {
 
-        // Prefab del objeto que se clona (Logo)
         "b534657a-38e6-4275-a37d-77b655561d5b": {
           "id": "b534657a-38e6-4275-a37d-77b655561d5b",
           "position": [0, 0, 0],
@@ -292,7 +283,6 @@
           "prefab": true
         },
 
-        // Luz direccional 1 y ShadowCamera (Restaurada la estructura original del bundle)
         "492cfe2c-9334-4a9c-a48a-be80132af9fb": {
           "id": "492cfe2c-9334-4a9c-a48a-be80132af9fb",
           "position": [0, 1, 0],
@@ -304,16 +294,16 @@
           "components": {},
           "light": {
             "type": "directional",
-            "shadowBias": 0.0001, // Previene artefactos de sombras a baja resolución (shadow acne)
+            "shadowBias": 0.0001, 
             "shadowRadius": 8,
             "followCamera": false,
-            "shadowCamera": [-10, 10, 10, -10, 3, 5] // Versión anterior: 0.3, 0.3, 0.3, 0.3, 0.4, 1
+            "shadowCamera": [-10, 10, 10, -10, 3, 5] 
           },
           "name": "Directional Light",
           "order": 0.6785011504707911
         },
 
-        // Segunda Luz Direccional (v2.75) - Con opacidad de sombra configurable fijada a 0.8
+        // Segunda Luz Direccional (v2.75) - Habilitada la emisión de sombras nativa ECS
         "2e6e118c-32b4-4b55-a28a-78dfdf649fb1": {
           "id": "2e6e118c-32b4-4b55-a28a-78dfdf649fb1",
           "position": [2, 1, 1.5],
@@ -323,20 +313,20 @@
           "material": null,
           "parentId": "84028e73-ee70-412d-b8d4-c09bf07c655c",
           "components": {},
+          "shadow": { "castShadow": true }, // HABILITACIÓN DE SOMBRAS EN ECS
           "light": {
             "type": "directional",
             "shadowBias": 0.0001,
-            "shadowRadius": 2, // Sombra definida nativa
+            "shadowRadius": 2, 
             "followCamera": false,
             "shadowCamera": [-10, 10, 10, -10, 3, 5],
-            "active": true,       // INTERRUPTOR: true para existir, false para desaparecer
-            "shadowOpacity": 0.8  // INTENSIDAD DE SOMBRA (AO sutil): Forzado a 0.8 para pruebas visuales
+            "active": true,       
+            "shadowOpacity": 0.8  
           },
-          "name": "Directional Light 2", // Nombre exclusivo para control dinámico en HTML
+          "name": "Directional Light 2", 
           "order": 0.6795011504707911
         },
 
-        // Camera de Realidad Aumentada
         "52ba8a86-a459-4df8-b954-a570e85e0484": {
           "id": "52ba8a86-a459-4df8-b954-a570e85e0484",
           "position": [0, 0.30, 0.30],
@@ -360,7 +350,6 @@
           "order": 2.1029089692509704
         },
 
-        // Pantalla de Carga (Overlay negro)
         "c7231d72-b7a3-44ea-b5f5-bb9ea9572ed9": {
           "id": "c7231d72-b7a3-44ea-b5f5-bb9ea9572ed9",
           "position": [0, 10.938518268367439, -2.5468804365107705],
@@ -391,7 +380,6 @@
           "order": 16.570036688545937
         },
 
-        // Texto "Camera Loading"
         "2f4186f0-5825-4b3c-868a-24bc7945a328": {
           "id": "2f4186f0-5825-4b3c-868a-24bc7945a328",
           "position": [0, 0, 0],
@@ -416,7 +404,6 @@
           "order": 1.9632252822400198
         },
 
-        // Plano del suelo (Ground)
         "bc7753ae-2b39-4f48-910a-7921b756487b": {
           "id": "bc7753ae-2b39-4f48-910a-7921b756487b",
           "position": [0, 0.001, 0],
@@ -439,7 +426,6 @@
           "shadow": { "receiveShadow": true }
         },
 
-        // Plano Ocultador (Hider)
         "17af117a-efce-48dd-857e-e383a3649c7b": {
           "id": "17af117a-efce-48dd-857e-e383a3649c7b",
           "position": [0, -0.001, 0],
@@ -453,7 +439,6 @@
           "order": 7.322553197845954
         },
 
-        // Texto UI "Tap to place"
         "9b5668bc-b512-4bb6-9c6b-8ba97d3f8af0": {
           "id": "9b5668bc-b512-4bb6-9c6b-8ba97d3f8af0",
           "position": [16.857510635812545, 15.927690665172552, 0],
@@ -484,7 +469,6 @@
           "order": 10.427624126637916
         },
 
-        // Entidad del Modelo 3D (El archivo .glb)
         "a02b4479-461e-40c2-ba91-0ccabbd1bd83": {
           "id": "a02b4479-461e-40c2-ba91-0ccabbd1bd83",
           "position": [0, 0, 0],
@@ -515,7 +499,6 @@
           "shadow": { "castShadow": true }
         },
 
-        // Botón UI (Reset)
         "5ac3deca-2126-4b56-b6a2-1442d035047a": {
           "id": "5ac3deca-2126-4b56-b6a2-1442d035047a",
           "position": [-8.46107198766815, 7.181789778649719, 0],
@@ -554,7 +537,6 @@
           "order": 13.280785398189009
         },
 
-        // Texto del Botón Reset
         "543540e1-7086-4068-a4e3-394084c146f8": {
           "id": "543540e1-7086-4068-a4e3-394084c146f8",
           "position": [0, 0, 0],
@@ -576,7 +558,6 @@
           "order": 1.2563868233834565
         },
 
-        // Contenedor principal UI
         "904308fe-98f5-4c93-bf62-f39d50c6e602": {
           "id": "904308fe-98f5-4c93-bf62-f39d50c6e602",
           "position": [9.546973370717888, 17.058059801097308, 0],
@@ -624,7 +605,6 @@
       };
     }
 
-    // Eliminación física y absoluta de los componentes de depuración si están inactivos
     if (!DEBUG_VISUALS.slamPointCloud) {
       delete i.objects["52ba8a86-a459-4df8-b954-a570e85e0484"].components["point-cloud-visualizer-comp"];
     }
