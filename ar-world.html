@@ -1,4 +1,4 @@
-<!-- 9th Wall v2.83 -->
+<!-- 9th Wall v2.81 -->
 <html>
 <head>
   <meta charset="UTF-8">
@@ -18,8 +18,8 @@
     style="position:fixed;top:10px;right:10px;z-index:1000000;background:rgba(0,0,0,0.9);color:#0f0;font-family:monospace;font-size:12px;padding:8px;border-radius:4px;cursor:pointer;line-height:1.2;border:1px solid #0f0;">
     <div id="debugTitle">FPS: --</div>
     <div id="debugContent">
-      ar-world: v2.83<br>
-      bundle: v2.83
+      ar-world: v2.81<br>
+      bundle: v2.81
     </div>
   </div>
   <style>
@@ -289,26 +289,15 @@
                 const activeCam = arCamera || (_world && _world.three ? _world.three.activeCamera : null);
 
                 if (_scene) {
-                  const dirLights = [];
                   _scene.traverse((node) => {
-                    if (node.isDirectionalLight) {
-                      dirLights.push(node);
-                      // Detección robusta buscando por ID de entidad (UUID), nombre legible y jerarquía de contenedor
-                      if (node.name === "2e6e118c-32b4-4b55-a28a-78dfdf649fb1" || 
-                          node.name === "Directional Light 2" || 
-                          (node.parent && (node.parent.name === "2e6e118c-32b4-4b55-a28a-78dfdf649fb1" || node.parent.name === "Directional Light 2"))) {
-                        secondLight = node;
-                      }
+                    // Detección jerárquica robusta del nodo DirectionalLight nativo dentro del contenedor de la entidad
+                    if (node.isDirectionalLight && (node.name === "Directional Light 2" || (node.parent && node.parent.name === "Directional Light 2"))) {
+                      secondLight = node;
                     }
                     if (node.name === "Model") {
                       modelNode = node;
                     }
                   });
-
-                  // Fallback por índice si la identificación por nombre falla en el árbol de Three.js
-                  if (!secondLight && dirLights.length >= 2) {
-                    secondLight = dirLights[1];
-                  }
                 }
 
                 if (secondLight) {

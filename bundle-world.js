@@ -1,4 +1,4 @@
-﻿// 9th Wall v2.83
+﻿// 9th Wall v2.81
 (() => {
   var e = {
     574() {
@@ -327,7 +327,7 @@
           "light": {
             "type": "directional",
             "shadowBias": 0.0001,
-            "shadowRadius": 2, // Sombra definida nativa
+            "shadowRadius": 1, // Sombra definida nativa
             "followCamera": false,
             "shadowCamera": [-10, 10, 10, -10, 3, 5],
             "active": true,       // INTERRUPTOR: true para existir, false para desaparecer
