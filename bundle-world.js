@@ -1,4 +1,4 @@
-﻿// 9th Wall v2.79
+﻿// 9th Wall v2.80 (limpieza+segunda luz direccional)
 (() => {
   var e = {
     574() {
@@ -307,13 +307,13 @@
             "shadowBias": 0.0001, // Previene artefactos de sombras a baja resolución (shadow acne)
             "shadowRadius": 8,
             "followCamera": false,
-            "shadowCamera": [-10, 10, 10, -10, 3, 5] // Versión anterior: 0.3, 0.3, 0.3, 0.3, 0.4, 1
+            "shadowCamera": [-10, 10, 10, -10, 3, 5]
           },
           "name": "Directional Light",
           "order": 0.6785011504707911
         },
 
-        // Segunda Luz Direccional (v2.79) - Con emisor de sombras activado en esquema
+        // Segunda Luz Direccional (v2.80) - Con emisor de sombras activado en esquema
         "2e6e118c-32b4-4b55-a28a-78dfdf649fb1": {
           "id": "2e6e118c-32b4-4b55-a28a-78dfdf649fb1",
           "position": [2, 1, 1.5],
