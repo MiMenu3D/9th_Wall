@@ -1,4 +1,4 @@
-<!-- 9th Wall v2.80 -->
+<!-- 9th Wall v2.81 -->
 <html>
 <head>
   <meta charset="UTF-8">
@@ -18,8 +18,8 @@
     style="position:fixed;top:10px;right:10px;z-index:1000000;background:rgba(0,0,0,0.9);color:#0f0;font-family:monospace;font-size:12px;padding:8px;border-radius:4px;cursor:pointer;line-height:1.2;border:1px solid #0f0;">
     <div id="debugTitle">FPS: --</div>
     <div id="debugContent">
-      ar-world: v2.80<br>
-      bundle: v2.80
+      ar-world: v2.81<br>
+      bundle: v2.81
     </div>
   </div>
   <style>
@@ -108,7 +108,7 @@
               
               // Buscamos el THREE nativo expuesto globalmente por el runtime de 8th Wall
               const nativeTHREE = window.THREE;
-              log('Capture exitosa. Usando Three nativo: ' + (!!nativeTHREE));
+              log('Captura exitosa. Usando Three nativo: ' + (!!nativeTHREE));
               
               if (nativeTHREE) {
                 // Instanciamos el vector tridimensional de destino de forma segura
@@ -117,7 +117,7 @@
                 // === ACTIVACIÓN SEGURA DEL TONE MAPPING ===
                 _renderer.toneMapping = nativeTHREE.ACESFilmicToneMapping;
 
-                // === FORZAR RESOLUCIÓN Y FRUSTUM DE SOMBRAS NATIVAS (Único punto de control de sombras) ===
+                // === FORZAR RESOLUCIÓN Y FRUSTUM DE SOMBRAS NATIVAS (Único punto de control de sombras - Restaurado frustum de v2.68) ===
                 _scene.traverse((node) => {
                   if (node.isDirectionalLight) {
                     log('Luz direccional localizada (' + node.name + '). Inicializando sombra...');
@@ -127,13 +127,12 @@
                       node.shadow.mapSize.width = 512; 
                       node.shadow.mapSize.height = 512; 
                       if (node.shadow.camera) {
-                        node.shadow.camera.left = -0.5; 
-                        node.shadow.camera.right = 0.5; 
-                        node.shadow.camera.top = 0.5; 
-                        node.shadow.camera.bottom = -0.5; 
-                        node.shadow.camera.near = 0.1; 
-                        // Para la luz inclinada que se proyecta lejana, el far debe ser de 4.0
-                        node.shadow.camera.far = (node.name === "Directional Light 2" || (node.parent && node.parent.name === "Directional Light 2")) ? 4.0 : 2.0;
+                        node.shadow.camera.left = -0.35; // Antes -0.35
+                        node.shadow.camera.right = 0.35; // Antes 0.35
+                        node.shadow.camera.top = 0.35; // Antes 0.35
+                        node.shadow.camera.bottom = -0.35; // Antes -0.35
+                        node.shadow.camera.near = 0.1; // Antes 0.1
+                        node.shadow.camera.far = 5; // Antes 2
                         node.shadow.camera.updateProjectionMatrix();
                       }
                       // Desechamos el mapa de sombras anterior para que Three.js lo regenere con la nueva resolución
@@ -254,11 +253,11 @@
                 const pixels = lightCtx.getImageData(0, 0, lightEstimationSize, lightEstimationSize).data;
                 let total = 0;
                 let maxBrightness = -1;
-                let brightX = 8; // Fila (eje vertical de la pantalla, tercio superior)
+                let brightX = 2; // Fila (eje vertical de la pantalla, tercio superior)
                 let brightY = 8; // Columna (eje horizontal de la pantalla, centro)
 
-                // Limitamos la detección al tercio superior físico (columnas y >= minSearchY en Landscape)
-                const minSearchY = Math.floor(lightEstimationSize * 0.6); // ~9.6, columnas >= 10
+                // Limitamos la detección de las filas al tercio superior (x < 5) de la pantalla física
+                const maxSearchX = Math.floor(lightEstimationSize / 3); // 16 / 3 = 5
 
                 for (let x = 0; x < lightEstimationSize; x++) {
                   for (let y = 0; y < lightEstimationSize; y++) {
@@ -269,8 +268,8 @@
                     const val = 0.299 * r + 0.587 * g + 0.114 * b; // Luminancia relativa
                     total += val; // Promedio general para el Tone Mapping de la escena
 
-                    // Búsqueda restringida al tercio superior físico (columnas y >= minSearchY)
-                    if (y >= minSearchY && val > maxBrightness) {
+                    // Búsqueda restringida al tercio superior (filas x < 5, columnas y de 0 a 15)
+                    if (x < maxSearchX && val > maxBrightness) {
                       maxBrightness = val;
                       brightX = x; // Fila (vertical)
                       brightY = y; // Columna (horizontal)
@@ -284,28 +283,21 @@
                 // LUZ PMREM LIGHT Ajuste de exposición basado en brillo promedio (Modificado a 1.4)
                 renderer.toneMappingExposure = 0.6 + (smoothed / 255) * 1.4; 
 
-                // === LÓGICA DE CONTROL Y TRANSICIÓN DE LA SEGUNDA LUZ (v2.79) ===
+                // === LÓGICA DE CONTROL Y TRANSICIÓN DE LA SEGUNDA LUZ (v2.80) ===
                 let secondLight = null;
                 let modelNode = null;
                 const activeCam = arCamera || (_world && _world.three ? _world.three.activeCamera : null);
 
                 if (_scene) {
-                  const dirLights = [];
                   _scene.traverse((node) => {
-                    if (node.isDirectionalLight) {
-                      dirLights.push(node);
-                      if (node.name === "Directional Light 2" || (node.parent && node.parent.name === "Directional Light 2")) {
-                        secondLight = node;
-                      }
+                    // Detección jerárquica robusta del nodo DirectionalLight nativo dentro del contenedor de la entidad
+                    if (node.isDirectionalLight && (node.name === "Directional Light 2" || (node.parent && node.parent.name === "Directional Light 2"))) {
+                      secondLight = node;
                     }
                     if (node.name === "Model") {
                       modelNode = node;
                     }
                   });
-
-                  if (!secondLight && dirLights.length >= 2) {
-                    secondLight = dirLights[1];
-                  }
                 }
 
                 if (secondLight) {
@@ -336,8 +328,8 @@
                       // === TRADUCCIÓN A NDC PANTALLA CORREGIDA ===
                       // brightY (columnas 0..15) -> ndcX (-1 a +1, izquierda a derecha)
                       // brightX (filas 0..4) -> ndcY (+1 a +0.47, tercio superior)
-                      const ndcX = (brightX / (lightEstimationSize - 1)) * 2 - 1;
-                      const ndcY = (brightY / (lightEstimationSize - 1)) * 2 - 1;
+                      const ndcX = (brightY / (lightEstimationSize - 1)) * 2 - 1;
+                      const ndcY = 1 - (brightX / (lightEstimationSize - 1)) * 2;
 
                       let candidatePos = null;
                       if (activeCam) {
@@ -415,7 +407,7 @@
 
                       // 3. OPTIMIZACIÓN ACTIVA DE GPU: Desactivar sombras si la luz está casi apagada en la transición
                       if (currentLightIntensityFactor < 0.05) {
-                        secondLight.castShadow = true;
+                        secondLight.castShadow = false;
                       } else {
                         secondLight.castShadow = true;
                       }
