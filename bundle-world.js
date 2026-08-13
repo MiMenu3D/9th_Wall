@@ -1,8 +1,8 @@
-﻿// 9th Wall v2.66
-(()=>{
-  var e={
-    574(){
-      const e=()=>{
+﻿// 9th Wall v2.80
+(() => {
+  var e = {
+    574() {
+      const e = () => {
         XR8.addCameraPipelineModule(LandingPage.pipelineModule()),
 
         // Registro del módulo de puntos condicionado de forma estricta por el estado debug
@@ -23,17 +23,17 @@
         }),
 
         LandingPage.configure({
-          mediaSrc:"./assets/preview.jpg"
+          mediaSrc: "./assets/preview.jpg"
         })
       };
-      window.XR8?e():window.addEventListener("xrloaded", e)
+      window.XR8 ? e() : window.addEventListener("xrloaded", e)
     }
   },
-  t={};
-  
+  t = {};
+
   // Leemos de forma nativa el estado del interruptor debug persistido en sessionStorage
   const IS_DEBUG = sessionStorage.getItem("debug_features") === "true";
-  
+
   // Nube de puntos SLAM activa en Debug; Shadow Camera Helper y Ground Visual desactivados para no entorpecer
   const DEBUG_VISUALS = Object.freeze({
     slamPointCloud: IS_DEBUG,
@@ -49,168 +49,168 @@
     pinchActivationThreshold: 0.09,
     rotationActivationThreshold: 0.020
   });
-  function a(o){
-    var n=t[o];
-    if(void 0!==n)return n.exports;
-    var i=t[o]={ exports:{} };
+  function a(o) {
+    var n = t[o];
+    if (void 0 !== n) return n.exports;
+    var i = t[o] = { exports: {} };
     return e[o](i, i.exports, a), i.exports
-  }(()=>{
+  }(() => {
     "use strict";
     a(574);
-    const e=window.ecs;
+    const e = window.ecs;
     e.registerComponent({
-      name:"hide-on-ready",
-      stateMachine:({ world:t, eid:a, defineState:o })=>{
-        o("initial").initial().onEvent(e.events.REALITY_READY, "ready", { target:t.events.globalId }),
-        o("ready").onEnter(()=>{ e.Disabled.reset(t, a) })
+      name: "hide-on-ready",
+      stateMachine: ({ world: t, eid: a, defineState: o }) => {
+        o("initial").initial().onEvent(e.events.REALITY_READY, "ready", { target: t.events.globalId }),
+        o("ready").onEnter(() => { e.Disabled.reset(t, a) })
       }
     });
-    
-    const t=e.registerComponent({ name:"logo" }),
-    o="object-placed",
-    n="object-removed";
-    let placementGroundEid=null;
+
+    const t = e.registerComponent({ name: "logo" }),
+    o = "object-placed",
+    n = "object-removed";
+    let placementGroundEid = null;
     e.registerComponent({
-      name:"tap-to-place",
-      schema:{ prefab:"eid" },
-      stateMachine:({ world:t, eid:a, schemaAttribute:schemaAttr, defineState:i })=>{
-        placementGroundEid=a;
-        i("initial").initial().listen(a, e.input.SCREEN_TOUCH_START, i=>{
-          if(!i.data.worldPosition)return;
-          const r=t.createEntity(schemaAttr.get(a).prefab),
-          d=t.getEntity(r);
+      name: "tap-to-place",
+      schema: { prefab: "eid" },
+      stateMachine: ({ world: t, eid: a, schemaAttribute: schemaAttr, defineState: i }) => {
+        placementGroundEid = a;
+        i("initial").initial().listen(a, e.input.SCREEN_TOUCH_START, i => {
+          if (!i.data.worldPosition) return;
+          const r = t.createEntity(schemaAttr.get(a).prefab),
+          d = t.getEntity(r);
           d.setLocalPosition(i.data.worldPosition),
-          d.set(e.Quaternion, e.math.quat.yRadians(Math.random()*Math.PI)),
+          d.set(e.Quaternion, e.math.quat.yRadians(Math.random() * Math.PI)),
           t.events.dispatch(a, o)
-        }).onEvent(o, "placed", { target:a }),
-        i("placed").onEvent(n, "initial", { target:a })
+        }).onEvent(o, "placed", { target: a }),
+        i("placed").onEvent(n, "initial", { target: a })
       }
     });
 
     e.registerComponent({
-      name:"model-gesture-controls",
-      stateMachine:({ world:t, eid:a, defineState:o })=>{
-        let isTwoFingerGesture=!1,
-        isModelTouchActive=!1,
-        dragPointerId=null,
-        dragPlaneY=0,
-        dragOffsetX=0,
-        dragOffsetZ=0,
-        activePointerIds=new Set(),
-        waitForAllTouchesToEnd=!1,
-        gestureMode="none",
-        currentScale=1,
-        scaleAtGestureStart=1;
+      name: "model-gesture-controls",
+      stateMachine: ({ world: t, eid: a, defineState: o }) => {
+        let isTwoFingerGesture = !1,
+        isModelTouchActive = !1,
+        dragPointerId = null,
+        dragPlaneY = 0,
+        dragOffsetX = 0,
+        dragOffsetZ = 0,
+        activePointerIds = new Set(),
+        waitForAllTouchesToEnd = !1,
+        gestureMode = "none",
+        currentScale = 1,
+        scaleAtGestureStart = 1;
         o("enabled").initial()
-          .listen(a, e.input.SCREEN_TOUCH_START, o=>{
-            const n=t.transform.getWorldPosition(a),
-            i=t.three.activeCamera,
-            r=window.THREE;
-            isModelTouchActive=!0,
-            dragPointerId=o.data.pointerId,
+          .listen(a, e.input.SCREEN_TOUCH_START, o => {
+            const n = t.transform.getWorldPosition(a),
+            i = t.three.activeCamera,
+            r = window.THREE;
+            isModelTouchActive = !0,
+            dragPointerId = o.data.pointerId,
             activePointerIds.add(o.data.pointerId),
-            dragPlaneY=n.y,
-            dragOffsetX=0,
-            dragOffsetZ=0;
-            if(!i||!r)return;
-            const d=new r.Raycaster(),
-            s=new r.Vector2(o.data.position.x*2-1, 1-o.data.position.y*2),
-            l=new r.Plane(new r.Vector3(0, 1, 0), -dragPlaneY),
-            c=new r.Vector3();
+            dragPlaneY = n.y,
+            dragOffsetX = 0,
+            dragOffsetZ = 0;
+            if (!i || !r) return;
+            const d = new r.Raycaster(),
+            s = new r.Vector2(o.data.position.x * 2 - 1, 1 - o.data.position.y * 2),
+            l = new r.Plane(new r.Vector3(0, 1, 0), -dragPlaneY),
+            c = new r.Vector3();
             d.setFromCamera(s, i);
-            if(d.ray.intersectPlane(l, c)){
-              dragOffsetX=n.x-c.x,
-              dragOffsetZ=n.z-c.z
+            if (d.ray.intersectPlane(l, c)) {
+              dragOffsetX = n.x - c.x,
+              dragOffsetZ = n.z - c.z
             }
           })
-          .listen(t.events.globalId, e.input.SCREEN_TOUCH_START, o=>{
-            if(isModelTouchActive)activePointerIds.add(o.data.pointerId)
+          .listen(t.events.globalId, e.input.SCREEN_TOUCH_START, o => {
+            if (isModelTouchActive) activePointerIds.add(o.data.pointerId)
           })
-          .listen(t.events.globalId, e.input.SCREEN_TOUCH_MOVE, o=>{
-            if(!isModelTouchActive||isTwoFingerGesture||waitForAllTouchesToEnd||o.data.pointerId!==dragPointerId)return;
-            const n=t.three.activeCamera,
-            i=window.THREE;
-            if(!n||!i)return;
-            const r=new i.Raycaster(),
-            d=new i.Vector2(o.data.position.x*2-1, 1-o.data.position.y*2),
-            s=new i.Plane(new i.Vector3(0, 1, 0), -dragPlaneY),
-            l=new i.Vector3();
+          .listen(t.events.globalId, e.input.SCREEN_TOUCH_MOVE, o => {
+            if (!isModelTouchActive || isTwoFingerGesture || waitForAllTouchesToEnd || o.data.pointerId !== dragPointerId) return;
+            const n = t.three.activeCamera,
+            i = window.THREE;
+            if (!n || !i) return;
+            const r = new i.Raycaster(),
+            d = new i.Vector2(o.data.position.x * 2 - 1, 1 - o.data.position.y * 2),
+            s = new i.Plane(new i.Vector3(0, 1, 0), -dragPlaneY),
+            l = new i.Vector3();
             r.setFromCamera(d, n);
-            if(r.ray.intersectPlane(s, l))t.transform.setWorldPosition(a, {
-              x:l.x+dragOffsetX,
-              y:dragPlaneY,
-              z:l.z+dragOffsetZ
+            if (r.ray.intersectPlane(s, l)) t.transform.setWorldPosition(a, {
+              x: l.x + dragOffsetX,
+              y: dragPlaneY,
+              z: l.z + dragOffsetZ
             })
           })
-          .listen(t.events.globalId, e.input.SCREEN_TOUCH_END, o=>{
+          .listen(t.events.globalId, e.input.SCREEN_TOUCH_END, o => {
             activePointerIds.delete(o.data.pointerId);
-            if(0===activePointerIds.size){
-              isModelTouchActive=!1,
-              dragPointerId=null,
-              waitForAllTouchesToEnd=!1,
-              gestureMode="none"
+            if (0 === activePointerIds.size) {
+              isModelTouchActive = !1,
+              dragPointerId = null,
+              waitForAllTouchesToEnd = !1,
+              gestureMode = "none"
             }
           })
-          .listen(t.events.globalId, e.input.GESTURE_START, o=>{
-            if(!isModelTouchActive||2!==o.data.touchCount)return;
-            isTwoFingerGesture=!0,
-            waitForAllTouchesToEnd=!0,
-            gestureMode="none",
-            scaleAtGestureStart=currentScale
+          .listen(t.events.globalId, e.input.GESTURE_START, o => {
+            if (!isModelTouchActive || 2 !== o.data.touchCount) return;
+            isTwoFingerGesture = !0,
+            waitForAllTouchesToEnd = !0,
+            gestureMode = "none",
+            scaleAtGestureStart = currentScale
           })
-          .listen(t.events.globalId, e.input.GESTURE_MOVE, o=>{
-            if(!isModelTouchActive||!isTwoFingerGesture||2!==o.data.touchCount)return;
-            const n=o.data.startSpread>0?Math.abs(o.data.spread-o.data.startSpread)/o.data.startSpread:0,
-            i=Math.abs(o.data.position.x-o.data.startPosition.x);
-            if("none"===gestureMode){
-              if(n>=MODEL_GESTURES.pinchActivationThreshold&&n/MODEL_GESTURES.pinchActivationThreshold>=i/MODEL_GESTURES.rotationActivationThreshold)gestureMode="scale";
-              else if(i>=MODEL_GESTURES.rotationActivationThreshold)gestureMode="rotate";
+          .listen(t.events.globalId, e.input.GESTURE_MOVE, o => {
+            if (!isModelTouchActive || !isTwoFingerGesture || 2 !== o.data.touchCount) return;
+            const n = o.data.startSpread > 0 ? Math.abs(o.data.spread - o.data.startSpread) / o.data.startSpread : 0,
+            i = Math.abs(o.data.position.x - o.data.startPosition.x);
+            if ("none" === gestureMode) {
+              if (n >= MODEL_GESTURES.pinchActivationThreshold && n / MODEL_GESTURES.pinchActivationThreshold >= i / MODEL_GESTURES.rotationActivationThreshold) gestureMode = "scale";
+              else if (i >= MODEL_GESTURES.rotationActivationThreshold) gestureMode = "rotate";
               else return
             }
-            if("scale"===gestureMode){
-              const n=o.data.startSpread>0?o.data.spread/o.data.startSpread:1;
-              currentScale=Math.max(MODEL_GESTURES.minimumScale, Math.min(MODEL_GESTURES.maximumScale, scaleAtGestureStart*n)),
-              e.Scale.set(t, a, { x:currentScale, y:currentScale, z:currentScale })
-            }else if("rotate"===gestureMode){
-              t.transform.rotateSelf(a, e.math.quat.yRadians(o.data.positionChange.x*MODEL_GESTURES.rotationSensitivity))
+            if ("scale" === gestureMode) {
+              const n = o.data.startSpread > 0 ? o.data.spread / o.data.startSpread : 1;
+              currentScale = Math.max(MODEL_GESTURES.minimumScale, Math.min(MODEL_GESTURES.maximumScale, scaleAtGestureStart * n)),
+              e.Scale.set(t, a, { x: currentScale, y: currentScale, z: currentScale })
+            } else if ("rotate" === gestureMode) {
+              t.transform.rotateSelf(a, e.math.quat.yRadians(o.data.positionChange.x * MODEL_GESTURES.rotationSensitivity))
             }
           })
-          .listen(t.events.globalId, e.input.GESTURE_END, o=>{
-            if(o.data.nextTouchCount<2)isTwoFingerGesture=!1
+          .listen(t.events.globalId, e.input.GESTURE_END, o => {
+            if (o.data.nextTouchCount < 2) isTwoFingerGesture = !1
           })
       }
     });
-    const r=e.defineQuery([t]);
+    const r = e.defineQuery([t]);
     e.registerComponent({
-      name:"reset-button",
-      stateMachine:({ world:t, entity:a, defineState:i })=>{
-        i("nothing-placed").initial().onEvent(o, "placed", { target:t.events.globalId }).onEnter(()=>a.hide()).onExit(()=>a.show()),
+      name: "reset-button",
+      stateMachine: ({ world: t, entity: a, defineState: i }) => {
+        i("nothing-placed").initial().onEvent(o, "placed", { target: t.events.globalId }).onEnter(() => a.hide()).onExit(() => a.show()),
         i("placed").onEvent(e.input.UI_CLICK, "resetting"),
-        i("resetting").wait(1e3, "nothing-placed").onEnter(()=>{
-          const a=e.math.vec3.zero();
-          r(t).forEach(o=>{
+        i("resetting").wait(1e3, "nothing-placed").onEnter(() => {
+          const a = e.math.vec3.zero();
+          r(t).forEach(o => {
             t.transform.getLocalPosition(o, a),
             e.PositionAnimation.set(t, o, {
-              duration:1e3,
-              loop:!1,
-              fromX:a.x,
-              fromY:a.y,
-              fromZ:a.z,
-              toX:a.x,
-              toY:-4,
-              toZ:a.z,
-              easeIn:!0,
-              easingFunction:"Quadratic"
+              duration: 1e3,
+              loop: !1,
+              fromX: a.x,
+              fromY: a.y,
+              fromZ: a.z,
+              toX: a.x,
+              toY: -4,
+              toZ: a.z,
+              easeIn: !0,
+              easingFunction: "Quadratic"
             })
           })
-        }).onExit(()=>{
-          r(t).forEach(e=>{ t.deleteEntity(e) }),
-          null!==placementGroundEid&&t.events.dispatch(placementGroundEid, n)
+        }).onExit(() => {
+          r(t).forEach(e => { t.deleteEntity(e) }),
+          null !== placementGroundEid && t.events.dispatch(placementGroundEid, n)
         })
       }
     });
 
-   // Componente oficial para visualizar la nube de puntos (SLAM) de 8th Wall (Solo activo en debug)
+    // Componente oficial para visualizar la nube de puntos (SLAM) de 8th Wall (Solo activo en debug)
     e.registerComponent({
       name: "point-cloud-visualizer",
       add: (world, component) => {
@@ -218,7 +218,7 @@
         const THREE_INSTANCE = window.THREE;
         if (!THREE_INSTANCE || !scene) return;
 
-        const maxPoints = 500;
+        const maxPoints = 100; // Reducido a 100 puntos por optimización
         const positionsArray = new Float32Array(maxPoints * 3);
         for (let j = 0; j < maxPoints * 3; j++) {
           positionsArray[j] = 999999;
@@ -226,13 +226,13 @@
 
         const geometry = new THREE_INSTANCE.BufferGeometry();
         geometry.setAttribute('position', new THREE_INSTANCE.BufferAttribute(positionsArray, 3));
-        
+
         const material = new THREE_INSTANCE.PointsMaterial({
           color: 0xffcc00,       // Amarillo/Dorado
-          size: 0.002,             
-          sizeAttenuation: true, 
+          size: 0.008,           // Aumentado el tamaño de los puntos para mejor visibilidad (Antes 0.002)
+          sizeAttenuation: true,
           opacity: 1.0,
-          depthWrite: true,     
+          depthWrite: true,
           depthTest: false
         });
 
@@ -246,7 +246,7 @@
           if (worldPoints) {
             const positions = pointCloudMesh.geometry.attributes.position.array;
             const count = Math.min(worldPoints.length, maxPoints);
-            
+
             for (let k = 0; k < count; k++) {
               const pt = worldPoints[k].position;
               positions[k * 3] = pt.x;
@@ -262,11 +262,11 @@
           }
           requestAnimationFrame(actualizarPuntos);
         };
-        
+
         actualizarPuntos();
       }
     });
-    
+
     // Componente oficial para visualizar la Shadow Camera de la luz direccional (Solo activo en debug)
     e.registerComponent({
       name: "shadow-camera-helper",
@@ -334,7 +334,7 @@
             "shadowBias": 0.0001, // Previene artefactos de sombras a baja resolución (shadow acne)
             "shadowRadius": 8,
             "followCamera": false,
-            "shadowCamera": [-10, 10, 10,-10, 3, 5] // Versión anterior: 0.3, 0.3, 0.3, 0.3, 0.4, 1
+            "shadowCamera": [-10, 10, 10, -10, 3, 5] // Versión anterior: 0.3, 0.3, 0.3, 0.3, 0.4, 1
           },
           "name": "Directional Light",
           "order": 0.6785011504707911
@@ -458,7 +458,6 @@
           "shadow": { "receiveShadow": false }
         },
 
-
         // Plano Ocultador (Hider)
         "17af117a-efce-48dd-857e-e383a3649c7b": {
           "id": "17af117a-efce-48dd-857e-e383a3649c7b",
@@ -502,37 +501,6 @@
           },
           "name": "Tap Prompt",
           "order": 10.427624126637916
-        },
-
-        // Sombra del texto UI "Tap to place"
-        "637f7413-261d-48bb-99c9-154bd99360da": {
-          "id": "637f7413-261d-48bb-99c9-154bd99360da",
-          "position": [16.857510635812545, 15.927690665172552, 0],
-          "rotation": [0, 0, 0, 1],
-          "scale": [1, 1, 1],
-          "geometry": null,
-          "material": null,
-          "parentId": "904308fe-98f5-4c93-bf62-f39d50c6e602",
-          "components": {},
-          "ui": {
-            "text": "Tap to place",
-            "width": "100%",
-            "height": 100,
-            "type": "overlay",
-            "verticalTextAlign": "start",
-            "textAlign": "center",
-            "fontSize": 32,
-            "position": "absolute",
-            "top": 12,
-            "left": 12,
-            "bottom": "",
-            "right": "",
-            "stackingOrder": -2,
-            "color": "#000000",
-            "font": { "type": "font", "font": "Roboto" }
-          },
-          "name": "Tap Prompt Shadow",
-          "order": 11.644447501347162
         },
 
         // Entidad del Modelo 3D (El archivo .glb)
@@ -663,10 +631,10 @@
     delete i.historyVersion;
     const _idx = sessionStorage.getItem("modelo_actual");
     const _models = [
-      "Plato_01.glb","Plato_02.glb","Plato_03.glb","Plato_04.glb",
-      "Plato_05.glb","Plato_06.glb","Plato_07.glb","Plato_08.glb",
-      "Plato_09.glb","Plato_10.glb","Plato_11.glb","Plato_12.glb",
-      "Plato_13.glb","Plato_14.glb","Plato_15.glb"
+      "Plato_01.glb", "Plato_02.glb", "Plato_03.glb", "Plato_04.glb",
+      "Plato_05.glb", "Plato_06.glb", "Plato_07.glb", "Plato_08.glb",
+      "Plato_09.glb", "Plato_10.glb", "Plato_11.glb", "Plato_12.glb",
+      "Plato_13.glb", "Plato_14.glb", "Plato_15.glb"
     ];
     if (_idx !== null && parseInt(_idx) < _models.length) {
       i.objects["a02b4479-461e-40c2-ba91-0ccabbd1bd83"].gltfModel.src = {
@@ -674,7 +642,7 @@
         asset: _models[parseInt(_idx)]
       };
     }
-    
+
     // Eliminación física y absoluta de los componentes de depuración si están inactivos
     if (!DEBUG_VISUALS.slamPointCloud) {
       delete i.objects["52ba8a86-a459-4df8-b954-a570e85e0484"].components["point-cloud-visualizer-comp"];
