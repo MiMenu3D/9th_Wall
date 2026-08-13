@@ -1,4 +1,4 @@
-<!-- 9th Wall v2.67 -->
+<!-- 9th Wall v2.66 -->
 <html>
 <head>
   <meta charset="UTF-8">
@@ -114,7 +114,7 @@
                         node.shadow.camera.top = 0.35; // Antes 0.35
                         node.shadow.camera.bottom = -0.35; // Antes -0.35
                         node.shadow.camera.near = 0.1; // Antes 0.1
-                        node.shadow.camera.far = 5; // Antes 2
+                        node.shadow.camera.far = 2; // Antes 2
                         node.shadow.camera.updateProjectionMatrix();
                       }
                       // Desechamos el mapa de sombras anterior para que Three.js lo regenere con la nueva resolución
@@ -273,7 +273,7 @@
           if (obj.name === 'Loading Screen') delete c.objects[k];
           
           // Solución a la doble iluminación nativa:
-          if (obj.name === 'Directional Light') {
+            if (obj.name === 'Directional Light') {
             if (obj.light) {
               obj.light.intensity = 0.00; // Atenuamos la luz direccional para conservar sombras suaves
             }
