@@ -1,4 +1,4 @@
-<!-- 9th Wall v2.81 -->
+<!-- 9th Wall v2.82 -->
 <html>
 <head>
   <meta charset="UTF-8">
@@ -18,8 +18,8 @@
     style="position:fixed;top:10px;right:10px;z-index:1000000;background:rgba(0,0,0,0.9);color:#0f0;font-family:monospace;font-size:12px;padding:8px;border-radius:4px;cursor:pointer;line-height:1.2;border:1px solid #0f0;">
     <div id="debugTitle">FPS: --</div>
     <div id="debugContent">
-      ar-world: v2.81<br>
-      bundle: v2.81
+      ar-world: v2.82<br>
+      bundle: v2.82
     </div>
   </div>
   <style>
@@ -173,8 +173,9 @@
 
     function initPMREMLogic(scene, renderer, THREE_INSTANCE, LoaderClass) {
       try {
-        // === INTERRUPTOR DE PRUEBA DE RENDIMIENTO v2.81 ===
-        const SLEEP_PMREM = true; // Forzado a true para dormir por completo el PMREM (0% consumo de CPU/GPU)
+        // === INTERRUPTORES DE PRUEBA DE RENDIMIENTO v2.82 ===
+        const SLEEP_PMREM = false; // RESTAURADO: Reactivado PMREM al 100% para v2.82
+        const SLEEP_LIGHT_ESTIMATION = true; // ACTIVADO PARA PRUEBA v2.82: Desactiva Light Estimation sin eliminar código
 
         if (!SLEEP_PMREM) {
           // Inicializamos PMREM usando la clase nativa del motor de 8th Wall
@@ -229,24 +230,29 @@
             let smoothed = 120;
 
             // Refresco del Light Estimation: lectura ligera del brillo de la cámara.
-            envInterval = setInterval(() => {
-              try {
-                if (!video || video.readyState < 2) return;
-                lightCtx.drawImage(video, 0, 0, lightEstimationSize, lightEstimationSize);
-                const pixels = lightCtx.getImageData(0, 0, lightEstimationSize, lightEstimationSize).data;
-                let total = 0;
-                for (let i = 0; i < pixels.length; i += 4) {
-                  total += (pixels[i] + pixels[i + 1] + pixels[i + 2]) / 3;
-                }
-                const brightness = total / (pixels.length / 4);
-                smoothed += (brightness - smoothed) * 0.08;
+            if (!SLEEP_LIGHT_ESTIMATION) {
+              envInterval = setInterval(() => {
+                try {
+                  if (!video || video.readyState < 2) return;
+                  lightCtx.drawImage(video, 0, 0, lightEstimationSize, lightEstimationSize);
+                  const pixels = lightCtx.getImageData(0, 0, lightEstimationSize, lightEstimationSize).data;
+                  let total = 0;
+                  for (let i = 0; i < pixels.length; i += 4) {
+                    total += (pixels[i] + pixels[i + 1] + pixels[i + 2]) / 3;
+                  }
+                  const brightness = total / (pixels.length / 4);
+                  smoothed += (brightness - smoothed) * 0.08;
 
-                // LUZ PMREM LIGHT Ajuste de exposición basado en brillo promedio. Valores anteriores 0.4 y 1.5 respectivamente.
-                renderer.toneMappingExposure = 0.6 + (smoothed / 255) * 1.9; 
-              } catch (e) {
-                // Silencioso
-              }
-            }, lightEstimationInterval);
+                  // LUZ PMREM LIGHT Ajuste de exposición basado en brillo promedio. Valores anteriores 0.4 y 1.5 respectivamente.
+                  renderer.toneMappingExposure = 0.6 + (smoothed / 255) * 1.9; 
+                } catch (e) {
+                  // Silencioso
+                }
+              }, lightEstimationInterval);
+            } else {
+              log('Light Estimation: DESACTIVADA (0% CPU en v2.82)');
+              renderer.toneMappingExposure = 1.0; // Exposición fija por defecto
+            }
 
             // Refresco del PMREM: actualización de reflejos menos frecuente.
             if (!SLEEP_PMREM) {
