@@ -1,4 +1,4 @@
-<!-- 9th Wall v2.83 -->
+<!-- 9th Wall v2.84 -->
 <html>
 <head>
   <meta charset="UTF-8">
@@ -18,8 +18,8 @@
     style="position:fixed;top:10px;right:10px;z-index:1000000;background:rgba(0,0,0,0.9);color:#0f0;font-family:monospace;font-size:12px;padding:8px;border-radius:4px;cursor:pointer;line-height:1.2;border:1px solid #0f0;">
     <div id="debugTitle">FPS: --</div>
     <div id="debugContent">
-      ar-world: v2.83<br>
-      bundle: v2.83
+      ar-world: v2.84<br>
+      bundle: v2.84
     </div>
   </div>
   <style>
@@ -98,29 +98,41 @@
               log('Captura exitosa. Usando Three nativo: ' + (!!nativeTHREE));
               
               if (nativeTHREE) {
+                // === INTERRUPTORES DE PRUEBA DE RENDIMIENTO v2.84 ===
+                const SLEEP_SHADOWS = true; // ACTIVADO: Apaga por completo las sombras dinámicas de WebGL (0% uso de GPU para sombreado)
+
+                if (SLEEP_SHADOWS) {
+                  _renderer.shadowMap.enabled = false;
+                  log('Sombras dinámicas de WebGL: DESACTIVADAS');
+                }
+
                 // === ACTIVACIÓN SEGURA DEL TONE MAPPING ===
                 _renderer.toneMapping = nativeTHREE.ACESFilmicToneMapping;
 
                 // === FORZAR RESOLUCIÓN Y FRUSTUM DE SOMBRAS NATIVAS (Único punto de control de sombras) ===
                 _scene.traverse((node) => {
                   if (node.isDirectionalLight) {
-                    log('Luz direccional localizada. Inicializando sombra a 64px...');
-                    if (node.shadow) {
-                      node.shadow.mapSize.width = 512; // <-- Modificar a mano aquí para pruebas (p.ej. 512, 256) -- Antes 128
-                      node.shadow.mapSize.height = 512; // <-- Modificar a mano aquí para pruebas (p.ej. 512, 256) -- Antes 128
-                      if (node.shadow.camera) {
-                        node.shadow.camera.left = -0.35; // Antes -0.35
-                        node.shadow.camera.right = 0.35; // Antes 0.35
-                        node.shadow.camera.top = 0.35; // Antes 0.35
-                        node.shadow.camera.bottom = -0.35; // Antes -0.35
-                        node.shadow.camera.near = 0.1; // Antes 0.1
-                        node.shadow.camera.far = 2; // Antes 2
-                        node.shadow.camera.updateProjectionMatrix();
-                      }
-                      // Desechamos el mapa de sombras anterior para que Three.js lo regenere con la nueva resolución
-                      if (node.shadow.map) {
-                        node.shadow.map.dispose();
-                        node.shadow.map = null;
+                    if (SLEEP_SHADOWS) {
+                      node.castShadow = false;
+                    } else {
+                      log('Luz direccional localizada. Inicializando sombra a 64px...');
+                      if (node.shadow) {
+                        node.shadow.mapSize.width = 512; // <-- Modificar a mano aquí para pruebas (p.ej. 512, 256) -- Antes 128
+                        node.shadow.mapSize.height = 512; // <-- Modificar a mano aquí para pruebas (p.ej. 512, 256) -- Antes 128
+                        if (node.shadow.camera) {
+                          node.shadow.camera.left = -0.35; // Antes -0.35
+                          node.shadow.camera.right = 0.35; // Antes 0.35
+                          node.shadow.camera.top = 0.35; // Antes 0.35
+                          node.shadow.camera.bottom = -0.35; // Antes -0.35
+                          node.shadow.camera.near = 0.1; // Antes 0.1
+                          node.shadow.camera.far = 2; // Antes 2
+                          node.shadow.camera.updateProjectionMatrix();
+                        }
+                        // Desechamos el mapa de sombras anterior para que Three.js lo regenere con la nueva resolución
+                        if (node.shadow.map) {
+                          node.shadow.map.dispose();
+                          node.shadow.map = null;
+                        }
                       }
                     }
                   }
@@ -173,9 +185,9 @@
 
     function initPMREMLogic(scene, renderer, THREE_INSTANCE, LoaderClass) {
       try {
-        // === INTERRUPTORES DE PRUEBA DE RENDIMIENTO v2.83 ===
-        const SLEEP_PMREM = false; // RESTAURADO: Reactivado PMREM al 100% para v2.83
-        const SLEEP_LIGHT_ESTIMATION = false; // RESTAURADO: Reactivada la Estimación de Luz para v2.83
+        // === INTERRUPTORES DE PRUEBA DE RENDIMIENTO v2.84 ===
+        const SLEEP_PMREM = false; // RESTAURADO: Reactivado PMREM al 100% para v2.84
+        const SLEEP_LIGHT_ESTIMATION = false; // RESTAURADO: Reactivada la Estimación de Luz para v2.84
 
         if (!SLEEP_PMREM) {
           // Inicializamos PMREM usando la clase nativa del motor de 8th Wall
