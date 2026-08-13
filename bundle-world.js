@@ -1,4 +1,4 @@
-﻿// 9th Wall v2.82
+﻿// 9th Wall v2.83
 (() => {
   var e = {
     574() {
@@ -90,6 +90,9 @@
     e.registerComponent({
       name: "model-gesture-controls",
       stateMachine: ({ world: t, eid: a, defineState: o }) => {
+        // === INTERRUPTOR DE PRUEBA DE RENDIMIENTO v2.83 ===
+        const SLEEP_GESTURES = true; // ACTIVADO: Duerme todo el procesamiento de escala/rotación táctil para aislar la dudad de escala
+
         let isTwoFingerGesture = !1,
         isModelTouchActive = !1,
         dragPointerId = null,
@@ -101,83 +104,90 @@
         gestureMode = "none",
         currentScale = 1,
         scaleAtGestureStart = 1;
-        o("enabled").initial()
-          .listen(a, e.input.SCREEN_TOUCH_START, o => {
-            const n = t.transform.getWorldPosition(a),
-            i = t.three.activeCamera,
-            r = window.THREE;
-            isModelTouchActive = !0,
-            dragPointerId = o.data.pointerId,
-            activePointerIds.add(o.data.pointerId),
-            dragPlaneY = n.y,
-            dragOffsetX = 0,
-            dragOffsetZ = 0;
-            if (!i || !r) return;
-            const d = new r.Raycaster(),
-            s = new r.Vector2(o.data.position.x * 2 - 1, 1 - o.data.position.y * 2),
-            l = new r.Plane(new r.Vector3(0, 1, 0), -dragPlaneY),
-            c = new r.Vector3();
-            d.setFromCamera(s, i);
-            if (d.ray.intersectPlane(l, c)) {
-              dragOffsetX = n.x - c.x,
-              dragOffsetZ = n.z - c.z
-            }
-          })
-          .listen(t.events.globalId, e.input.SCREEN_TOUCH_START, o => {
-            if (isModelTouchActive) activePointerIds.add(o.data.pointerId)
-          })
-          .listen(t.events.globalId, e.input.SCREEN_TOUCH_MOVE, o => {
-            if (!isModelTouchActive || isTwoFingerGesture || waitForAllTouchesToEnd || o.data.pointerId !== dragPointerId) return;
-            const n = t.three.activeCamera,
-            i = window.THREE;
-            if (!n || !i) return;
-            const r = new i.Raycaster(),
-            d = new i.Vector2(o.data.position.x * 2 - 1, 1 - o.data.position.y * 2),
-            s = new i.Plane(new i.Vector3(0, 1, 0), -dragPlaneY),
-            l = new i.Vector3();
-            r.setFromCamera(d, n);
-            if (r.ray.intersectPlane(s, l)) t.transform.setWorldPosition(a, {
-              x: l.x + dragOffsetX,
-              y: dragPlaneY,
-              z: l.z + dragOffsetZ
+
+        if (SLEEP_GESTURES) {
+          // Si los gestos están dormidos, inicializamos el estado de la máquina vacío
+          o("enabled").initial();
+        } else {
+          // El bloque de lógica original multitáctil se conserva intacto
+          o("enabled").initial()
+            .listen(a, e.input.SCREEN_TOUCH_START, o => {
+              const n = t.transform.getWorldPosition(a),
+              i = t.three.activeCamera,
+              r = window.THREE;
+              isModelTouchActive = !0,
+              dragPointerId = o.data.pointerId,
+              activePointerIds.add(o.data.pointerId),
+              dragPlaneY = n.y,
+              dragOffsetX = 0,
+              dragOffsetZ = 0;
+              if (!i || !r) return;
+              const d = new r.Raycaster(),
+              s = new r.Vector2(o.data.position.x * 2 - 1, 1 - o.data.position.y * 2),
+              l = new r.Plane(new r.Vector3(0, 1, 0), -dragPlaneY),
+              c = new r.Vector3();
+              d.setFromCamera(s, i);
+              if (d.ray.intersectPlane(l, c)) {
+                dragOffsetX = n.x - c.x,
+                dragOffsetZ = n.z - c.z
+              }
             })
-          })
-          .listen(t.events.globalId, e.input.SCREEN_TOUCH_END, o => {
-            activePointerIds.delete(o.data.pointerId);
-            if (0 === activePointerIds.size) {
-              isModelTouchActive = !1,
-              dragPointerId = null,
-              waitForAllTouchesToEnd = !1,
-              gestureMode = "none"
-            }
-          })
-          .listen(t.events.globalId, e.input.GESTURE_START, o => {
-            if (!isModelTouchActive || 2 !== o.data.touchCount) return;
-            isTwoFingerGesture = !0,
-            waitForAllTouchesToEnd = !0,
-            gestureMode = "none",
-            scaleAtGestureStart = currentScale
-          })
-          .listen(t.events.globalId, e.input.GESTURE_MOVE, o => {
-            if (!isModelTouchActive || !isTwoFingerGesture || 2 !== o.data.touchCount) return;
-            const n = o.data.startSpread > 0 ? Math.abs(o.data.spread - o.data.startSpread) / o.data.startSpread : 0,
-            i = Math.abs(o.data.position.x - o.data.startPosition.x);
-            if ("none" === gestureMode) {
-              if (n >= MODEL_GESTURES.pinchActivationThreshold && n / MODEL_GESTURES.pinchActivationThreshold >= i / MODEL_GESTURES.rotationActivationThreshold) gestureMode = "scale";
-              else if (i >= MODEL_GESTURES.rotationActivationThreshold) gestureMode = "rotate";
-              else return
-            }
-            if ("scale" === gestureMode) {
-              const n = o.data.startSpread > 0 ? o.data.spread / o.data.startSpread : 1;
-              currentScale = Math.max(MODEL_GESTURES.minimumScale, Math.min(MODEL_GESTURES.maximumScale, scaleAtGestureStart * n)),
-              e.Scale.set(t, a, { x: currentScale, y: currentScale, z: currentScale })
-            } else if ("rotate" === gestureMode) {
-              t.transform.rotateSelf(a, e.math.quat.yRadians(o.data.positionChange.x * MODEL_GESTURES.rotationSensitivity))
-            }
-          })
-          .listen(t.events.globalId, e.input.GESTURE_END, o => {
-            if (o.data.nextTouchCount < 2) isTwoFingerGesture = !1
-          })
+            .listen(t.events.globalId, e.input.SCREEN_TOUCH_START, o => {
+              if (isModelTouchActive) activePointerIds.add(o.data.pointerId)
+            })
+            .listen(t.events.globalId, e.input.SCREEN_TOUCH_MOVE, o => {
+              if (!isModelTouchActive || isTwoFingerGesture || waitForAllTouchesToEnd || o.data.pointerId !== dragPointerId) return;
+              const n = t.three.activeCamera,
+              i = window.THREE;
+              if (!n || !i) return;
+              const r = new i.Raycaster(),
+              d = new i.Vector2(o.data.position.x * 2 - 1, 1 - o.data.position.y * 2),
+              s = new i.Plane(new i.Vector3(0, 1, 0), -dragPlaneY),
+              l = new i.Vector3();
+              r.setFromCamera(d, n);
+              if (r.ray.intersectPlane(s, l)) t.transform.setWorldPosition(a, {
+                x: l.x + dragOffsetX,
+                y: dragPlaneY,
+                z: l.z + dragOffsetZ
+              })
+            })
+            .listen(t.events.globalId, e.input.SCREEN_TOUCH_END, o => {
+              activePointerIds.delete(o.data.pointerId);
+              if (0 === activePointerIds.size) {
+                isModelTouchActive = !1,
+                dragPointerId = null,
+                waitForAllTouchesToEnd = !1,
+                gestureMode = "none"
+              }
+            })
+            .listen(t.events.globalId, e.input.GESTURE_START, o => {
+              if (!isModelTouchActive || 2 !== o.data.touchCount) return;
+              isTwoFingerGesture = !0,
+              waitForAllTouchesToEnd = !0,
+              gestureMode = "none",
+              scaleAtGestureStart = currentScale
+            })
+            .listen(t.events.globalId, e.input.GESTURE_MOVE, o => {
+              if (!isModelTouchActive || !isTwoFingerGesture || 2 !== o.data.touchCount) return;
+              const n = o.data.startSpread > 0 ? Math.abs(o.data.spread - o.data.startSpread) / o.data.startSpread : 0,
+              i = Math.abs(o.data.position.x - o.data.startPosition.x);
+              if ("none" === gestureMode) {
+                if (n >= MODEL_GESTURES.pinchActivationThreshold && n / MODEL_GESTURES.pinchActivationThreshold >= i / MODEL_GESTURES.rotationActivationThreshold) gestureMode = "scale";
+                else if (i >= MODEL_GESTURES.rotationActivationThreshold) gestureMode = "rotate";
+                else return
+              }
+              if ("scale" === gestureMode) {
+                const n = o.data.startSpread > 0 ? o.data.spread / o.data.startSpread : 1;
+                currentScale = Math.max(MODEL_GESTURES.minimumScale, Math.min(MODEL_GESTURES.maximumScale, scaleAtGestureStart * n)),
+                e.Scale.set(t, a, { x: currentScale, y: currentScale, z: currentScale })
+              } else if ("rotate" === gestureMode) {
+                t.transform.rotateSelf(a, e.math.quat.yRadians(o.data.positionChange.x * MODEL_GESTURES.rotationSensitivity))
+              }
+            })
+            .listen(t.events.globalId, e.input.GESTURE_END, o => {
+              if (o.data.nextTouchCount < 2) isTwoFingerGesture = !1
+            })
+        }
       }
     });
     const r = e.defineQuery([t]);

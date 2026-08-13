@@ -1,4 +1,4 @@
-<!-- 9th Wall v2.82 -->
+<!-- 9th Wall v2.83 -->
 <html>
 <head>
   <meta charset="UTF-8">
@@ -18,8 +18,8 @@
     style="position:fixed;top:10px;right:10px;z-index:1000000;background:rgba(0,0,0,0.9);color:#0f0;font-family:monospace;font-size:12px;padding:8px;border-radius:4px;cursor:pointer;line-height:1.2;border:1px solid #0f0;">
     <div id="debugTitle">FPS: --</div>
     <div id="debugContent">
-      ar-world: v2.82<br>
-      bundle: v2.82
+      ar-world: v2.83<br>
+      bundle: v2.83
     </div>
   </div>
   <style>
@@ -173,9 +173,9 @@
 
     function initPMREMLogic(scene, renderer, THREE_INSTANCE, LoaderClass) {
       try {
-        // === INTERRUPTORES DE PRUEBA DE RENDIMIENTO v2.82 ===
-        const SLEEP_PMREM = false; // RESTAURADO: Reactivado PMREM al 100% para v2.82
-        const SLEEP_LIGHT_ESTIMATION = true; // ACTIVADO PARA PRUEBA v2.82: Desactiva Light Estimation sin eliminar código
+        // === INTERRUPTORES DE PRUEBA DE RENDIMIENTO v2.83 ===
+        const SLEEP_PMREM = false; // RESTAURADO: Reactivado PMREM al 100% para v2.83
+        const SLEEP_LIGHT_ESTIMATION = false; // RESTAURADO: Reactivada la Estimación de Luz para v2.83
 
         if (!SLEEP_PMREM) {
           // Inicializamos PMREM usando la clase nativa del motor de 8th Wall
