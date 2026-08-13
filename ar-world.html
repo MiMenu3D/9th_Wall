@@ -1,4 +1,4 @@
-<!-- 9th Wall v2.80 -->
+<!-- 9th Wall v2.81 -->
 <html>
 <head>
   <meta charset="UTF-8">
@@ -18,8 +18,8 @@
     style="position:fixed;top:10px;right:10px;z-index:1000000;background:rgba(0,0,0,0.9);color:#0f0;font-family:monospace;font-size:12px;padding:8px;border-radius:4px;cursor:pointer;line-height:1.2;border:1px solid #0f0;">
     <div id="debugTitle">FPS: --</div>
     <div id="debugContent">
-      ar-world: v2.80<br>
-      bundle: v2.80
+      ar-world: v2.81<br>
+      bundle: v2.81
     </div>
   </div>
   <style>
@@ -173,10 +173,17 @@
 
     function initPMREMLogic(scene, renderer, THREE_INSTANCE, LoaderClass) {
       try {
-        // Inicializamos PMREM usando la clase nativa del motor de 8th Wall
-        pmremGenerator = new THREE_INSTANCE.PMREMGenerator(renderer);
-        pmremGenerator.compileEquirectangularShader();
-        log('PMREM compilado en motor nativo');
+        // === INTERRUPTOR DE PRUEBA DE RENDIMIENTO v2.81 ===
+        const SLEEP_PMREM = true; // Forzado a true para dormir por completo el PMREM (0% consumo de CPU/GPU)
+
+        if (!SLEEP_PMREM) {
+          // Inicializamos PMREM usando la clase nativa del motor de 8th Wall
+          pmremGenerator = new THREE_INSTANCE.PMREMGenerator(renderer);
+          pmremGenerator.compileEquirectangularShader();
+          log('PMREM compilado en motor nativo');
+        } else {
+          log('PMREM DORMIDO (Bypasseando compilaciones y shaders nativos)');
+        }
 
         // === CONTROL DE CARGA DEL HDR (Configuración manual) ===
         const LOAD_HDR = true; // Cambiar a true para reactivar la descarga y uso del entorno HDR
@@ -242,20 +249,24 @@
             }, lightEstimationInterval);
 
             // Refresco del PMREM: actualización de reflejos menos frecuente.
-            setInterval(() => {
-              try {
-                if (!video || video.readyState < 2 || !pmremGenerator) return;
-                pmremCtx.drawImage(video, 0, 0, pmremSize, pmremSize);
-                envTexture.needsUpdate = true;
+            if (!SLEEP_PMREM) {
+              setInterval(() => {
+                try {
+                  if (!video || video.readyState < 2 || !pmremGenerator) return;
+                  pmremCtx.drawImage(video, 0, 0, pmremSize, pmremSize);
+                  envTexture.needsUpdate = true;
 
-                const oldRT = cameraRT;
-                cameraRT = pmremGenerator.fromEquirectangular(envTexture);
-                if (envMode === 'cam') scene.environment = cameraRT.texture;
-                if (oldRT) oldRT.dispose();
-              } catch (e) {
-                // Silencioso
-              }
-            }, pmremInterval);
+                  const oldRT = cameraRT;
+                  cameraRT = pmremGenerator.fromEquirectangular(envTexture);
+                  if (envMode === 'cam') scene.environment = cameraRT.texture;
+                  if (oldRT) oldRT.dispose();
+                } catch (e) {
+                  // Silencioso
+                }
+              }, pmremInterval);
+            } else {
+              log('Intervalo PMREM: DESACTIVADO.');
+            }
           }
         }, 500);
 
