@@ -1,4 +1,4 @@
-﻿// 9th Wall v2.89
+﻿// 9th Wall v2.91
 (() => {
   var e = {
     574() {
@@ -34,7 +34,7 @@
   // Leemos de forma nativa el estado del interruptor debug persistido en sessionStorage
   const IS_DEBUG = sessionStorage.getItem("debug_features") === "true";
 
-  // Nube de puntos SLAM activa en Debug; Shadow Camera Helper y Ground Visual desactivados para no entorpecer
+  // Nube de puntos SLAM activa en Debug
   const DEBUG_VISUALS = Object.freeze({
     slamPointCloud: IS_DEBUG
   });
@@ -362,7 +362,7 @@
           "light": {
             "type": "directional",
             "shadowBias": 0.0001, // Previene artefactos de sombras a baja resolución (shadow acne)
-            "shadowRadius": 8,
+            "shadowRadius": 4,
             "followCamera": false,
             "shadowCamera": [-10, 10, 10, -10, 3, 5] // Versión anterior: 0.3, 0.3, 0.3, 0.3, 0.4, 1
           },
@@ -373,7 +373,7 @@
         // Camera de Realidad Aumentada
         "52ba8a86-a459-4df8-b954-a570e85e0484": {
           "id": "52ba8a86-a459-4df8-b954-a570e85e0484",
-          "position": [0, 0.30, 0.30],
+          "position": [0, 0.23, 0.23],
           "rotation": [-0.0004637899966810532, 0.9978406073902779, -0.06529682289718859, -0.007087458033270938],
           "scale": [1.0000000000000002, 1, 1.0000000000000004],
           "geometry": null,
