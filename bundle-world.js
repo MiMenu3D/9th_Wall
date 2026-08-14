@@ -1,4 +1,4 @@
-﻿// 9th Wall v2.85
+﻿// 9th Wall v2.86
 (() => {
   var e = {
     574() {
@@ -36,9 +36,7 @@
 
   // Nube de puntos SLAM activa en Debug; Shadow Camera Helper y Ground Visual desactivados para no entorpecer
   const DEBUG_VISUALS = Object.freeze({
-    slamPointCloud: IS_DEBUG,
-    shadowCameraHelper: false,
-    groundVisual: false
+    slamPointCloud: IS_DEBUG
   });
 
   // Controles del único modelo colocado.
@@ -75,23 +73,30 @@
       schema: { prefab: "eid" },
       stateMachine: ({ world: t, eid: a, schemaAttribute: schemaAttr, defineState: i }) => {
         placementGroundEid = a;
-        i("initial").initial().listen(a, e.input.SCREEN_TOUCH_START, i => {
+        let isPlaced = false;
+        i("initial").initial().onEnter(() => {
+          isPlaced = false;
+        }).listen(a, e.input.SCREEN_TOUCH_START, i => {
+          if (isPlaced) return;
           if (!i.data.worldPosition) return;
+          isPlaced = true;
           const r = t.createEntity(schemaAttr.get(a).prefab),
           d = t.getEntity(r);
           d.setLocalPosition(i.data.worldPosition),
           d.set(e.Quaternion, e.math.quat.yRadians(Math.random() * Math.PI)),
           t.events.dispatch(a, o)
         }).onEvent(o, "placed", { target: a }),
-        i("placed").onEvent(n, "initial", { target: a })
+        i("placed").onEvent(n, "initial", { target: a }).onEnter(() => {
+          isPlaced = true;
+        })
       }
     });
 
     e.registerComponent({
       name: "model-gesture-controls",
       stateMachine: ({ world: t, eid: a, defineState: o }) => {
-        // === INTERRUPTOR DE PRUEBA DE RENDIMIENTO v2.85 ===
-        const SLEEP_GESTURES = false; // RESTAURADO: Reactivado el procesamiento de escala/rotación táctil para v2.85
+        // === INTERRUPTOR DE PRUEBA DE RENDIMIENTO v2.86 ===
+        const SLEEP_GESTURES = true; // ACTIVADO: Desactivado por completo el procesamiento de escala/rotación táctil para v2.86
 
         let isTwoFingerGesture = !1,
         isModelTouchActive = !1,
@@ -281,21 +286,6 @@
     e.registerComponent({
       name: "performance-debugger",
       add: (world, component) => {
-        // Crear un contenedor flotante en la UI para ver los datos en tiempo real
-        const debugDiv = document.createElement("div");
-        debugDiv.style.position = "absolute";
-        debugDiv.style.top = "60px"; // Debajo del contador nativo si tienes uno
-        debugDiv.style.left = "10px";
-        debugDiv.style.backgroundColor = "rgba(0, 0, 0, 0.7)";
-        debugDiv.style.color = "#00ff00";
-        debugDiv.style.fontFamily = "monospace";
-        debugDiv.style.padding = "6px";
-        debugDiv.style.borderRadius = "4px";
-        debugDiv.style.fontSize = "12px";
-        debugDiv.style.zIndex = "99999";
-        debugDiv.innerHTML = "Latencia: -- ms";
-        document.body.appendChild(debugDiv);
-
         let lastTime = performance.now();
         let frameTimes = [];
 
@@ -310,41 +300,25 @@
           }
 
           const promedio = frameTimes.reduce((a, b) => a + b, 0) / frameTimes.length;
+          const latencySpan = document.getElementById("latencySpan");
 
-          // Un frame óptimo a 60 FPS debe renderizarse en < 16.67ms
-          if (promedio > 16.67) {
-            debugDiv.style.color = "#ff3333"; // Alerta visual (Rojo si hay lag)
-          } else if (promedio > 12) {
-            debugDiv.style.color = "#ffcc00"; // Advertencia (Amarillo)
-          } else {
-            debugDiv.style.color = "#00ff00"; // Excelente rendimiento (Verde)
+          if (latencySpan) {
+            // Umbrales realistas basados en FPS objetivo para WebAR móvil
+            if (promedio > 66.7) {
+              latencySpan.style.color = "#ff3333"; // Alerta visual (Rojo si hay lag severo < 15 FPS)
+            } else if (promedio > 33.3) {
+              latencySpan.style.color = "#ffcc00"; // Advertencia/Aceptable (Amarillo 15-30 FPS)
+            } else {
+              latencySpan.style.color = "#00ff00"; // Excelente rendimiento (Verde > 30 FPS)
+            }
+
+            latencySpan.innerHTML = `Latencia: ${promedio.toFixed(1)} ms`;
           }
-
-          debugDiv.innerHTML = `Latencia Frame: ${promedio.toFixed(1)} ms`;
 
           requestAnimationFrame(medirRendimiento);
         };
 
         requestAnimationFrame(medirRendimiento);
-      }
-    });
-
-    // Componente oficial para visualizar la Shadow Camera de la luz direccional (Solo activo en debug)
-    e.registerComponent({
-      name: "shadow-camera-helper",
-      add: (world, component) => {
-        const scene = world.three.scene;
-        const THREE_INSTANCE = window.THREE;
-        if (!THREE_INSTANCE || !scene) return;
-
-        setTimeout(() => {
-          scene.traverse((node) => {
-            if (node.isDirectionalLight && node.shadow && node.shadow.camera) {
-              const helper = new THREE_INSTANCE.CameraHelper(node.shadow.camera);
-              scene.add(helper);
-            }
-          });
-        }, 2000);
       }
     });
 
@@ -384,13 +358,7 @@
           "geometry": null,
           "material": null,
           "parentId": "84028e73-ee70-412d-b8d4-c09bf07c655c",
-          "components": {
-            "shadow-camera-helper-comp": {
-              "id": "shadow-camera-helper-comp",
-              "name": "shadow-camera-helper",
-              "parameters": {}
-            }
-          },
+          "components": {},
           "light": {
             "type": "directional",
             "shadowBias": 0.0001, // Previene artefactos de sombras a baja resolución (shadow acne)
@@ -508,21 +476,6 @@
           "name": "Ground",
           "order": 5.877553308364804,
           "shadow": { "receiveShadow": true }
-        },
-
-        // Plano Visual Rojo (Ground Visual Debug)
-        "bc7753ae-2b39-4f48-910a-7921b756487c": {
-          "id": "bc7753ae-2b39-4f48-910a-7921b756487c",
-          "position": [0, 0, 0],
-          "rotation": [-0.7071068, 0, 0, 0.7071068],
-          "scale": [2, 2, 2],
-          "geometry": { "type": "plane", "width": 1, "height": 1 },
-          "material": { "type": "basic", "color": "#ff0000", "opacity": 0.2 },
-          "parentId": "84028e73-ee70-412d-b8d4-c09bf07c655c",
-          "components": {},
-          "name": "Ground Visual Debug",
-          "order": 5.878553308364804,
-          "shadow": { "receiveShadow": false }
         },
 
         // Plano Ocultador (Hider)
@@ -744,12 +697,6 @@
     // Eliminación física y absoluta de los componentes de depuración si están inactivos
     if (!DEBUG_VISUALS.slamPointCloud) {
       delete i.objects["52ba8a86-a459-4df8-b954-a570e85e0484"].components["point-cloud-visualizer-comp"];
-    }
-    if (!DEBUG_VISUALS.shadowCameraHelper) {
-      delete i.objects["492cfe2c-9334-4a9c-a48a-be80132af9fb"].components["shadow-camera-helper-comp"];
-    }
-    if (!DEBUG_VISUALS.groundVisual) {
-      delete i.objects["bc7753ae-2b39-4f48-910a-7921b756487c"];
     }
     window.ecs.application.init(i)
   })()

@@ -1,4 +1,4 @@
-<!-- 9th Wall v2.85 -->
+<!-- 9th Wall v2.86 -->
 <html>
 <head>
   <meta charset="UTF-8">
@@ -18,8 +18,9 @@
     style="position:fixed;top:10px;right:10px;z-index:1000000;background:rgba(0,0,0,0.9);color:#0f0;font-family:monospace;font-size:12px;padding:8px;border-radius:4px;cursor:pointer;line-height:1.2;border:1px solid #0f0;">
     <div id="debugTitle">FPS: --</div>
     <div id="debugContent">
-      ar-world: v2.85<br>
-      bundle: v2.85
+      ar-world: v2.86<br>
+      bundle: v2.86<br>
+      <span id="latencySpan" style="color:#0f0;">Latencia: -- ms</span>
     </div>
   </div>
   <style>
@@ -95,15 +96,15 @@
               
               // Buscamos el THREE nativo expuesto globalmente por el runtime de 8th Wall
               const nativeTHREE = window.THREE;
-              log('Captura exitosa. Usando Three nativo: ' + (!!nativeTHREE));
               
               if (nativeTHREE) {
-                // === INTERRUPTORES DE PRUEBA DE RENDIMIENTO v2.85 ===
-                const SLEEP_SHADOWS = true; // ACTIVADO: Apaga por completo las sombras dinámicas
+                // === INTERRUPTORES DE PRUEBA DE RENDIMIENTO v2.86 ===
+                const SLEEP_SHADOWS = false; // DESACTIVADO: Se restauran por completo las sombras dinámicas
 
                 if (SLEEP_SHADOWS) {
                   _renderer.shadowMap.enabled = false;
-                  log('Sombras de WebGL: DESACTIVADAS de raíz');
+                } else {
+                  _renderer.shadowMap.enabled = true;
                 }
 
                 // === ACTIVACIÓN SEGURA DEL TONE MAPPING ===
@@ -115,7 +116,6 @@
                     if (SLEEP_SHADOWS) {
                       node.castShadow = false;
                     } else {
-                      log('Luz direccional localizada. Inicializando sombra a 64px...');
                       if (node.shadow) {
                         node.shadow.mapSize.width = 512; // <-- Modificar a mano aquí para pruebas (p.ej. 512, 256) -- Antes 128
                         node.shadow.mapSize.height = 512; // <-- Modificar a mano aquí para pruebas (p.ej. 512, 256) -- Antes 128
@@ -166,14 +166,12 @@
           return;
         }
         
-        log('Descargando RGBELoader...');
         fetch('https://unpkg.com/three@0.139.2/examples/js/loaders/RGBELoader.js')
           .then(res => res.text())
           .then(code => {
             // Evaluamos el código del loader forzando el ámbito del THREE nativo de 8th Wall
             window.THREE = THREE_INSTANCE;
             (new Function(code))();
-            log('RGBELoader acoplado al Three nativo con éxito.');
             resolve(THREE_INSTANCE.RGBELoader);
           })
           .catch(err => {
@@ -185,7 +183,7 @@
 
     function initPMREMLogic(scene, renderer, THREE_INSTANCE, LoaderClass) {
       try {
-        // === INTERRUPTORES DE PRUEBA DE RENDIMIENTO v2.85 ===
+        // === INTERRUPTORES DE PRUEBA DE RENDIMIENTO v2.86 ===
         const SLEEP_PMREM = false; // RESTAURADO: Reactivado PMREM al 100% para v2.85
         const SLEEP_LIGHT_ESTIMATION = false; // RESTAURADO: Reactivada la Estimación de Luz para v2.85
 
@@ -193,7 +191,6 @@
           // Inicializamos PMREM usando la clase nativa del motor de 8th Wall
           pmremGenerator = new THREE_INSTANCE.PMREMGenerator(renderer);
           pmremGenerator.compileEquirectangularShader();
-          log('PMREM compilado en motor nativo');
         } else {
           log('PMREM DORMIDO (Bypasseando compilaciones y shaders nativos)');
         }
@@ -202,9 +199,7 @@
         const LOAD_HDR = true; // Cambiar a true para reactivar la descarga y uso del entorno HDR
         
         if (LOAD_HDR) {
-          log('Cargando textura de entorno HDR...');
           new LoaderClass().load('HDR/terrace_sea.hdr', (hdr) => {
-            log('HDR cargado');
             hdr.mapping = THREE_INSTANCE.EquirectangularReflectionMapping;
             originalEnv = hdr;
             if (envMode === 'hdr') scene.environment = hdr;
@@ -220,7 +215,6 @@
           const video = document.querySelector('video');
           if (video && video.readyState >= 2) {
             clearInterval(waitForVideo);
-            log('Vídeo listo para estimación');
 
             // Refresco del Light Estimation: brillo medio para la exposición.
             const lightEstimationSize = 16;
@@ -255,7 +249,7 @@
                   const brightness = total / (pixels.length / 4);
                   smoothed += (brightness - smoothed) * 0.08;
 
-                  // LUZ PMREM LIGHT Ajuste de exposición basado en brillo promedio. Valores anteriores 0.4 y 1.5 respectivamente.
+                  // LUZ PMREM LIGHT Ajuste de exposición basado en brillo promedio. Valores anteriores 0.4 y 1.5 respectively.
                   renderer.toneMappingExposure = 0.6 + (smoothed / 255) * 1.9; 
                 } catch (e) {
                   // Silencioso
@@ -297,8 +291,8 @@
     if (window.ecs) {
       const _i = ecs.application.init;
       ecs.application.init = c => {
-        // === INTERRUPTOR DE PRUEBA DE RENDIMIENTO v2.85 ===
-        const SLEEP_SHADOWS = true; // ACTIVADO: Apaga sombras a nivel raíz en el ECS antes de compilar sombreadores
+        // === INTERRUPTOR DE PRUEBA DE RENDIMIENTO v2.86 ===
+        const SLEEP_SHADOWS = false; // DESACTIVADO: Se restauran por completo las sombras dinámicas
 
         for (const k in c.objects) {
           const obj = c.objects[k];
