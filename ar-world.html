@@ -1,4 +1,4 @@
-<!-- 9th Wall v2.88 -->
+<!-- 9th Wall v2.89 -->
 <html>
 <head>
   <meta charset="UTF-8">
@@ -18,8 +18,8 @@
     style="position:fixed;top:10px;right:10px;z-index:1000000;background:rgba(0,0,0,0.9);color:#0f0;font-family:monospace;font-size:12px;padding:8px;border-radius:4px;cursor:pointer;line-height:1.2;border:1px solid #0f0;">
     <div id="debugTitle">FPS: --</div>
     <div id="debugContent">
-      ar-world: v2.88<br>
-      bundle: v2.88<br>
+      ar-world: v2.89<br>
+      bundle: v2.89<br>
       <span id="latencySpan" style="color:#0f0;">Latencia: -- ms</span>
     </div>
   </div>
@@ -98,7 +98,7 @@
               const nativeTHREE = window.THREE;
               
               if (nativeTHREE) {
-                // === INTERRUPTORES DE PRUEBA DE RENDIMIENTO v2.87 ===
+                // === INTERRUPTORES DE PRUEBA DE RENDIMIENTO v2.89 ===
                 const SLEEP_SHADOWS = false; // DESACTIVADO: Se restauran por completo las sombras dinámicas
 
                 if (SLEEP_SHADOWS) {
@@ -183,9 +183,9 @@
 
     function initPMREMLogic(scene, renderer, THREE_INSTANCE, LoaderClass) {
       try {
-        // === INTERRUPTORES DE PRUEBA DE RENDIMIENTO v2.87 ===
-        const SLEEP_PMREM = false; // ACTIVADO: PMREM dormido al 100% para v2.87
-        const SLEEP_LIGHT_ESTIMATION = false; // DESACTIVADO: Estimación de Luz activa para v2.87
+        // === INTERRUPTORES DE PRUEBA DE RENDIMIENTO v2.89 ===
+        const SLEEP_PMREM = false; // DESACTIVADO: Se restaura PMREM normalmente para v2.89
+        const SLEEP_LIGHT_ESTIMATION = false; // DESACTIVADO: Estimación de Luz activa para v2.89
 
         if (!SLEEP_PMREM) {
           // Inicializamos PMREM usando la clase nativa del motor de 8th Wall
@@ -225,8 +225,8 @@
             const lightCtx = lightCanvas.getContext('2d');
 
             // Configuración del PMREM: reflejos de los materiales desde la cámara.
-            const pmremSize = 256;
-            const pmremInterval = 100;
+            const pmremSize = 128; // Versión anterior: 64. Cambiado para v2.89
+            const pmremInterval = 150; // Versión anterior: 200. Cambiado para v2.89
             const pmremCanvas = document.createElement('canvas');
             pmremCanvas.width = pmremSize;
             pmremCanvas.height = pmremSize;
@@ -291,7 +291,7 @@
     if (window.ecs) {
       const _i = ecs.application.init;
       ecs.application.init = c => {
-        // === INTERRUPTOR DE PRUEBA DE RENDIMIENTO v2.87 ===
+        // === INTERRUPTOR DE PRUEBA DE RENDIMIENTO v2.89 ===
         const SLEEP_SHADOWS = false; // DESACTIVADO: Se restauran por completo las sombras dinámicas
 
         for (const k in c.objects) {
