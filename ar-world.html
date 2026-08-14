@@ -1,4 +1,4 @@
-<!-- 9th Wall v2.93 -->
+<!-- 9th Wall v2.94 -->
 <html>
 <head>
   <meta charset="UTF-8">
@@ -18,8 +18,8 @@
     style="position:fixed;top:10px;right:10px;z-index:1000000;background:rgba(0,0,0,0.9);color:#0f0;font-family:monospace;font-size:12px;padding:8px;border-radius:4px;cursor:pointer;line-height:1.2;border:1px solid #0f0;">
     <div id="debugTitle">FPS: --</div>
     <div id="debugContent">
-      ar-world: v2.93<br>
-      bundle: v2.91<br>
+      ar-world: v2.94<br>
+      bundle: v2.94<br>
       <span id="latencySpan" style="color:#0f0;">Latencia: -- ms</span>
     </div>
   </div>
@@ -98,18 +98,8 @@
               const nativeTHREE = window.THREE;
               
               if (nativeTHREE) {
-                // === CONTROL DE RESOLUCIÓN Y ESCALADO DPR (v2.92) ===
-                const maxDPR = 1.0; // <-- Modificar a mano aquí para pruebas (p.ej. 1.5, 1.25, 1.0) -- Antes: nativo sin tope
-                _renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, maxDPR));
-
-                // === INTERRUPTORES DE PRUEBA DE RENDIMIENTO v2.89 ===
-                const SLEEP_SHADOWS = false; // DESACTIVADO: Se restauran por completo las sombras dinámicas
-
-                if (SLEEP_SHADOWS) {
-                  _renderer.shadowMap.enabled = false;
-                } else {
-                  _renderer.shadowMap.enabled = true;
-                }
+                // Activación de sombras dinámicas nativas
+                _renderer.shadowMap.enabled = true;
 
                 // === ACTIVACIÓN SEGURA DEL TONE MAPPING ===
                 _renderer.toneMapping = nativeTHREE.ACESFilmicToneMapping;
@@ -117,26 +107,22 @@
                 // === FORZAR RESOLUCIÓN Y FRUSTUM DE SOMBRAS NATIVAS (Único punto de control de sombras) ===
                 _scene.traverse((node) => {
                   if (node.isDirectionalLight) {
-                    if (SLEEP_SHADOWS) {
-                      node.castShadow = false;
-                    } else {
-                      if (node.shadow) {
-                        node.shadow.mapSize.width = 256; // <-- Modificar a mano aquí para pruebas (p.ej. 512, 256) -- Antes 128
-                        node.shadow.mapSize.height = 256; // <-- Modificar a mano aquí para pruebas (p.ej. 512, 256) -- Antes 128
-                        if (node.shadow.camera) {
-                          node.shadow.camera.left = -0.30; // Antes -0.35
-                          node.shadow.camera.right = 0.30; // Antes 0.35
-                          node.shadow.camera.top = 0.30; // Antes 0.35
-                          node.shadow.camera.bottom = -0.30; // Antes -0.35
-                          node.shadow.camera.near = 0.1; // Antes 0.1
-                          node.shadow.camera.far = 5; // Antes 2
-                          node.shadow.camera.updateProjectionMatrix();
-                        }
-                        // Desechamos el mapa de sombras anterior para que Three.js lo regenere con la nueva resolución
-                        if (node.shadow.map) {
-                          node.shadow.map.dispose();
-                          node.shadow.map = null;
-                        }
+                    if (node.shadow) {
+                      node.shadow.mapSize.width = 256; // <-- Modificar a mano aquí para pruebas (p.ej. 512, 256) -- Antes 128
+                      node.shadow.mapSize.height = 256; // <-- Modificar a mano aquí para pruebas (p.ej. 512, 256) -- Antes 128
+                      if (node.shadow.camera) {
+                        node.shadow.camera.left = -0.30; // Antes -0.35
+                        node.shadow.camera.right = 0.30; // Antes 0.35
+                        node.shadow.camera.top = 0.30; // Antes 0.35
+                        node.shadow.camera.bottom = -0.30; // Antes -0.35
+                        node.shadow.camera.near = 0.1; // Antes 0.1
+                        node.shadow.camera.far = 5; // Antes 2
+                        node.shadow.camera.updateProjectionMatrix();
+                      }
+                      // Desechamos el mapa de sombras anterior para que Three.js lo regenere con la nueva resolución
+                      if (node.shadow.map) {
+                        node.shadow.map.dispose();
+                        node.shadow.map = null;
                       }
                     }
                   }
@@ -187,17 +173,9 @@
 
     function initPMREMLogic(scene, renderer, THREE_INSTANCE, LoaderClass) {
       try {
-        // === INTERRUPTORES DE PRUEBA DE RENDIMIENTO v2.89 ===
-        const SLEEP_PMREM = false; // DESACTIVADO: Se restaura PMREM normalmente para v2.89
-        const SLEEP_LIGHT_ESTIMATION = false; // DESACTIVADO: Estimación de Luz activa para v2.89
-
-        if (!SLEEP_PMREM) {
-          // Inicializamos PMREM usando la clase nativa del motor de 8th Wall
-          pmremGenerator = new THREE_INSTANCE.PMREMGenerator(renderer);
-          pmremGenerator.compileEquirectangularShader();
-        } else {
-          log('PMREM DORMIDO (Bypasseando compilaciones y shaders nativos)');
-        }
+        // Inicializamos PMREM usando la clase nativa del motor de 8th Wall
+        pmremGenerator = new THREE_INSTANCE.PMREMGenerator(renderer);
+        pmremGenerator.compileEquirectangularShader();
 
         // === CONTROL DE CARGA DEL HDR (Configuración manual) ===
         const LOAD_HDR = true; // Cambiar a true para reactivar la descarga y uso del entorno HDR
@@ -240,49 +218,40 @@
             let smoothed = 120;
 
             // Refresco del Light Estimation: lectura ligera del brillo de la cámara.
-            if (!SLEEP_LIGHT_ESTIMATION) {
-              envInterval = setInterval(() => {
-                try {
-                  if (!video || video.readyState < 2) return;
-                  lightCtx.drawImage(video, 0, 0, lightEstimationSize, lightEstimationSize);
-                  const pixels = lightCtx.getImageData(0, 0, lightEstimationSize, lightEstimationSize).data;
-                  let total = 0;
-                  for (let i = 0; i < pixels.length; i += 4) {
-                    total += (pixels[i] + pixels[i + 1] + pixels[i + 2]) / 3;
-                  }
-                  const brightness = total / (pixels.length / 4);
-                  smoothed += (brightness - smoothed) * 0.08;
-
-                  // LUZ PMREM LIGHT Ajuste de exposición basado en brillo promedio. Valores anteriores 0.4 y 1.5 respectively.
-                  renderer.toneMappingExposure = 0.6 + (smoothed / 255) * 1.9; 
-                } catch (e) {
-                  // Silencioso
+            envInterval = setInterval(() => {
+              try {
+                if (!video || video.readyState < 2) return;
+                lightCtx.drawImage(video, 0, 0, lightEstimationSize, lightEstimationSize);
+                const pixels = lightCtx.getImageData(0, 0, lightEstimationSize, lightEstimationSize).data;
+                let total = 0;
+                for (let i = 0; i < pixels.length; i += 4) {
+                  total += (pixels[i] + pixels[i + 1] + pixels[i + 2]) / 3;
                 }
-              }, lightEstimationInterval);
-            } else {
-              log('Light Estimation: DESACTIVADA (0% CPU en v2.82)');
-              renderer.toneMappingExposure = 1.0; // Exposición fija por defecto
-            }
+                const brightness = total / (pixels.length / 4);
+                smoothed += (brightness - smoothed) * 0.08;
 
-            // Refresco del PMREM: actualización de reflejos menos frecuente.
-            if (!SLEEP_PMREM) {
-              setInterval(() => {
-                try {
-                  if (!video || video.readyState < 2 || !pmremGenerator) return;
-                  pmremCtx.drawImage(video, 0, 0, pmremSize, pmremSize);
-                  envTexture.needsUpdate = true;
+                // LUZ PMREM LIGHT Ajuste de exposición basado en brillo promedio. Valores anteriores 0.4 y 1.5 respectively.
+                renderer.toneMappingExposure = 0.6 + (smoothed / 255) * 1.9; 
+              } catch (e) {
+                // Silencioso
+              }
+            }, lightEstimationInterval);
 
-                  const oldRT = cameraRT;
-                  cameraRT = pmremGenerator.fromEquirectangular(envTexture);
-                  if (envMode === 'cam') scene.environment = cameraRT.texture;
-                  if (oldRT) oldRT.dispose();
-                } catch (e) {
-                  // Silencioso
-                }
-              }, pmremInterval);
-            } else {
-              log('Intervalo PMREM: DESACTIVADO.');
-            }
+            // Refresco del PMREM: actualización de reflejos.
+            setInterval(() => {
+              try {
+                if (!video || video.readyState < 2 || !pmremGenerator) return;
+                pmremCtx.drawImage(video, 0, 0, pmremSize, pmremSize);
+                envTexture.needsUpdate = true;
+
+                const oldRT = cameraRT;
+                cameraRT = pmremGenerator.fromEquirectangular(envTexture);
+                if (envMode === 'cam') scene.environment = cameraRT.texture;
+                if (oldRT) oldRT.dispose();
+              } catch (e) {
+                // Silencioso
+              }
+            }, pmremInterval);
           }
         }, 500);
 
@@ -295,29 +264,11 @@
     if (window.ecs) {
       const _i = ecs.application.init;
       ecs.application.init = c => {
-        // === INTERRUPTOR DE PRUEBA DE RENDIMIENTO v2.89 ===
-        const SLEEP_SHADOWS = false; // DESACTIVADO: Se restauran por completo las sombras dinámicas
-
         for (const k in c.objects) {
           const obj = c.objects[k];
           if (obj.name === 'Loading Screen') delete c.objects[k];
-          
-          if (SLEEP_SHADOWS) {
-            // Desactivamos sombras de raíz en el ECS para que no reserve cámaras ni sombreadores de profundidad
-            if (obj.name === 'Directional Light') {
-              delete c.objects[k]; // Eliminación absoluta del árbol de objetos
-              continue;
-            }
-            if (obj.shadow) {
-              obj.shadow.castShadow = false;
-              obj.shadow.receiveShadow = false;
-            }
-            if (obj.material && obj.material.type === 'shadow') {
-              obj.material = { type: "basic", color: "#000000", opacity: 0.0 };
-            }
-          }
 
-          // Solución a la doble iluminación nativa (Solo se ejecuta si no está en modo SLEEP):
+          // Solución a la doble iluminación nativa:
           if (obj.name === 'Directional Light') {
             if (obj.light) {
               obj.light.intensity = 0.00; // Atenuamos la luz direccional para conservar sombras suaves
