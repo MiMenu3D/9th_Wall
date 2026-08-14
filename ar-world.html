@@ -1,4 +1,4 @@
-<!-- 9th Wall v2.84 -->
+<!-- 9th Wall v2.85 -->
 <html>
 <head>
   <meta charset="UTF-8">
@@ -18,8 +18,8 @@
     style="position:fixed;top:10px;right:10px;z-index:1000000;background:rgba(0,0,0,0.9);color:#0f0;font-family:monospace;font-size:12px;padding:8px;border-radius:4px;cursor:pointer;line-height:1.2;border:1px solid #0f0;">
     <div id="debugTitle">FPS: --</div>
     <div id="debugContent">
-      ar-world: v2.84<br>
-      bundle: v2.84
+      ar-world: v2.85<br>
+      bundle: v2.85
     </div>
   </div>
   <style>
@@ -98,12 +98,12 @@
               log('Captura exitosa. Usando Three nativo: ' + (!!nativeTHREE));
               
               if (nativeTHREE) {
-                // === INTERRUPTORES DE PRUEBA DE RENDIMIENTO v2.84 ===
-                const SLEEP_SHADOWS = true; // ACTIVADO: Apaga por completo las sombras dinámicas de WebGL (0% uso de GPU para sombreado)
+                // === INTERRUPTORES DE PRUEBA DE RENDIMIENTO v2.85 ===
+                const SLEEP_SHADOWS = true; // ACTIVADO: Apaga por completo las sombras dinámicas
 
                 if (SLEEP_SHADOWS) {
                   _renderer.shadowMap.enabled = false;
-                  log('Sombras dinámicas de WebGL: DESACTIVADAS');
+                  log('Sombras de WebGL: DESACTIVADAS de raíz');
                 }
 
                 // === ACTIVACIÓN SEGURA DEL TONE MAPPING ===
@@ -185,9 +185,9 @@
 
     function initPMREMLogic(scene, renderer, THREE_INSTANCE, LoaderClass) {
       try {
-        // === INTERRUPTORES DE PRUEBA DE RENDIMIENTO v2.84 ===
-        const SLEEP_PMREM = false; // RESTAURADO: Reactivado PMREM al 100% para v2.84
-        const SLEEP_LIGHT_ESTIMATION = false; // RESTAURADO: Reactivada la Estimación de Luz para v2.84
+        // === INTERRUPTORES DE PRUEBA DE RENDIMIENTO v2.85 ===
+        const SLEEP_PMREM = false; // RESTAURADO: Reactivado PMREM al 100% para v2.85
+        const SLEEP_LIGHT_ESTIMATION = false; // RESTAURADO: Reactivada la Estimación de Luz para v2.85
 
         if (!SLEEP_PMREM) {
           // Inicializamos PMREM usando la clase nativa del motor de 8th Wall
@@ -297,12 +297,30 @@
     if (window.ecs) {
       const _i = ecs.application.init;
       ecs.application.init = c => {
+        // === INTERRUPTOR DE PRUEBA DE RENDIMIENTO v2.85 ===
+        const SLEEP_SHADOWS = true; // ACTIVADO: Apaga sombras a nivel raíz en el ECS antes de compilar sombreadores
+
         for (const k in c.objects) {
           const obj = c.objects[k];
           if (obj.name === 'Loading Screen') delete c.objects[k];
           
-          // Solución a la doble iluminación nativa:
+          if (SLEEP_SHADOWS) {
+            // Desactivamos sombras de raíz en el ECS para que no reserve cámaras ni sombreadores de profundidad
             if (obj.name === 'Directional Light') {
+              delete c.objects[k]; // Eliminación absoluta del árbol de objetos
+              continue;
+            }
+            if (obj.shadow) {
+              obj.shadow.castShadow = false;
+              obj.shadow.receiveShadow = false;
+            }
+            if (obj.material && obj.material.type === 'shadow') {
+              obj.material = { type: "basic", color: "#000000", opacity: 0.0 };
+            }
+          }
+
+          // Solución a la doble iluminación nativa (Solo se ejecuta si no está en modo SLEEP):
+          if (obj.name === 'Directional Light') {
             if (obj.light) {
               obj.light.intensity = 0.00; // Atenuamos la luz direccional para conservar sombras suaves
             }

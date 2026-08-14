@@ -1,4 +1,4 @@
-﻿// 9th Wall v2.84
+﻿// 9th Wall v2.85
 (() => {
   var e = {
     574() {
@@ -90,8 +90,8 @@
     e.registerComponent({
       name: "model-gesture-controls",
       stateMachine: ({ world: t, eid: a, defineState: o }) => {
-        // === INTERRUPTOR DE PRUEBA DE RENDIMIENTO v2.84 ===
-        const SLEEP_GESTURES = false; // RESTAURADO: Reactivado el procesamiento de escala/rotación táctil para v2.84
+        // === INTERRUPTOR DE PRUEBA DE RENDIMIENTO v2.85 ===
+        const SLEEP_GESTURES = false; // RESTAURADO: Reactivado el procesamiento de escala/rotación táctil para v2.85
 
         let isTwoFingerGesture = !1,
         isModelTouchActive = !1,
@@ -277,6 +277,58 @@
       }
     });
 
+    // Componente oficial para medir latencia y rendimiento del Frame
+    e.registerComponent({
+      name: "performance-debugger",
+      add: (world, component) => {
+        // Crear un contenedor flotante en la UI para ver los datos en tiempo real
+        const debugDiv = document.createElement("div");
+        debugDiv.style.position = "absolute";
+        debugDiv.style.top = "60px"; // Debajo del contador nativo si tienes uno
+        debugDiv.style.left = "10px";
+        debugDiv.style.backgroundColor = "rgba(0, 0, 0, 0.7)";
+        debugDiv.style.color = "#00ff00";
+        debugDiv.style.fontFamily = "monospace";
+        debugDiv.style.padding = "6px";
+        debugDiv.style.borderRadius = "4px";
+        debugDiv.style.fontSize = "12px";
+        debugDiv.style.zIndex = "99999";
+        debugDiv.innerHTML = "Latencia: -- ms";
+        document.body.appendChild(debugDiv);
+
+        let lastTime = performance.now();
+        let frameTimes = [];
+
+        const medirRendimiento = () => {
+          const now = performance.now();
+          const deltaFrame = now - lastTime; // Latencia total de ciclo (Frame Time)
+          lastTime = now;
+
+          frameTimes.push(deltaFrame);
+          if (frameTimes.length > 30) { // Promedio móvil de 30 frames para evitar parpadeos
+            frameTimes.shift();
+          }
+
+          const promedio = frameTimes.reduce((a, b) => a + b, 0) / frameTimes.length;
+
+          // Un frame óptimo a 60 FPS debe renderizarse en < 16.67ms
+          if (promedio > 16.67) {
+            debugDiv.style.color = "#ff3333"; // Alerta visual (Rojo si hay lag)
+          } else if (promedio > 12) {
+            debugDiv.style.color = "#ffcc00"; // Advertencia (Amarillo)
+          } else {
+            debugDiv.style.color = "#00ff00"; // Excelente rendimiento (Verde)
+          }
+
+          debugDiv.innerHTML = `Latencia Frame: ${promedio.toFixed(1)} ms`;
+
+          requestAnimationFrame(medirRendimiento);
+        };
+
+        requestAnimationFrame(medirRendimiento);
+      }
+    });
+
     // Componente oficial para visualizar la Shadow Camera de la luz direccional (Solo activo en debug)
     e.registerComponent({
       name: "shadow-camera-helper",
@@ -363,6 +415,11 @@
             "point-cloud-visualizer-comp": {
               "id": "point-cloud-visualizer-comp",
               "name": "point-cloud-visualizer",
+              "parameters": {}
+            },
+            "performance-debugger-comp": {
+              "id": "performance-debugger-comp",
+              "name": "performance-debugger",
               "parameters": {}
             }
           },
@@ -511,6 +568,37 @@
           },
           "name": "Tap Prompt",
           "order": 10.427624126637916
+        },
+
+        // Sombra del texto UI "Tap to place"
+        "637f7413-261d-48bb-99c9-154bd99360da": {
+          "id": "637f7413-261d-48bb-99c9-154bd99360da",
+          "position": [16.857510635812545, 15.927690665172552, 0],
+          "rotation": [0, 0, 0, 1],
+          "scale": [1, 1, 1],
+          "geometry": null,
+          "material": null,
+          "parentId": "904308fe-98f5-4c93-bf62-f39d50c6e602",
+          "components": {},
+          "ui": {
+            "text": "Tap to place",
+            "width": "100%",
+            "height": 100,
+            "type": "overlay",
+            "verticalTextAlign": "start",
+            "textAlign": "center",
+            "fontSize": 32,
+            "position": "absolute",
+            "top": 12,
+            "left": 12,
+            "bottom": "",
+            "right": "",
+            "stackingOrder": -2,
+            "color": "#000000",
+            "font": { "type": "font", "font": "Roboto" }
+          },
+          "name": "Tap Prompt Shadow",
+          "order": 11.644447501347162
         },
 
         // Entidad del Modelo 3D (El archivo .glb)
