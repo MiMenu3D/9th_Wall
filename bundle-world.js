@@ -362,7 +362,7 @@
           "light": {
             "type": "directional",
             "shadowBias": 0.0001, // Previene artefactos de sombras a baja resolución (shadow acne)
-            "shadowRadius": 4,
+            "shadowRadius": 3,
             "followCamera": false,
             "shadowCamera": [-10, 10, 10, -10, 3, 5] // Versión anterior: 0.3, 0.3, 0.3, 0.3, 0.4, 1
           },
@@ -462,7 +462,7 @@
           "rotation": [-0.7071068, 0, 0, 0.7071068],
           "scale": [5, 5, 5], // Antes: 2, 2, 2
           "geometry": { "type": "plane", "width": 1, "height": 1 },
-          "material": { "type": "shadow", "color": "#000000", "opacity": 0.4 },
+          "material": { "type": "shadow", "color": "#000000", "opacity": 0.6 },
           "parentId": "84028e73-ee70-412d-b8d4-c09bf07c655c",
           "components": {
             "efcfa10c-5fe6-4a92-85de-a602a68683b2": {
