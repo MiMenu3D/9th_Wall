@@ -1,4 +1,4 @@
-<!-- 9th Wall v2.92 -->
+<!-- 9th Wall v2.93 -->
 <html>
 <head>
   <meta charset="UTF-8">
@@ -18,7 +18,7 @@
     style="position:fixed;top:10px;right:10px;z-index:1000000;background:rgba(0,0,0,0.9);color:#0f0;font-family:monospace;font-size:12px;padding:8px;border-radius:4px;cursor:pointer;line-height:1.2;border:1px solid #0f0;">
     <div id="debugTitle">FPS: --</div>
     <div id="debugContent">
-      ar-world: v2.92<br>
+      ar-world: v2.93<br>
       bundle: v2.91<br>
       <span id="latencySpan" style="color:#0f0;">Latencia: -- ms</span>
     </div>
@@ -99,7 +99,7 @@
               
               if (nativeTHREE) {
                 // === CONTROL DE RESOLUCIÓN Y ESCALADO DPR (v2.92) ===
-                const maxDPR = 1.5; // <-- Modificar a mano aquí para pruebas (p.ej. 1.5, 1.25, 1.0) -- Antes: nativo sin tope
+                const maxDPR = 1.0; // <-- Modificar a mano aquí para pruebas (p.ej. 1.5, 1.25, 1.0) -- Antes: nativo sin tope
                 _renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, maxDPR));
 
                 // === INTERRUPTORES DE PRUEBA DE RENDIMIENTO v2.89 ===
