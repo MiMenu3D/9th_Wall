@@ -1,4 +1,4 @@
-﻿// 9th Wall v2.86
+﻿// 9th Wall v2.87
 (() => {
   var e = {
     574() {
@@ -95,8 +95,8 @@
     e.registerComponent({
       name: "model-gesture-controls",
       stateMachine: ({ world: t, eid: a, defineState: o }) => {
-        // === INTERRUPTOR DE PRUEBA DE RENDIMIENTO v2.86 ===
-        const SLEEP_GESTURES = true; // ACTIVADO: Desactivado por completo el procesamiento de escala/rotación táctil para v2.86
+        // === INTERRUPTOR DE PRUEBA DE RENDIMIENTO v2.87 ===
+        const SLEEP_GESTURES = false; // RESTAURADO: Reactivado el procesamiento de escala/rotación táctil para v2.87
 
         let isTwoFingerGesture = !1,
         isModelTouchActive = !1,
