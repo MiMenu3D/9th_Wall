@@ -1,4 +1,4 @@
-<!-- 9th Wall v2.89 -->
+<!-- 9th Wall v2.90 -->
 <html>
 <head>
   <meta charset="UTF-8">
@@ -217,8 +217,8 @@
             clearInterval(waitForVideo);
 
             // Refresco del Light Estimation: brillo medio para la exposición.
-            const lightEstimationSize = 16;
-            const lightEstimationInterval = 50;
+            const lightEstimationSize = 4;
+            const lightEstimationInterval = 800;
             const lightCanvas = document.createElement('canvas');
             lightCanvas.width = lightEstimationSize;
             lightCanvas.height = lightEstimationSize;
