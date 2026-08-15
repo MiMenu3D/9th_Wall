@@ -1,4 +1,4 @@
-<!-- 9th Wall v3.00 Apple Probe -->
+<!-- 9th Wall v3.01 Apple Probe -->
 <html>
 <head>
   <meta charset="UTF-8">
@@ -18,8 +18,8 @@
     style="position:fixed;top:10px;right:10px;z-index:1000000;background:rgba(0,0,0,0.9);color:#0f0;font-family:monospace;font-size:12px;padding:8px;border-radius:4px;cursor:pointer;line-height:1.2;border:1px solid #0f0;">
     <div id="debugTitle">FPS: --</div>
     <div id="debugContent">
-      ar-world: v3.00<br>
-      bundle: v3.00<br>
+      ar-world: v3.01<br>
+      bundle: v3.01<br>
       <span id="latencySpan" style="color:#0f0;">Latencia: -- ms</span>
     </div>
   </div>
@@ -227,7 +227,7 @@
                }, lightEstimationInterval);
             ===================================================================================== */
 
-            // === CONFIGURACIÓN DEL PMREM Y SÍNTESIS DE TECHO ESTILO APPLE (v3.00) ===
+            // === CONFIGURACIÓN DEL PMREM Y SÍNTESIS ADITIVA DE FOCO (v3.01) ===
             const pmremSize = 128; // Versión anterior: 64. Cambiado para v2.89
             const pmremInterval = 150; // Versión anterior: 200. Cambiado para v2.89
             const pmremCanvas = document.createElement('canvas');
@@ -236,93 +236,108 @@
             const pmremCtx = pmremCanvas.getContext('2d', { willReadFrequently: true });
             const envTexture = new THREE_INSTANCE.CanvasTexture(pmremCanvas);
             envTexture.mapping = THREE_INSTANCE.EquirectangularReflectionMapping;
-            
+
             let smoothedBrightness = 120; // Valor suavizado para la exposición automática
             let smoothedLightX = pmremSize * 0.5; // Posición X suavizada del foco en el techo
             let smoothedLightY = pmremSize * 0.25; // Posición Y suavizada del foco en el techo
+            let targetLightX = pmremSize * 0.5;
+            let targetLightY = pmremSize * 0.25;
+            
+            let lastScanTime = 0;
+            const scanInterval = 900; // Escaneo pausado cada 900 ms para máxima estabilidad (ambiente restaurante)
 
-            // Bucle unificado: Procesa el PMREM y sintetiza el hemisferio norte (techo HDR) en un solo paso
             setInterval(() => {
               try {
                 if (!video || video.readyState < 2 || !pmremGenerator) return;
 
-                // 1. DIBUJAMOS EL VÍDEO DE LA CÁMARA EN EL HEMISFERIO SUR (La mesa / mantel real)
-                // Ocupa la mitad inferior del canvas (desde Y = 64 hasta Y = 128)
-                const halfHeight = pmremSize * 0.5;
-                pmremCtx.drawImage(video, 0, halfHeight, pmremSize, halfHeight);
+                const now = performance.now();
 
-                // 2. MUESTREO ULTRA-LIGERO DE LA MESA (4 cuadrantes) PARA ESTIMACIÓN ESTILO APPLE
-                // Extraemos brillo general y detectamos el cuadrante con mayor rebote de luz
-                const imgData = pmremCtx.getImageData(0, halfHeight, pmremSize, halfHeight);
-                const data = imgData.data;
-                const totalPixels = data.length / 4;
+                // 1. DIBUJAMOS EL VÍDEO COMPLETO EN EL CANVAS (Restauramos 100% los reflejos reales)
+                // Usamos source-over para asegurar que el vídeo cubre todo el canvas (la TV, los muebles, la mesa)
+                pmremCtx.globalCompositeOperation = 'source-over';
+                pmremCtx.drawImage(video, 0, 0, pmremSize, pmremSize);
 
-                let sumR = 0, sumG = 0, sumB = 0;
-                let maxBrightness = 0;
-                let brightPixelIdx = 0;
+                // 2. ESCANEO PAUSADO (CADA 900ms) LIMITADO AL TERCIO SUPERIOR (Zona de lámparas/techo)
+                // Ignoramos el 65% inferior donde está la mesa y los platos
+                if (now - lastScanTime > scanInterval) {
+                  lastScanTime = now;
+                  
+                  const scanHeight = Math.floor(pmremSize * 0.35); // Tercio superior de la pantalla (35%)
+                  const imgData = pmremCtx.getImageData(0, 0, pmremSize, scanHeight);
+                  const data = imgData.data;
 
-                // Escaneamos con un salto de 16 píxeles para consumir prácticamente 0 ms de CPU
-                for (let idx = 0; idx < data.length; idx += 64) {
-                  const r = data[idx];
-                  const g = data[idx + 1];
-                  const b = data[idx + 2];
-                  const lum = (r * 0.299 + g * 0.587 + b * 0.114);
+                  let sumR = 0, sumG = 0, sumB = 0;
+                  let maxLum = 0;
+                  let peakPixelIdx = 0;
+                  let count = 0;
 
-                  sumR += r;
-                  sumG += g;
-                  sumB += b;
+                  // Muestreo con paso de 16 píxeles (coste computacional prácticamente nulo)
+                  for (let idx = 0; idx < data.length; idx += 64) {
+                    const r = data[idx];
+                    const g = data[idx + 1];
+                    const b = data[idx + 2];
+                    const lum = (r * 0.299 + g * 0.587 + b * 0.114);
 
-                  if (lum > maxBrightness) {
-                    maxBrightness = lum;
-                    brightPixelIdx = idx / 4;
+                    sumR += r;
+                    sumG += g;
+                    sumB += b;
+                    count++;
+
+                    if (lum > maxLum) {
+                      maxLum = lum;
+                      peakPixelIdx = idx / 4;
+                    }
+                  }
+
+                  const avgR = sumR / count;
+                  const avgG = sumG / count;
+                  const avgB = sumB / count;
+                  const avgLum = (avgR * 0.299 + avgG * 0.587 + avgB * 0.114);
+
+                  // Ajuste suave de exposición general
+                  smoothedBrightness += (avgLum - smoothedBrightness) * 0.10;
+                  renderer.toneMappingExposure = 0.6 + (smoothedBrightness / 255) * 1.9;
+
+                  // Determinamos la coordenada destino en el techo
+                  const newX = (peakPixelIdx % pmremSize);
+                  const newY = Math.max(8, Math.min(scanHeight, Math.floor(peakPixelIdx / pmremSize)));
+
+                  // Zona muerta (Deadzone): si el cambio es menor a 5 píxeles, ignoramos micro-temblores
+                  const dist = Math.hypot(newX - targetLightX, newY - targetLightY);
+                  if (dist > 5) {
+                    targetLightX = newX;
+                    targetLightY = newY;
                   }
                 }
 
-                // Cálculo del color ambiental promedio de la sala
-                const sampleCount = totalPixels / 16;
-                const avgR = Math.round(sumR / sampleCount);
-                const avgG = Math.round(sumG / sampleCount);
-                const avgB = Math.round(sumB / sampleCount);
-                const avgLum = (avgR * 0.299 + avgG * 0.587 + avgB * 0.114);
+                // 3. LERP CINEMATOGRÁFICO ULTRA-SUAVE (Factor 0.025 para movimiento orgánico)
+                smoothedLightX += (targetLightX - smoothedLightX) * 0.025;
+                smoothedLightY += (targetLightY - smoothedLightY) * 0.025;
 
-                // Suavizado de exposición (Reemplazo ultra-rápido del antiguo bucle de Light Estimation)
-                smoothedBrightness += (avgLum - smoothedBrightness) * 0.08;
-                renderer.toneMappingExposure = 0.6 + (smoothedBrightness / 255) * 1.9; // Valores heredados: 0.6 y 1.9
+                // 4. SUPERPOSICIÓN ADITIVA DEL FOCO HDR (Modo 'screen')
+                // Añade el destello especular puro encima del vídeo real sin tapar ningún reflejo
+                pmremCtx.globalCompositeOperation = 'screen';
 
-                // 3. CÁLCULO DE LA POSICIÓN DEL FOCO EN EL TECHO (Óptica inversa inspirada en Apple ParametricLights)
-                const targetPixelX = (brightPixelIdx % pmremSize);
-                const targetPixelY = Math.floor(brightPixelIdx / pmremSize);
-
-                // Proyectamos el foco en el hemisferio norte (Y de 0 a 64) de forma simétrica
-                const targetLightX = targetPixelX;
-                const targetLightY = Math.max(10, Math.min(halfHeight - 10, (halfHeight - targetPixelY)));
-
-                // Suavizado para evitar parpadeos (flickering) en el reflejo
-                smoothedLightX += (targetLightX - smoothedLightX) * 0.15;
-                smoothedLightY += (targetLightY - smoothedLightY) * 0.15;
-
-                // 4. SÍNTESIS DEL HEMISFERIO NORTE (El techo virtual con bombilla HDR)
-                // A) Base ambiental del techo: tono difuso de la sala ligeramente atenuado
-                pmremCtx.fillStyle = `rgb(${Math.round(avgR * 0.7)}, ${Math.round(avgG * 0.7)}, ${Math.round(avgB * 0.7)})`;
-                pmremCtx.fillRect(0, 0, pmremSize, halfHeight);
-
-                // B) Foco principal de luz artificial (Bombilla/Lámpara de techo)
-                // Usamos un gradiente radial con núcleo blanco puro (100% reflectivo para forzar destellos especulares)
-                const lightRadius = 18; // Radio del foco en el mapa equirectangular
+                const lightRadius = 24; // Radio del destello especular
                 const grad = pmremCtx.createRadialGradient(
                   smoothedLightX, smoothedLightY, 1,
                   smoothedLightX, smoothedLightY, lightRadius
                 );
-                grad.addColorStop(0, 'rgba(255, 255, 255, 1.0)'); // Núcleo superbrillante (Especular directo)
-                grad.addColorStop(0.3, `rgba(${Math.min(255, avgR + 50)}, ${Math.min(255, avgG + 50)}, ${Math.min(255, avgB + 50)}, 0.9)`);
-                grad.addColorStop(1, 'rgba(0, 0, 0, 0)'); // Difuminado con el techo
+                // Núcleo blanco puro concentrado (genera destello especular en curvas 3D sin quemar el difuso)
+                grad.addColorStop(0, 'rgba(255, 255, 255, 1.0)');
+                grad.addColorStop(0.25, 'rgba(255, 245, 220, 0.85)'); // Tono cálido de lámpara
+                grad.addColorStop(0.6, 'rgba(255, 230, 180, 0.35)');
+                grad.addColorStop(1, 'rgba(0, 0, 0, 0)'); // Desvanecimiento limpio
 
                 pmremCtx.fillStyle = grad;
                 pmremCtx.beginPath();
                 pmremCtx.arc(smoothedLightX, smoothedLightY, lightRadius, 0, Math.PI * 2);
                 pmremCtx.fill();
 
-                // 5. ACTUALIZACIÓN DE TEXTURA Y CONVOLUCIÓN PMREM
+                // Restauramos el modo normal para el siguiente fotograma
+                pmremCtx.globalCompositeOperation = 'source-over';
+
+                // 5. ACTUALIZACIÓN DE TEXTURA Y GENERACIÓN PMREM
                 envTexture.needsUpdate = true;
                 const oldRT = cameraRT;
                 cameraRT = pmremGenerator.fromEquirectangular(envTexture);
