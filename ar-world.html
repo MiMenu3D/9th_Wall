@@ -1,4 +1,4 @@
-<!-- 9th Wall v3.02 Apple Probe -->
+<!-- 9th Wall v3.03 Apple Probe -->
 <html>
 <head>
   <meta charset="UTF-8">
@@ -18,8 +18,8 @@
     style="position:fixed;top:10px;right:10px;z-index:1000000;background:rgba(0,0,0,0.9);color:#0f0;font-family:monospace;font-size:12px;padding:8px;border-radius:4px;cursor:pointer;line-height:1.2;border:1px solid #0f0;">
     <div id="debugTitle">FPS: --</div>
     <div id="debugContent">
-      ar-world: v3.02<br>
-      bundle: v3.02<br>
+      ar-world: v3.03<br>
+      bundle: v3.03<br>
       <span id="latencySpan" style="color:#0f0;">Latencia: -- ms</span>
     </div>
   </div>
@@ -63,10 +63,12 @@
     let pmremGenerator = null, cameraRT = null, originalEnv = null;
     let envMode = 'cam'; // Iniciamos por defecto en CAM ya que el HDR está inactivo para optimizar
     let envInterval = null;
-    let _scene = null, _renderer = null;
+    let _scene = null, _renderer = null, _activeCamera = null;
 
-    // Referencia a la segunda luz direccional para control 3D en tiempo real
-    let secondLightNode = null;
+    // Referencias directas a las luces para control 3D continuo
+    let light1Node = null; // Luz 1 (Sombra base / Contact AO)
+    let light2Node = null; // Luz 2 (Probe físico con sombra direccional y radio 1)
+    let light3Node = null; // Luz 3 (Relleno lateral derecho sin sombra)
 
     document.getElementById('envToggle').addEventListener('click', (e) => {
       log('Button clicked');
@@ -96,6 +98,7 @@
             try {
               _scene = world.three.scene;
               _renderer = world.three.renderer;
+              _activeCamera = world.three.activeCamera;
               
               // Buscamos el THREE nativo expuesto globalmente por el runtime de 8th Wall
               const nativeTHREE = window.THREE;
@@ -107,7 +110,7 @@
                 // === ACTIVACIÓN SEGURA DEL TONE MAPPING ===
                 _renderer.toneMapping = nativeTHREE.ACESFilmicToneMapping;
 
-                // === FORZAR RESOLUCIÓN Y FRUSTUM DE SOMBRAS NATIVAS (Control de Luces 1 y 2) ===
+                // === FORZAR RESOLUCIÓN Y FRUSTUM DE SOMBRAS NATIVAS (Control de Luces 1, 2 y 3) ===
                 let directionalCount = 0;
                 _scene.traverse((node) => {
                   if (node.isDirectionalLight) {
@@ -115,6 +118,7 @@
                     
                     if (directionalCount === 1) {
                       // Configuración de Luz 1 (Sombra base / AO de contacto)
+                      light1Node = node;
                       if (node.shadow) {
                         node.shadow.mapSize.width = 256; // <-- Modificar a mano aquí para pruebas (p.ej. 512, 256) -- Antes 128
                         node.shadow.mapSize.height = 256; // <-- Modificar a mano aquí para pruebas (p.ej. 512, 256) -- Antes 128
@@ -133,16 +137,15 @@
                         }
                       }
                     } else if (directionalCount === 2) {
-                      // Capturamos y configuramos Luz 2 (Luz física del Probe, radio 2, intensidad de sombra 0.5)
-                      secondLightNode = node;
+                      // Luz 2 (Luz física del Probe, radio 1, sombra secundaria con lerp)
+                      light2Node = node;
                       if (node.shadow) {
                         node.shadow.mapSize.width = 256;
                         node.shadow.mapSize.height = 256;
-                        node.shadow.radius = 2; // NOTA 2: ShadowRadius inicial 2 (posible 1 en pruebas futuras)
+                        node.shadow.radius = 1; // Sombra nítida con radio 1 (Cambiado para v3.03 - Antes 2)
                         
-                        // NOTA 3: Intensidad de sombra forzada (la mitad de la opacidad del Ground)
                         if (typeof node.shadow.intensity !== 'undefined') {
-                          node.shadow.intensity = 0.5;
+                          node.shadow.intensity = 0.0; // Inicia en 0.0 y sube a 0.5 con lerp
                         }
 
                         if (node.shadow.camera) {
@@ -159,6 +162,10 @@
                           node.shadow.map = null;
                         }
                       }
+                    } else if (directionalCount === 3) {
+                      // Luz 3 (Relleno lateral derecho sin sombra)
+                      light3Node = node;
+                      node.castShadow = false;
                     }
                   }
                 });
@@ -262,7 +269,7 @@
                }, lightEstimationInterval);
             ===================================================================================== */
 
-            // === CONFIGURACIÓN DEL PMREM Y CONTROL DINÁMICO 3D (v3.02) ===
+            // === CONFIGURACIÓN DEL PMREM Y CONTROL DINÁMICO 3D (v3.03) ===
             const pmremSize = 128; // Versión anterior: 64. Cambiado para v2.89
             const pmremInterval = 150; // Versión anterior: 200. Cambiado para v2.89
             const pmremCanvas = document.createElement('canvas');
@@ -281,7 +288,7 @@
             let lastScanTime = 0;
             const scanInterval = 900; // Escaneo pausado cada 900 ms para máxima estabilidad (ambiente restaurante)
 
-            // NOTA 4: Control de arranque de 1 segundo para la Luz 2
+            // Control de arranque cinematográfico de 1 segundo
             let startupStartTime = performance.now();
             const startupDuration = 1000; // 1000 ms de transición inicial
             const initialLightPos = new THREE_INSTANCE.Vector3(0, 1.8, 0); // Cenital encima del plato (< 2m)
@@ -333,9 +340,10 @@
                   const avgB = sumB / count;
                   const avgLum = (avgR * 0.299 + avgG * 0.587 + avgB * 0.114);
 
-                  // Ajuste compensado de exposición: Base 0.45 y mult 1.30 (Valores anteriores: 0.6 y 1.9)
+                  // Ajuste compensado para 3 luces activas: Base 0.35 y mult 1.00 
+                  // [Valores históricos: v3.02 era 0.45 y 1.30; v2.94-v3.01 era 0.6 y 1.9; v2.89 era 0.4 y 1.5]
                   smoothedBrightness += (avgLum - smoothedBrightness) * 0.10;
-                  renderer.toneMappingExposure = 0.45 + (smoothedBrightness / 255) * 1.30;
+                  renderer.toneMappingExposure = 0.35 + (smoothedBrightness / 255) * 1.00;
 
                   // Determinamos la coordenada destino en el canvas
                   const newX = (peakPixelIdx % pmremSize);
@@ -374,31 +382,57 @@
 
                 pmremCtx.globalCompositeOperation = 'source-over';
 
-                // 5. CÁLCULO Y CONTROL DE LA LUZ DIRECCIONAL 2 (3D)
-                if (secondLightNode) {
-                  const elapsedStartup = now - startupStartTime;
-                  const startupProgress = Math.min(1.0, elapsedStartup / startupDuration);
+                // 5. CÁLCULO Y CONTROL CINEMÁTICO DE LUCES 2 Y 3 (3D)
+                const elapsedStartup = now - startupStartTime;
+                const startupProgress = Math.min(1.0, elapsedStartup / startupDuration);
 
-                  // NOTA 4: Intensidad pasa gradualmente de 0.15 a 0.30 en 1 segundo
-                  const targetIntensity = 0.15 + (startupProgress * 0.15);
-                  secondLightNode.intensity = targetIntensity;
+                // --- CONTROL DE LUZ 2 (Probe físico con sombra direccional y radio 1) ---
+                if (light2Node) {
+                  // Intensidad duplicada: arranca en 0.30 y sube a 0.60 en 1 segundo
+                  const targetIntensity = 0.30 + (startupProgress * 0.30);
+                  light2Node.intensity = targetIntensity;
 
-                  // NOTA 1: Acotación matemática a un máximo estricto de 1.7m del punto (0,0,0)
-                  const maxDistance = 1.7; // Siempre < 2.0 metros
+                  // Lerp de la sombra secundaria: arranca en 0.0 y sube a 0.5
+                  if (light2Node.shadow && typeof light2Node.shadow.intensity !== 'undefined') {
+                    light2Node.shadow.intensity = startupProgress * 0.5;
+                  }
+
+                  // Corrección espacial del mundo: rotamos las coordenadas 2D usando el ángulo Y de la cámara
+                  const maxDistance = 1.6; // Estrictamente < 1.7 metros del origen
                   const normX = (smoothedLightX / pmremSize) - 0.5; // -0.5 a 0.5
                   const normY = smoothedLightY / (pmremSize * 0.35); // 0 a 1.0
 
-                  const angleAzimuth = normX * Math.PI * 0.85;
-                  const calc3DX = Math.sin(angleAzimuth) * maxDistance * 0.75;
-                  const calc3DY = Math.max(0.9, Math.min(1.8, 1.0 + (1.0 - normY) * 0.8));
-                  const calc3DZ = Math.cos(angleAzimuth) * maxDistance * 0.45;
+                  // Obtenemos el ángulo Yaw de la cámara respecto al espacio real
+                  let camYaw = 0;
+                  if (_activeCamera) {
+                    camYaw = _activeCamera.rotation.y;
+                  }
 
-                  targetLight3DPos.set(calc3DX, calc3DY, calc3DZ);
+                  // Calculamos la dirección en espacio local de vista
+                  const localX = normX * maxDistance * 0.85;
+                  const localZ = 0.70; // Ligera inclinación frontal hacia el plato
+                  const calc3DY = Math.max(0.85, Math.min(1.7, 1.0 + (1.0 - normY) * 0.7));
 
-                  // Transición suave desde la posición cenital [0, 1.8, 0] hacia la posición estimada
-                  secondLightNode.position.lerpVectors(initialLightPos, targetLight3DPos, startupProgress);
-                  if (secondLightNode.target) {
-                    secondLightNode.target.position.set(0, 0, 0);
+                  // Rotamos el vector por el ángulo real de la cámara para que coincida con la habitación
+                  const worldX = localX * Math.cos(camYaw) + localZ * Math.sin(camYaw);
+                  const worldZ = -localX * Math.sin(camYaw) + localZ * Math.cos(camYaw);
+
+                  targetLight3DPos.set(worldX, calc3DY, worldZ);
+
+                  // Transición suave desde la posición cenital hacia la coordenada calculada
+                  light2Node.position.lerpVectors(initialLightPos, targetLight3DPos, startupProgress);
+                  if (light2Node.target) {
+                    light2Node.target.position.set(0, 0, 0);
+                  }
+                }
+
+                // --- CONTROL DE LUZ 3 (Relleno lateral derecho sin sombra) ---
+                if (light3Node) {
+                  // Intensidad: la mitad de la Luz 2 (arranca en 0.15 y sube a 0.30)
+                  light3Node.intensity = 0.15 + (startupProgress * 0.15);
+                  light3Node.position.set(1.5, 1.0, 0.2); // Fijo lateral derecho (< 1.8m)
+                  if (light3Node.target) {
+                    light3Node.target.position.set(0, 0, 0);
                   }
                 }
 
@@ -432,12 +466,19 @@
           // Solución a la doble iluminación nativa:
           if (obj.name === 'Directional Light') {
             if (obj.light) {
-              obj.light.intensity = 0.00; // Luz 1: Atenuada para conservar sombras suaves/AO
+              obj.light.intensity = 0.00; // Luz 1: Sombra base / AO
             }
           }
 
-          // Luz 2: Inicializada a la mitad de su potencia (0.15) para arranque suave
+          // Luz 2: Inicializada a media potencia para arranque suave (0.30 -> 0.60)
           if (obj.name === 'Directional Light 2') {
+            if (obj.light) {
+              obj.light.intensity = 0.30;
+            }
+          }
+
+          // Luz 3: Inicializada a media potencia para arranque suave (0.15 -> 0.30)
+          if (obj.name === 'Directional Light 3') {
             if (obj.light) {
               obj.light.intensity = 0.15;
             }

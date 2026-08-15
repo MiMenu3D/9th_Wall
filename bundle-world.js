@@ -1,4 +1,4 @@
-﻿// 9th Wall v3.02 Apple Probe
+﻿// 9th Wall v3.03 Apple Probe
 (() => {
   var e = {
     574() {
@@ -341,7 +341,7 @@
           "prefab": true
         },
 
-        // Luz direccional 1: Contact AO y sombras base (Intensidad 0.00 en runtime)
+        // Luz 1: Contact AO y sombras base (Intensidad 0.00 en runtime)
         "492cfe2c-9334-4a9c-a48a-be80132af9fb": {
           "id": "492cfe2c-9334-4a9c-a48a-be80132af9fb",
           "position": [0, 1, 0],
@@ -362,7 +362,7 @@
           "order": 0.6785011504707911
         },
 
-        // Luz direccional 2: Luz física vinculada al Probe (Especular directo y sombra secundaria)
+        // Luz 2: Luz física vinculada al Probe (Especular + Sombra direccional con radio 1)
         "f642cfe2-9334-4a9c-a48a-be80132af9fc": {
           "id": "f642cfe2-9334-4a9c-a48a-be80132af9fc",
           "position": [0, 1.8, 0], // Inicia cenital a < 2m del origen
@@ -375,13 +375,32 @@
           "light": {
             "type": "directional",
             "shadowBias": 0.0001,
-            "shadowRadius": 2, // Sombra más definida (radio 2). Bajar a 1 en pruebas si se desea más nítida
+            "shadowRadius": 1, // Sombra nítida (radio 1 - cambiado para v3.03)
             "shadowIntensity": 0.5, // 50% de intensidad relativa respecto a la sombra del Ground
             "followCamera": false,
-            "shadowCamera": [-2, 2, 2, -2, 0.1, 4] // Frustum optimizado para distancias <= 1.8m
+            "shadowCamera": [-2, 2, 2, -2, 0.1, 4] // Frustum optimizado para distancias <= 1.7m
           },
           "name": "Directional Light 2",
           "order": 0.679
+        },
+
+        // Luz 3: Relleno lateral derecho (Volumen 3D sin sombra añadida para v3.03)
+        "a753cfe2-9334-4a9c-a48a-be80132af9fd": {
+          "id": "a753cfe2-9334-4a9c-a48a-be80132af9fd",
+          "position": [1.5, 1.0, 0.2], // Lateral derecho fijo < 1.8m
+          "rotation": [0, 0, 0, 1],
+          "scale": [1, 1, 1],
+          "geometry": null,
+          "material": null,
+          "parentId": "84028e73-ee70-412d-b8d4-c09bf07c655c",
+          "components": {},
+          "light": {
+            "type": "directional",
+            "shadowBias": 0.0001,
+            "castShadow": false // Sin sombra para optimizar 100% de rendimiento GPU
+          },
+          "name": "Directional Light 3",
+          "order": 0.680
         },
 
         // Camera de Realidad Aumentada
