@@ -1,4 +1,4 @@
-﻿// 9th Wall v3.04 Apple Probe
+﻿// 9th Wall v3.05 Apple Probe
 (() => {
   var e = {
     574() {
@@ -225,7 +225,7 @@
         const THREE_INSTANCE = window.THREE;
         if (!THREE_INSTANCE || !scene) return;
 
-        const maxPoints = 100; // Reducido a 100 puntos por optimización
+        const maxPoints = 100;
         const positionsArray = new Float32Array(maxPoints * 3);
         for (let j = 0; j < maxPoints * 3; j++) {
           positionsArray[j] = 999999;
@@ -235,8 +235,8 @@
         geometry.setAttribute('position', new THREE_INSTANCE.BufferAttribute(positionsArray, 3));
 
         const material = new THREE_INSTANCE.PointsMaterial({
-          color: 0xffcc00,       // Amarillo/Dorado
-          size: 0.008,           // Aumentado el tamaño de los puntos para mejor visibilidad (Antes 0.002)
+          color: 0xffcc00,
+          size: 0.008,
           sizeAttenuation: true,
           opacity: 1.0,
           depthWrite: true,
@@ -283,11 +283,11 @@
 
         const medirRendimiento = () => {
           const now = performance.now();
-          const deltaFrame = now - lastTime; // Latencia total de ciclo (Frame Time)
+          const deltaFrame = now - lastTime;
           lastTime = now;
 
           frameTimes.push(deltaFrame);
-          if (frameTimes.length > 30) { // Promedio móvil de 30 frames para evitar parpadeos
+          if (frameTimes.length > 30) {
             frameTimes.shift();
           }
 
@@ -295,13 +295,12 @@
           const latencySpan = document.getElementById("latencySpan");
 
           if (latencySpan) {
-            // Umbrales realistas basados en FPS objetivo para WebAR móvil
             if (promedio > 66.7) {
-              latencySpan.style.color = "#ff3333"; // Alerta visual (Rojo si hay lag severo < 15 FPS)
+              latencySpan.style.color = "#ff3333";
             } else if (promedio > 33.3) {
-              latencySpan.style.color = "#ffcc00"; // Advertencia/Aceptable (Amarillo 15-30 FPS)
+              latencySpan.style.color = "#ffcc00";
             } else {
-              latencySpan.style.color = "#00ff00"; // Excelente rendimiento (Verde > 30 FPS)
+              latencySpan.style.color = "#00ff00";
             }
 
             latencySpan.innerHTML = `Latencia: ${promedio.toFixed(1)} ms`;
@@ -353,10 +352,10 @@
           "components": {},
           "light": {
             "type": "directional",
-            "shadowBias": 0.0001, // Previene artefactos de sombras a baja resolución (shadow acne)
+            "shadowBias": 0.0001,
             "shadowRadius": 3,
             "followCamera": false,
-            "shadowCamera": [-10, 10, 10, -10, 3, 5] // Versión anterior: 0.3, 0.3, 0.3, 0.3, 0.4, 1
+            "shadowCamera": [-10, 10, 10, -10, 3, 5]
           },
           "name": "Directional Light",
           "order": 0.6785011504707911
@@ -452,7 +451,7 @@
           "id": "bc7753ae-2b39-4f48-910a-7921b756487b",
           "position": [0, 0.001, 0],
           "rotation": [-0.7071068, 0, 0, 0.7071068],
-          "scale": [5, 5, 5], // Antes: 2, 2, 2
+          "scale": [5, 5, 5],
           "geometry": { "type": "plane", "width": 1, "height": 1 },
           "material": { "type": "shadow", "color": "#000000", "opacity": 0.6 },
           "parentId": "84028e73-ee70-412d-b8d4-c09bf07c655c",
