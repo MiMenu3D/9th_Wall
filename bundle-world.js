@@ -1,4 +1,4 @@
-﻿// 9th Wall v3.09 Apple Probe
+﻿// 9th Wall v3.10 Apple Probe
 (() => {
   var e = {
     574() {
@@ -353,7 +353,7 @@
           "light": {
             "type": "directional",
             "shadowBias": 0.0001,
-            "shadowRadius": 3,
+            "shadowRadius": 1.5,
             "followCamera": false,
             "shadowCamera": [-10, 10, 10, -10, 3, 5]
           },
@@ -364,7 +364,7 @@
         // Camera de Realidad Aumentada
         "52ba8a86-a459-4df8-b954-a570e85e0484": {
           "id": "52ba8a86-a459-4df8-b954-a570e85e0484",
-          "position": [0, 0.23, 0.23],
+          "position": [0, 0.23, 0.10],
           "rotation": [-0.0004637899966810532, 0.9978406073902779, -0.06529682289718859, -0.007087458033270938],
           "scale": [1.0000000000000002, 1, 1.0000000000000004],
           "geometry": null,
