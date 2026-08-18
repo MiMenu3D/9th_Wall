@@ -1,4 +1,4 @@
-<!-- 9th Wall v3.06x Apple Probe -->
+<!-- 9th Wall v3.05 Apple Probe -->
 <html>
 <head>
   <meta charset="UTF-8">
@@ -18,8 +18,8 @@
     style="position:fixed;top:10px;right:10px;z-index:1000000;background:rgba(0,0,0,0.9);color:#0f0;font-family:monospace;font-size:12px;padding:8px;border-radius:4px;cursor:pointer;line-height:1.2;border:1px solid #0f0;">
     <div id="debugTitle">FPS: --</div>
     <div id="debugContent">
-      ar-world: v3.06x<br>
-      bundle: v3.06<br>
+      ar-world: v3.05<br>
+      bundle: v3.05<br>
       <span id="latencySpan" style="color:#0f0;">Latencia: -- ms</span>
     </div>
   </div>
@@ -40,41 +40,37 @@
 
   <script>
     // =====================================================================================
-    // === CONTROL DE ILUMINACIÓN (Consola Central de Calibración v3.06) ===
+    // === CONTROL DE ILUMINACIÓN (Consola Central de Calibración v3.05) ===
     // =====================================================================================
     const LIGHTING_CONFIG = {
-      // --- INTENSIDADES Y MULTIPLICADORES (CERO UMBRAL MÍNIMO) ---
+      // --- INTENSIDADES Y MULTIPLICADORES ---
       light1_intensity: 0.00,        // Luz 1 (ECS Ground / Contact AO): 0.00 para sombra pura sin doble iluminación
-      light2_maxIntensity: 8.50,     // Luz 2 (Clave / Especular): Intensidad máxima en fuentes directas potentes (x5 volumen)
-      light2_minIntensity: 0.00,     // Luz 2: Cero estricto en oscuridad absoluta (sin umbral mínimo)
-      light3_ratio: 0.60,            // Luz 3 (Relleno lateral): 60% respecto a Luz 2 por defecto
+      light2_maxIntensity: 1.30,     // Luz 2 (Clave / Especular): Intensidad máxima en entornos de alta luminosidad
+      light2_minIntensity: 0.35,     // Luz 2: Intensidad mínima en penumbra / salas oscuras
+      light3_ratio: 0.75,            // Luz 3 (Relleno lateral): Porcentaje estricto respecto a la Luz 2 (75%)
       
       // --- SOMBRAS DINÁMICAS ---
       light1_castShadow: true,       // Sombra de contacto base en el suelo (Ground)
-      light2_castShadow: false,      // Sombra secundaria de Luz 2 (Desactivada en v3.06 para rendimiento)
+      light2_castShadow: false,      // Sombra secundaria de Luz 2 (Desactivada en v3.05 para rendimiento)
       light3_castShadow: false,      // Sombra de Luz 3 (Falsa: luz de relleno puro sin coste GPU)
       
-      // --- POSICIONAMIENTO 3D Y ANCLAJE ESPACIAL (SLAM) ---
+      // --- POSICIONAMIENTO 3D Y DESPROYECCIÓN (RAY UNPROJECTION) ---
       light2_distance: 2.8,          // Distancia en metros a lo largo del rayo real desproyectado de la cámara
-      light3_default_pos: [1.3, 0.20, 0.0], // Posición inicial derecha de Luz 3 [X, Y rasante 20cm, Z]
-      min_separation_angle: 0.55,    // Separación angular mínima (~32º) para considerar un nuevo foco distinto
-      transition_duration_ms: 1000,  // Duración de la transición suave al reubicar luces (1000 ms)
+      light3_position: [1.3, 0.40, 0.4], // Posición fija lateral derecha de Luz 3 [X, Y rasante, Z]
       
-      // --- AMBIENTE, TONE MAPPING Y CROMINANCIA CONTROLADA ---
-      exposure_base: 0.10,           // Exposición en oscuridad total (cero estricto)
-      exposure_mult: 0.85,           // Multiplicador de exposición ambiental
-      chroma_tint_strength: 0.50,    // Margen cromático (35% color real detectado, 65% blanco para no teñir comida)
+      // --- AMBIENTE Y TONE MAPPING ---
+      exposure_base: 0.25,           // Exposición mínima del Tone Mapping (ACES Filmic)
+      exposure_mult: 0.75,           // Factor multiplicador de exposición basado en brillo ambiental
       
       // --- LIGHT PROBE EN CANVAS (HDR SCREEN BLOB) ---
-      probe_radius: 30,             // Radio del foco aditivo en canvas (v3.06 = 100 para reflejo amplio tipo Apple)
+      probe_radius: 100,             // Radio del foco aditivo en canvas (v3.05 = 100 para reflejo amplio tipo Apple)
       
-      // --- LIGHT ESTIMATION: RESOLUCIÓN Y ESCANEO COMPLETO (100%) ---
+      // --- LIGHT ESTIMATION: RESOLUCIÓN Y TIEMPOS ---
       pmrem_resolution: 128,         // Tamaño del canvas PMREM (128x128 píxeles)
       pmrem_interval_ms: 150,        // Frecuencia de actualización de la textura PMREM (cada 150 ms)
-      scan_interval_ms: 250,         // Frecuencia de escaneo a pantalla completa (cada 250 ms)
-      scan_height_ratio: 1.00,       // Porcentaje vertical analizado (100% = mesa y entorno completo)
-      scan_pixel_step: 16,           // Paso de muestreo en bytes (16 bytes = cada 4 píxeles para alta resolución)
-      obvious_lum_threshold: 215     // Umbral de luminancia (0-255) para considerar una fuente directa "obvia"
+      scan_interval_ms: 900,         // Frecuencia de escaneo del tercio superior (cada 900 ms)
+      scan_height_ratio: 0.35,       // Porcentaje vertical superior analizado (35% = solo lámparas/techo)
+      scan_pixel_step: 16            // Paso de muestreo en bytes (16 bytes = cada 4 píxeles para alta resolución)
     };
     // =====================================================================================
 
@@ -105,34 +101,10 @@
     let _scene = null, _renderer = null, _activeCamera = null;
 
     // Referencias a las luces físicas de Three.js nativo (liberadas del cerrojo de ECS)
-    let dynamicLight2 = null; // Luz 2: Clave + Especular dinámico desproyectado / 1.er foco anclado
-    let dynamicLight3 = null; // Luz 3: Relleno lateral derecho (60%) / 2.º foco anclado
-    let dynamicLight4 = null; // Luz 4: Durmiente en reserva para 3.er foco obvio
-    let dynamicLight5 = null; // Luz 5: Durmiente en reserva para 4.º foco obvio
-
-    // Colores objetivo con desaturación para protección cromática
-    let targetLight2Color = null;
-    let targetLight3Color = null;
-    let neutralWhite = null;
-
-    // Estado del sistema de memoria y anclaje espacial de luces (v3.06)
-    let isLight2Anchored = false;
-    let isLight3Anchored = false;
-    let isLight4Anchored = false;
-    let isLight5Anchored = false;
-
-    const anchoredLight2Dir = { x: 0, y: 1, z: 0 };
-    const anchoredLight3Dir = { x: 0, y: 0, z: 0 };
-
-    // Estado de la transición cinemática de la Luz 3
-    const light3Transition = {
-      active: false,
-      startTime: 0,
-      duration: LIGHTING_CONFIG.transition_duration_ms,
-      startPos: null,
-      targetPos: null,
-      targetIntensity: 0
-    };
+    let dynamicLight2 = null; // Luz 2: Clave + Especular dinámico desproyectado
+    let dynamicLight3 = null; // Luz 3: Relleno lateral derecho (75% potencia de Luz 2)
+    let targetLight2Color = null; // Color muestreado del foco principal
+    let targetLight3Color = null; // Color muestreado del ambiente superior
 
     document.getElementById('envToggle').addEventListener('click', (e) => {
       toggleEnv();
@@ -173,13 +145,9 @@
                 // === ACTIVACIÓN SEGURA DEL TONE MAPPING ===
                 _renderer.toneMapping = nativeTHREE.ACESFilmicToneMapping;
 
-                // Inicializamos colores objetivo y blanco neutro
+                // Inicializamos los colores objetivo para interpolación cromática suave
                 targetLight2Color = new nativeTHREE.Color(0xffffff);
                 targetLight3Color = new nativeTHREE.Color(0xffffff);
-                neutralWhite = new nativeTHREE.Color(0xffffff);
-
-                light3Transition.startPos = new nativeTHREE.Vector3();
-                light3Transition.targetPos = new nativeTHREE.Vector3();
 
                 // === FORZAR RESOLUCIÓN Y FRUSTUM DE SOMBRA BASE (Luz 1 en Ground) ===
                 _scene.traverse((node) => {
@@ -205,40 +173,28 @@
                 });
 
                 // === CREACIÓN NATIVA DIRECTA EN THREE.JS (Evita el bloqueo de posición de ECS) ===
-                // 1. Instanciamos Luz 2 (Clave / 1.er foco anclado)
-                dynamicLight2 = new nativeTHREE.DirectionalLight(0xffffff, 0.0);
+                // 1. Instanciamos Luz 2 (Desproyectada en 3D, sombra configurable en LIGHTING_CONFIG)
+                dynamicLight2 = new nativeTHREE.DirectionalLight(0xffffff, LIGHTING_CONFIG.light2_minIntensity);
                 dynamicLight2.position.set(0, 1.8, 0);
                 dynamicLight2.castShadow = LIGHTING_CONFIG.light2_castShadow;
                 if (!LIGHTING_CONFIG.light2_castShadow && dynamicLight2.shadow && dynamicLight2.shadow.map) {
                   dynamicLight2.shadow.map.dispose();
                   dynamicLight2.shadow.map = null;
                 }
+                
                 _scene.add(dynamicLight2);
                 _scene.add(dynamicLight2.target);
 
-                // 2. Instanciamos Luz 3 (Relleno lateral rasante a la derecha por defecto)
-                dynamicLight3 = new nativeTHREE.DirectionalLight(0xffffff, 0.0);
+                // 2. Instanciamos Luz 3 (Relleno lateral rasante a la derecha, sin sombra)
+                dynamicLight3 = new nativeTHREE.DirectionalLight(0xffffff, LIGHTING_CONFIG.light2_minIntensity * LIGHTING_CONFIG.light3_ratio);
                 dynamicLight3.position.set(
-                  LIGHTING_CONFIG.light3_default_pos[0],
-                  LIGHTING_CONFIG.light3_default_pos[1],
-                  LIGHTING_CONFIG.light3_default_pos[2]
+                  LIGHTING_CONFIG.light3_position[0],
+                  LIGHTING_CONFIG.light3_position[1],
+                  LIGHTING_CONFIG.light3_position[2]
                 );
                 dynamicLight3.castShadow = LIGHTING_CONFIG.light3_castShadow;
                 _scene.add(dynamicLight3);
                 _scene.add(dynamicLight3.target);
-
-                // 3. Instanciamos Luces 4 y 5 (Durmientes en reserva)
-                dynamicLight4 = new nativeTHREE.DirectionalLight(0xffffff, 0.0);
-                dynamicLight4.position.set(0, 2, 0);
-                dynamicLight4.castShadow = false;
-                _scene.add(dynamicLight4);
-                _scene.add(dynamicLight4.target);
-
-                dynamicLight5 = new nativeTHREE.DirectionalLight(0xffffff, 0.0);
-                dynamicLight5.position.set(0, 2, 0);
-                dynamicLight5.castShadow = false;
-                _scene.add(dynamicLight5);
-                _scene.add(dynamicLight5.target);
 
                 // Descargamos y registramos RGBELoader directamente en el THREE nativo
                 loadNativeRGBELoader(nativeTHREE).then((LoaderClass) => {
@@ -339,7 +295,7 @@
                }, lightEstimationInterval);
             ===================================================================================== */
 
-            // === CONFIGURACIÓN DEL PMREM Y CONTROL DINÁMICO 3D (v3.06) ===
+            // === CONFIGURACIÓN DEL PMREM Y CONTROL DINÁMICO 3D (v3.05) ===
             const pmremSize = LIGHTING_CONFIG.pmrem_resolution;
             const pmremInterval = LIGHTING_CONFIG.pmrem_interval_ms;
             const pmremCanvas = document.createElement('canvas');
@@ -349,35 +305,25 @@
             const envTexture = new THREE_INSTANCE.CanvasTexture(pmremCanvas);
             envTexture.mapping = THREE_INSTANCE.EquirectangularReflectionMapping;
 
-            let smoothedBrightness = 0; // Inicia en 0 (sin umbrales mínimos)
-            let smoothedLightX = pmremSize * 0.5;
-            let smoothedLightY = pmremSize * 0.3;
+            let smoothedBrightness = 120; // Valor suavizado para la exposición automática
+            let smoothedLightX = pmremSize * 0.5; // Posición X suavizada del foco en el techo
+            let smoothedLightY = pmremSize * 0.15; // Posición Y suavizada del foco en el techo
             let targetLightX = pmremSize * 0.5;
-            let targetLightY = pmremSize * 0.3;
+            let targetLightY = pmremSize * 0.15;
             
             let lastScanTime = 0;
             const scanInterval = LIGHTING_CONFIG.scan_interval_ms;
 
-            // Objetivos de intensidad en tiempo real (interpolados suavemente a 60 FPS)
-            let targetIntensity2 = 0.0;
-            let targetIntensity3 = 0.0;
-            let targetExposure = 0.0;
-
-            const targetLight3DPos2 = new THREE_INSTANCE.Vector3(0, 1.8, 0);
-            const targetLight3DPos3 = new THREE_INSTANCE.Vector3(
-              LIGHTING_CONFIG.light3_default_pos[0],
-              LIGHTING_CONFIG.light3_default_pos[1],
-              LIGHTING_CONFIG.light3_default_pos[2]
-            );
+            // Control de arranque cinematográfico de 1 segundo
+            let startupStartTime = performance.now();
+            const startupDuration = 1000;
+            const initialLightPos = new THREE_INSTANCE.Vector3(0, 1.8, 0);
+            const targetLight3DPos = new THREE_INSTANCE.Vector3(0, 1.8, 0);
 
             // Vectores auxiliares para desproyección espacial 3D
             const probeNDC = new THREE_INSTANCE.Vector3();
             const camWorldPos = new THREE_INSTANCE.Vector3();
             const rayDir = new THREE_INSTANCE.Vector3();
-
-            // Colores temporales con protección de saturación cromática
-            const rawColorBlob = new THREE_INSTANCE.Color();
-            const rawColorAmbient = new THREE_INSTANCE.Color();
 
             setInterval(() => {
               try {
@@ -389,7 +335,7 @@
                 pmremCtx.globalCompositeOperation = 'source-over';
                 pmremCtx.drawImage(video, 0, 0, pmremSize, pmremSize);
 
-                // 2. ESCANEO DEL 100% DE LA PANTALLA (v3.06)
+                // 2. ESCANEO DEL TERCIO SUPERIOR CON CENTRO DE MASAS PONDERADO (v3.05)
                 if (now - lastScanTime > scanInterval) {
                   lastScanTime = now;
                   
@@ -401,7 +347,7 @@
                   let maxLum = 0;
                   let count = 0;
 
-                  // Muestreo a pantalla completa con paso de 4 píxeles
+                  // Paso 1: Muestreo a paso de 4 píxeles para detectar con precisión el foco más brillante
                   for (let idx = 0; idx < data.length; idx += LIGHTING_CONFIG.scan_pixel_step) {
                     const r = data[idx];
                     const g = data[idx + 1];
@@ -418,13 +364,13 @@
                     }
                   }
 
-                  const avgR = count > 0 ? sumR / count : 0;
-                  const avgG = count > 0 ? sumG / count : 0;
-                  const avgB = count > 0 ? sumB / count : 0;
+                  const avgR = sumR / count;
+                  const avgG = sumG / count;
+                  const avgB = sumB / count;
                   const avgLum = (avgR * 0.299 + avgG * 0.587 + avgB * 0.114);
 
-                  // Detección de centro de masas del foco principal
-                  const lumThreshold = Math.max(70, maxLum * 0.80);
+                  // Paso 2: Centro de masas ponderado del foco principal
+                  const lumThreshold = Math.max(70, maxLum * 0.75);
                   let weightedSumX = 0;
                   let weightedSumY = 0;
                   let blobWeight = 0;
@@ -455,121 +401,36 @@
                     targetLightX = weightedSumX / blobWeight;
                     targetLightY = Math.max(2, Math.min(scanHeight, weightedSumY / blobWeight));
 
-                    // Tono cromático con margen de seguridad (evita teñir la comida en exceso)
-                    if (targetLight2Color && neutralWhite) {
-                      rawColorBlob.setRGB((blobR / blobWeight) / 255, (blobG / blobWeight) / 255, (blobB / blobWeight) / 255);
-                      targetLight2Color.copy(neutralWhite).lerp(rawColorBlob, LIGHTING_CONFIG.chroma_tint_strength);
+                    // Extracción del color dominante del foco (Luz 2)
+                    if (targetLight2Color) {
+                      targetLight2Color.setRGB(
+                        (blobR / blobWeight) / 255,
+                        (blobG / blobWeight) / 255,
+                        (blobB / blobWeight) / 255
+                      );
                     }
                   } else {
                     targetLightX = pmremSize * 0.5;
-                    targetLightY = scanHeight * 0.3;
+                    targetLightY = scanHeight * 0.5;
                     if (targetLight2Color) targetLight2Color.setRGB(1, 1, 1);
                   }
 
-                  // Tono ambiental protegido
-                  if (targetLight3Color && neutralWhite) {
-                    rawColorAmbient.setRGB(avgR / 255, avgG / 255, avgB / 255);
-                    targetLight3Color.copy(neutralWhite).lerp(rawColorAmbient, LIGHTING_CONFIG.chroma_tint_strength);
+                  // Extracción del color ambiental general del entorno (Luz 3)
+                  if (targetLight3Color) {
+                    targetLight3Color.setRGB(avgR / 255, avgG / 255, avgB / 255);
                   }
 
-                  // Estimación de brillo sin suelo artificial (0 a 1 estricto)
-                  smoothedBrightness += (avgLum - smoothedBrightness) * 0.15;
+                  // Suavizado del brillo ambiental y ajuste de exposición
+                  smoothedBrightness += (avgLum - smoothedBrightness) * 0.10;
                   const normalizedBrightness = Math.max(0.0, Math.min(1.0, smoothedBrightness / 255));
-                  const isObviousLight = maxLum >= LIGHTING_CONFIG.obvious_lum_threshold;
-
-                  // --- DESPROYECCIÓN ESPACIAL 3D Y ANCLAJE SLAM (v3.06) ---
-                  if (_activeCamera) {
-                    const ndcX = (targetLightX / pmremSize) * 2 - 1;
-                    const ndcY = 1 - (targetLightY / pmremSize) * 2;
-
-                    _activeCamera.getWorldPosition(camWorldPos);
-                    probeNDC.set(ndcX, ndcY, 0.5);
-                    probeNDC.unproject(_activeCamera);
-                    rayDir.subVectors(probeNDC, camWorldPos).normalize();
-
-                    // Comprobación y anclaje de Luz 2 (Primer foco)
-                    if (!isLight2Anchored) {
-                      targetLight3DPos2.copy(camWorldPos).addScaledVector(rayDir, LIGHTING_CONFIG.light2_distance);
-                      if (dynamicLight2) dynamicLight2.position.copy(targetLight3DPos2);
-
-                      if (isObviousLight) {
-                        isLight2Anchored = true;
-                        anchoredLight2Dir.x = rayDir.x;
-                        anchoredLight2Dir.y = rayDir.y;
-                        anchoredLight2Dir.z = rayDir.z;
-                      }
-                    } else if (isObviousLight) {
-                      // Comprobación de separación angular con Luz 2 para anclar Luz 3 (Segundo foco)
-                      const dot2 = rayDir.x * anchoredLight2Dir.x + rayDir.y * anchoredLight2Dir.y + rayDir.z * anchoredLight2Dir.z;
-                      const angleWith2 = Math.acos(Math.max(-1, Math.min(1, dot2)));
-
-                      if (angleWith2 >= LIGHTING_CONFIG.min_separation_angle) {
-                        if (!isLight3Anchored && !light3Transition.active) {
-                          // Iniciamos la transición suave de reubicación de Luz 3 (1.000 ms)
-                          light3Transition.active = true;
-                          light3Transition.startTime = now;
-                          if (dynamicLight3) light3Transition.startPos.copy(dynamicLight3.position);
-                          light3Transition.targetPos.copy(camWorldPos).addScaledVector(rayDir, LIGHTING_CONFIG.light2_distance);
-                          
-                          isLight3Anchored = true;
-                          anchoredLight3Dir.x = rayDir.x;
-                          anchoredLight3Dir.y = rayDir.y;
-                          anchoredLight3Dir.z = rayDir.z;
-                        }
-                      }
-                    }
-                  }
-
-                  // Cálculo de intensidades directas proporcionales
-                  targetIntensity2 = normalizedBrightness * LIGHTING_CONFIG.light2_maxIntensity;
-                  targetIntensity3 = targetIntensity2 * LIGHTING_CONFIG.light3_ratio;
-
-                  // Conservación de energía inversa: si la luz directa es fuerte, el ambiente baja
-                  const directRatio = Math.min(1.0, targetIntensity2 / LIGHTING_CONFIG.light2_maxIntensity);
-                  const inverseExposureFactor = 1.0 - (directRatio * 0.40);
-                  targetExposure = (LIGHTING_CONFIG.exposure_base + (normalizedBrightness * LIGHTING_CONFIG.exposure_mult)) * inverseExposureFactor;
+                  renderer.toneMappingExposure = LIGHTING_CONFIG.exposure_base + (normalizedBrightness * LIGHTING_CONFIG.exposure_mult);
                 }
 
-                // 3. INTERPOLACIÓN CINEMÁTICA Y APLICACIÓN A 60 FPS (Anti-flickering)
-                if (dynamicLight2) {
-                  dynamicLight2.intensity += (targetIntensity2 - dynamicLight2.intensity) * 0.10;
-                  if (targetLight2Color) dynamicLight2.color.lerp(targetLight2Color, 0.05);
-                  dynamicLight2.target.position.set(0, 0, 0);
-                }
+                // 3. LERP CINEMATOGRÁFICO DE POSICIÓN 2D DEL PROBE
+                smoothedLightX += (targetLightX - smoothedLightX) * 0.04;
+                smoothedLightY += (targetLightY - smoothedLightY) * 0.04;
 
-                if (dynamicLight3) {
-                  if (targetLight3Color) dynamicLight3.color.lerp(targetLight3Color, 0.05);
-                  dynamicLight3.target.position.set(0, 0, 0);
-
-                  // Manejo de la transición suave de 1.000 ms para reubicar Luz 3
-                  if (light3Transition.active) {
-                    const elapsed = now - light3Transition.startTime;
-                    const progress = Math.min(1.0, elapsed / light3Transition.duration);
-
-                    // Curva de intensidad: cae al 25% y vuelve a subir
-                    const dipIntensity = targetIntensity3 * 0.25;
-                    const currentTransIntensity = progress < 0.5 
-                      ? targetIntensity3 - (targetIntensity3 - dipIntensity) * (progress * 2)
-                      : dipIntensity + (targetIntensity3 - dipIntensity) * ((progress - 0.5) * 2);
-
-                    dynamicLight3.intensity = currentTransIntensity;
-                    dynamicLight3.position.lerpVectors(light3Transition.startPos, light3Transition.targetPos, progress);
-
-                    if (progress >= 1.0) {
-                      light3Transition.active = false;
-                    }
-                  } else {
-                    dynamicLight3.intensity += (targetIntensity3 - dynamicLight3.intensity) * 0.10;
-                  }
-                }
-
-                // Exposición suave en tiempo real
-                renderer.toneMappingExposure += (targetExposure - renderer.toneMappingExposure) * 0.10;
-
-                // 4. SUPERPOSICIÓN ADITIVA DEL FOCO EN EL CANVAS PMREM
-                smoothedLightX += (targetLightX - smoothedLightX) * 0.05;
-                smoothedLightY += (targetLightY - smoothedLightY) * 0.05;
-
+                // 4. SUPERPOSICIÓN ADITIVA DEL FOCO EN EL CANVAS (Radio 100 configurado)
                 pmremCtx.globalCompositeOperation = 'screen';
 
                 const lightRadius = LIGHTING_CONFIG.probe_radius;
@@ -590,7 +451,65 @@
 
                 pmremCtx.globalCompositeOperation = 'source-over';
 
-                // 5. ACTUALIZACIÓN DE TEXTURA Y GENERACIÓN PMREM
+                // 5. ENLACE DINÁMICO Y DESPROYECCIÓN 3D DE LAS LUCES NATIVAS (v3.05)
+                const elapsedStartup = now - startupStartTime;
+                const startupProgress = Math.min(1.0, elapsedStartup / startupDuration);
+                const normalizedBrightness = Math.max(0.0, Math.min(1.0, smoothedBrightness / 255));
+
+                // Intensidad dinámica de Luz 2 gobernada por la estimación de luz
+                const dynamicIntensity2 = LIGHTING_CONFIG.light2_minIntensity + 
+                  (normalizedBrightness * (LIGHTING_CONFIG.light2_maxIntensity - LIGHTING_CONFIG.light2_minIntensity));
+
+                // --- CONTROL DE LUZ 2 (Clave + Especular) ---
+                if (dynamicLight2) {
+                  // Intensidad proporcional vinculada al brillo de la cámara
+                  dynamicLight2.intensity = dynamicIntensity2 * startupProgress;
+
+                  // Tono cromático en tiempo real
+                  if (targetLight2Color) {
+                    dynamicLight2.color.lerp(targetLight2Color, 0.05);
+                  }
+
+                  // DESPROYECCIÓN 3D EXACTA DESDE LA CÁMARA (Ray Unprojection):
+                  // Convertimos la coordenada 2D del probe en coordenadas normalizadas de pantalla (NDC)
+                  const ndcX = (smoothedLightX / pmremSize) * 2 - 1; // -1 (Izquierda) a +1 (Derecha)
+                  const ndcY = 1 - (smoothedLightY / (pmremSize * LIGHTING_CONFIG.scan_height_ratio)) * 0.8; // Parte superior del frustum
+
+                  if (_activeCamera) {
+                    _activeCamera.getWorldPosition(camWorldPos);
+                    
+                    probeNDC.set(ndcX, ndcY, 0.5);
+                    probeNDC.unproject(_activeCamera); // Punto 3D en el espacio del mundo proyectado por la cámara
+
+                    rayDir.subVectors(probeNDC, camWorldPos).normalize();
+
+                    // La luz física se posiciona a lo largo del rayo visual exacto
+                    targetLight3DPos.copy(camWorldPos).addScaledVector(rayDir, LIGHTING_CONFIG.light2_distance);
+                  } else {
+                    targetLight3DPos.set(ndcX * 1.6, 1.4, 0.6);
+                  }
+
+                  dynamicLight2.position.lerpVectors(initialLightPos, targetLight3DPos, startupProgress);
+                  dynamicLight2.target.position.set(0, 0, 0);
+                }
+
+                // --- CONTROL DE LUZ 3 (Relleno lateral rasante al 75% de la Luz 2) ---
+                if (dynamicLight3) {
+                  dynamicLight3.intensity = (dynamicLight2 ? dynamicLight2.intensity : dynamicIntensity2) * LIGHTING_CONFIG.light3_ratio;
+
+                  if (targetLight3Color) {
+                    dynamicLight3.color.lerp(targetLight3Color, 0.05);
+                  }
+
+                  dynamicLight3.position.set(
+                    LIGHTING_CONFIG.light3_position[0],
+                    LIGHTING_CONFIG.light3_position[1],
+                    LIGHTING_CONFIG.light3_position[2]
+                  );
+                  dynamicLight3.target.position.set(0, 0, 0);
+                }
+
+                // 6. ACTUALIZACIÓN DE TEXTURA Y GENERACIÓN PMREM
                 envTexture.needsUpdate = true;
                 const oldRT = cameraRT;
                 cameraRT = pmremGenerator.fromEquirectangular(envTexture);
