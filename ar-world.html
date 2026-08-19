@@ -1,4 +1,4 @@
-<!-- 9th Wall v3.10 Apple Probe -->
+<!-- 9th Wall v3.10y Apple Probe -->
 <html>
 <head>
   <meta charset="UTF-8">
@@ -18,8 +18,8 @@
     style="position:fixed;top:10px;right:10px;z-index:1000000;background:rgba(0,0,0,0.9);color:#0f0;font-family:monospace;font-size:12px;padding:8px;border-radius:4px;cursor:pointer;line-height:1.2;border:1px solid #0f0;">
     <div id="debugTitle">FPS: --</div>
     <div id="debugContent">
-      ar-world: v3.10<br>
-      bundle: v3.10<br>
+      ar-world: v3.10y<br>
+      bundle: v3.10y<br>
       <span id="latencySpan" style="color:#0f0;">Latencia: -- ms</span>
     </div>
   </div>
@@ -86,9 +86,9 @@
       reaction_speed: 0.35,          // Factor de respuesta rápida anti-retardo (~0,4s de adaptación)
       
       // --- LIGHT ESTIMATION: RESOLUCIÓN Y ESCANEO COMPLETO (100%) ---
-      pmrem_resolution: 128,         // Tamaño del canvas PMREM (128x128 píxeles)
-      pmrem_interval_ms: 150,        // Frecuencia de actualización de la textura PMREM (cada 150 ms)
-      scan_interval_ms: 250,         // Frecuencia de escaneo a pantalla completa (cada 250 ms)
+      pmrem_resolution: 64,         // Tamaño del canvas PMREM (128x128 píxeles)
+      pmrem_interval_ms: 200,        // Frecuencia de actualización de la textura PMREM (cada 150 ms)
+      scan_interval_ms: 200,         // Frecuencia de escaneo a pantalla completa (cada 250 ms)
       scan_height_ratio: 1.00,       // Porcentaje vertical analizado (100% = mesa y entorno completo)
       scan_pixel_step: 16            // Paso de muestreo en bytes (16 bytes = cada 4 píxeles)
     };
@@ -207,8 +207,8 @@
                 _scene.traverse((node) => {
                   if (node.isDirectionalLight) {
                     if (node.shadow) {
-                      node.shadow.mapSize.width = 256; // <-- Modificar a mano aquí para pruebas (p.ej. 512, 256) -- Antes 128
-                      node.shadow.mapSize.height = 256; // <-- Modificar a mano aquí para pruebas (p.ej. 512, 256) -- Antes 128
+                      node.shadow.mapSize.width = 512; // <-- Modificar a mano aquí para pruebas (p.ej. 512, 256) -- Antes 128
+                      node.shadow.mapSize.height = 512; // <-- Modificar a mano aquí para pruebas (p.ej. 512, 256) -- Antes 128
                       if (node.shadow.camera) {
                         node.shadow.camera.left = -0.30; // Antes -0.35
                         node.shadow.camera.right = 0.30; // Antes 0.35
