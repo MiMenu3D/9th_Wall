@@ -1,4 +1,4 @@
-<!-- 9th Wall v3.10 Apple Probe -->
+<!-- 9th Wall v3.10x Apple Probe -->
 <html>
 <head>
   <meta charset="UTF-8">
@@ -18,8 +18,8 @@
     style="position:fixed;top:10px;right:10px;z-index:1000000;background:rgba(0,0,0,0.9);color:#0f0;font-family:monospace;font-size:12px;padding:8px;border-radius:4px;cursor:pointer;line-height:1.2;border:1px solid #0f0;">
     <div id="debugTitle">FPS: --</div>
     <div id="debugContent">
-      ar-world: v3.10<br>
-      bundle: v3.10<br>
+      ar-world: v3.10x<br>
+      bundle: v3.10x<br>
       <span id="latencySpan" style="color:#0f0;">Latencia: -- ms</span>
     </div>
   </div>
@@ -55,8 +55,8 @@
       
       // --- SOMBRAS DINÁMICAS ---
       light1_castShadow: true,       // Sombra de contacto base en el suelo (Ground)
-      light2_castShadow: false,      // Sombra secundaria de Luz 2 (Desactivada para rendimiento)
-      light3_castShadow: false,      // Sombra de Luz 3 (Falsa: luz de relleno puro sin coste GPU)
+      light2_castShadow: true,      // Sombra secundaria de Luz 2 (Desactivada para rendimiento)
+      light3_castShadow: true,      // Sombra de Luz 3 (Falsa: luz de relleno puro sin coste GPU)
       light4_castShadow: false,      // Sombra de Luz 4 (Falsa: luz de relleno puro sin coste GPU)
       
       // --- RESTRICCIONES ESPACIALES Y 3 FOCOS FIJOS (v3.10) ---
@@ -207,13 +207,13 @@
                 _scene.traverse((node) => {
                   if (node.isDirectionalLight) {
                     if (node.shadow) {
-                      node.shadow.mapSize.width = 256; // <-- Modificar a mano aquí para pruebas (p.ej. 512, 256) -- Antes 128
-                      node.shadow.mapSize.height = 256; // <-- Modificar a mano aquí para pruebas (p.ej. 512, 256) -- Antes 128
+                      node.shadow.mapSize.width = 1024; // <-- Modificar a mano aquí para pruebas (p.ej. 512, 256) -- Antes 128
+                      node.shadow.mapSize.height = 1024; // <-- Modificar a mano aquí para pruebas (p.ej. 512, 256) -- Antes 128
                       if (node.shadow.camera) {
-                        node.shadow.camera.left = -0.30; // Antes -0.35
-                        node.shadow.camera.right = 0.30; // Antes 0.35
-                        node.shadow.camera.top = 0.30; // Antes 0.35
-                        node.shadow.camera.bottom = -0.30; // Antes -0.35
+                        node.shadow.camera.left = -0.40; // Antes -0.30
+                        node.shadow.camera.right = 0.40; // Antes 0.30
+                        node.shadow.camera.top = 0.40; // Antes 0.30
+                        node.shadow.camera.bottom = -0.40; // Antes -0.30
                         node.shadow.camera.near = 0.1; // Antes 0.1
                         node.shadow.camera.far = 10; // Rango amplio de sombra base
                         node.shadow.camera.updateProjectionMatrix();
