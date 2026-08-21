@@ -1,4 +1,4 @@
-<!-- 9th Wall v3.15 Apple Probe -->
+<!-- 9th Wall v3.16 Apple Probe -->
 <html>
 <head>
   <meta charset="UTF-8">
@@ -18,8 +18,9 @@
     style="position:fixed;top:10px;right:10px;z-index:1000000;background:rgba(0,0,0,0.9);color:#0f0;font-family:monospace;font-size:12px;padding:8px;border-radius:4px;cursor:pointer;line-height:1.2;border:1px solid #0f0;">
     <div id="debugTitle">FPS: --</div>
     <div id="debugContent">
-      ar-world: v3.15<br>
+      ar-world: v3.16<br>
       bundle: v3.10y<br>
+      <span id="lightsCountSpan" style="color:#0f0;">Luces: 1</span><br>
       <span id="latencySpan" style="color:#0f0;">Latencia: -- ms</span>
     </div>
   </div>
@@ -40,19 +41,19 @@
 
   <script>
     // =====================================================================================
-    // === CONTROL DE ILUMINACIÓN (Consola Central de Calibración v3.15) ===
+    // === CONTROL DE ILUMINACIÓN (Consola Central de Calibración v3.16) ===
     // =====================================================================================
     const LIGHTING_CONFIG = {
-      // --- INTENSIDADES BASE Y PARIDAD DE FOCOS (v3.15) ---
+      // --- INTENSIDADES BASE Y PARIDAD DE FOCOS (v3.16) ---
       light1_intensity: 0.10,        // Luz 1 (ECS Ground / AO): 0.10 contacto cenital suave
-      light_maxIntensity: 1.35,      // Techo máximo contenido para todas las luces directas (evita quemar 3D)
-      light2_initialRatio: 0.50,     // Intensidad inicial suave de Luz 2 a 45º (50% de 1.35 = ~0.67)
+      light_maxIntensity: 2.60,      // Techo máximo rotundo para luces directas (volumen y especular)
+      light2_initialRatio: 0.65,     // Potencia inicial de Luz 2 a 45º (65% de 2.60 = ~1.69 para modelado inmediato)
       
       // --- SOBREIMPULSO POR FUENTES DIRECTAS POTENTES (> 235) ---
       boost_lum_threshold: 235,      // Umbral de luminancia para activar sobreimpulso (235-255)
-      boost_multiplier: 1.25,        // Multiplicador contenido para bombillas reales
+      boost_multiplier: 1.25,        // Multiplicador contenido para lámparas reales
       
-      // --- SOMBRAS DINÁMICAS SUAVES (v3.15) ---
+      // --- SOMBRAS DINÁMICAS SUAVES (v3.16) ---
       light1_castShadow: true,       // Sombra base de contacto en el suelo (Ground)
       shadow_radius_direct: 2.2,     // Radio de sombra suave con foco directo
       shadow_radius_ambient: 4.0,    // Radio de difusión para AO ambiental
@@ -62,7 +63,7 @@
       light3_castShadow: false,
       light4_castShadow: false,
       
-      // --- RESTRICCIONES ESPACIALES Y CARRUSEL TÁNDEM (v3.15) ---
+      // --- RESTRICCIONES ESPACIALES Y CARRUSEL TÁNDEM (v3.16) ---
       light2_distance: 2.2,          // Distancia de proyección espacial
       min_light_height: 0.25,        // Altura mínima obligatoria sobre el plano de la mesa (25 cm)
       max_light_radius: 2.0,         // Radio espacial máximo respecto al centro [0,0,0] (2 metros)
@@ -73,7 +74,7 @@
       decay_duration_ms: 4000,       // Caída suave y amortiguada al salir de cuadro (4000 ms)
       out_of_frame_retention: 0.60,  // Retención física del 60% en el mundo AR al girar la cámara
       
-      // --- DETECCIÓN INTELIGENTE ANTI-FALSOS POSITIVOS (v3.15) ---
+      // --- DETECCIÓN INTELIGENTE ANTI-FALSOS POSITIVOS (v3.16) ---
       emitter_clipping_threshold: 245,// Detección de emisor real (clipping del sensor en canales RGB)
       obvious_lum_threshold: 215,    // Umbral estricto para evitar confundir paredes o folios blancos
       contrast_delta_threshold: 115, // Diferencia foco vs fondo para confirmar luz real
@@ -81,13 +82,16 @@
       upper_half_limit: 0.45,        // Límite vertical: solo se buscan emisores en el 45% superior
       large_area_threshold: 0.06,    // Filtro de área grande (ventanas/paneles difusos)
       
-      // --- AMBIENTE, TONE MAPPING Y CONSERVACIÓN DE ENERGÍA ---
+      // --- SUELO DE RUGOSIDAD DINÁMICO (PROTECCIÓN ANTI-TITILEO EN DIELÉCTRICOS) ---
+      min_material_roughness: 0.20,  // Suelo de rugosidad en 0.20 para evitar parpadeo estrellado en tomates/vajilla
+      metalness_bypass_threshold: 0.50, // Bypass: metales puros (> 0.5) se mantienen como espejos nítidos
+      
+      // --- AMBIENTE, TONE MAPPING Y ESTRATEGIA SERVILLETA (P90) ---
       exposure_base: 0.00,           // Exposición en oscuridad total
-      exposure_mult: 1.45,           // Multiplicador ambiental PMREM (PMREM aporta ~75% de la luz difusa)
-      pmrem_energy_damping: 0.35,    // Factor de amortiguación inversa (evita sobreexposición con múltiples luces)
+      exposure_mult: 2.00,           // Multiplicador ambiental PMREM base
       reaction_speed: 0.35,          // Factor de respuesta fluida para PMREM y exposición
-      p90_weight: 0.60,              // Peso de la estrategia servilleta (P90)
-      avg_weight: 0.40,              // Peso del promedio global
+      p90_weight: 0.70,              // Peso del Percentil P90 (Solución Servilleta al 100% de la pantalla)
+      avg_weight: 0.30,              // Peso del promedio global
       
       // --- LIGHT ESTIMATION: RESOLUCIÓN Y ESCANEO ---
       pmrem_resolution: 64,          // Tamaño del canvas PMREM (64x64 píxeles)
@@ -123,7 +127,7 @@
     let envInterval = null;
     let _scene = null, _renderer = null, _activeCamera = null, _groundMesh = null, _baseLight1 = null;
 
-    // Estructuras de control para el Carrusel Tándem LRU (v3.15)
+    // Estructuras de control para el Carrusel Tándem LRU (v3.16)
     const crearRanuraLuz = () => ({
       light: null,
       isAnchored: false,
@@ -150,6 +154,14 @@
     let hasDetectedDirectLight = false;
     let light2InitialPlaced = false;
     let lastFrameTime = performance.now();
+    let totalLightsDetected = 1; // Inicia en 1 por la Luz 2 inicial
+
+    const actualizarContadorLuces = () => {
+      const lightsSpan = document.getElementById('lightsCountSpan');
+      if (lightsSpan) {
+        lightsSpan.innerText = `Luces: ${totalLightsDetected}`;
+      }
+    };
 
     document.getElementById('envToggle').addEventListener('click', (e) => {
       toggleEnv();
@@ -342,7 +354,7 @@
                }, lightEstimationInterval);
             ===================================================================================== */
 
-            // === CONFIGURACIÓN DEL PMREM Y CARRUSEL TÁNDEM (v3.15) ===
+            // === CONFIGURACIÓN DEL PMREM Y CARRUSEL TÁNDEM (v3.16) ===
             const pmremSize = LIGHTING_CONFIG.pmrem_resolution;
             const pmremInterval = LIGHTING_CONFIG.pmrem_interval_ms;
             const pmremCanvas = document.createElement('canvas');
@@ -397,6 +409,23 @@
               slot.transition.destDir.copy(newDir);
             };
 
+            // Suelo de rugosidad a 0.20 para evitar el parpadeo en tomates y vajillas brillantes
+            const aplicarSueloRugosidad = () => {
+              if (!_scene) return;
+              _scene.traverse((child) => {
+                if (child.isMesh && child.material) {
+                  const mats = Array.isArray(child.material) ? child.material : [child.material];
+                  mats.forEach((mat) => {
+                    const isMetal = mat.metalness !== undefined && mat.metalness > LIGHTING_CONFIG.metalness_bypass_threshold;
+                    if (!isMetal && mat.roughness !== undefined && mat.roughness < LIGHTING_CONFIG.min_material_roughness) {
+                      mat.roughness = LIGHTING_CONFIG.min_material_roughness;
+                      mat.needsUpdate = true;
+                    }
+                  });
+                }
+              });
+            };
+
             const lumaBins = new Int32Array(16);
 
             setInterval(() => {
@@ -429,14 +458,15 @@
                     slotLight2.state = 'active';
                     slotLight2.lastAnchorTime = now;
                     light2InitialPlaced = true;
+                    actualizarContadorLuces();
                   }
                 }
 
-                // 2. ESCANEO AMBIENTAL Y ANÁLISIS DE FOCOS (v3.15)
+                // 2. ESCANEO AMBIENTAL Y ANÁLISIS DE FOCOS (v3.16)
                 if (now - lastScanTime > scanInterval) {
                   lastScanTime = now;
                   
-                  const scanHeight = Math.floor(pmremSize * LIGHTING_CONFIG.upper_half_limit);
+                  const scanEmitterHeight = Math.floor(pmremSize * LIGHTING_CONFIG.upper_half_limit);
                   const imgData = pmremCtx.getImageData(0, 0, pmremSize, pmremSize);
                   const data = imgData.data;
 
@@ -448,6 +478,7 @@
 
                   lumaBins.fill(0);
 
+                  // Escaneo del 100% de la pantalla para la Estrategia Servilleta (P90)
                   for (let idx = 0; idx < data.length; idx += LIGHTING_CONFIG.scan_pixel_step) {
                     const r = data[idx];
                     const g = data[idx + 1];
@@ -463,6 +494,7 @@
                     sumB += b;
                     count++;
 
+                    // Histograma de 16 bins para P90
                     const binIdx = Math.min(15, Math.floor((lum / 256) * 16));
                     lumaBins[binIdx]++;
 
@@ -471,7 +503,7 @@
                     }
 
                     // Detección estricta de emisor real por saturación en los 3 canales RGB en mitad superior
-                    if (py < scanHeight && 
+                    if (py < scanEmitterHeight && 
                         r >= LIGHTING_CONFIG.emitter_clipping_threshold && 
                         g >= LIGHTING_CONFIG.emitter_clipping_threshold && 
                         b >= LIGHTING_CONFIG.emitter_clipping_threshold) {
@@ -486,7 +518,7 @@
                   const avgB = count > 0 ? sumB / count : 0;
                   const avgLum = (avgR * 0.299 + avgG * 0.587 + avgB * 0.114);
 
-                  // Extracción P90 (Estrategia Servilleta)
+                  // Extracción P90 al 100% de la pantalla (Estrategia Servilleta)
                   let p90Lum = avgLum;
                   let accumulated = 0;
                   const p90Target = count * 0.90;
@@ -516,7 +548,7 @@
                     const pixelIdx = idx / 4;
                     const py = Math.floor(pixelIdx / pmremSize);
 
-                    if (py < scanHeight && lum >= lumThreshold) {
+                    if (py < scanEmitterHeight && lum >= lumThreshold) {
                       const px = pixelIdx % pmremSize;
                       const weight = lum - lumThreshold + 1;
 
@@ -532,10 +564,10 @@
                     targetLightY = clippingSumY / clippingCount;
                   } else if (blobWeight > 0) {
                     targetLightX = weightedSumX / blobWeight;
-                    targetLightY = Math.max(2, Math.min(scanHeight, weightedSumY / blobWeight));
+                    targetLightY = Math.max(2, Math.min(scanEmitterHeight, weightedSumY / blobWeight));
                   } else {
                     targetLightX = pmremSize * 0.5;
-                    targetLightY = scanHeight * 0.5;
+                    targetLightY = scanEmitterHeight * 0.5;
                   }
 
                   // Filtros estrictos anti-falsos positivos
@@ -564,14 +596,14 @@
                     boostFactor = 1.0 + boostRatio * (LIGHTING_CONFIG.boost_multiplier - 1.0);
                   }
 
-                  // Paridad total de intensidades: todas comparten el mismo techo contenido
+                  // Paridad total de intensidades: techo rotundo en 2.60
                   const baseDirectIntensity = normalizedBrightness * LIGHTING_CONFIG.light_maxIntensity * boostFactor * areaDiffuseFactor;
                   
                   slotLight2.targetIntensity = isObviousLight ? baseDirectIntensity : (baseDirectIntensity * LIGHTING_CONFIG.light2_initialRatio);
                   slotLight3.targetIntensity = baseDirectIntensity;
                   slotLight4.targetIntensity = baseDirectIntensity;
 
-                  // --- DESPROYECCIÓN ESPACIAL Y CARRUSEL TÁNDEM LRU (v3.15) ---
+                  // --- DESPROYECCIÓN ESPACIAL Y CARRUSEL TÁNDEM LRU (v3.16) ---
                   if (_activeCamera && isObviousLight) {
                     const ndcX = (targetLightX / pmremSize) * 2 - 1;
                     const ndcY = 1 - (targetLightY / pmremSize) * 2;
@@ -583,7 +615,7 @@
 
                     aplicarRestriccionesMesa(candidatePos, camWorldPos, rayDir, LIGHTING_CONFIG.light2_distance);
 
-                    // Comprobamos si el foco coincide con algún cono ya anclado (>30º de separación)
+                    // Comprobamos separación angular (>30º) respecto a todas las luces ancladas
                     let isInsideExistingCone = false;
                     carruselSlots.forEach(slot => {
                       if (slot.isAnchored && rayDir.angleTo(slot.anchoredDir) < LIGHTING_CONFIG.min_separation_angle) {
@@ -591,14 +623,18 @@
                       }
                     });
 
-                    // Si es una fuente nueva a >30º: asignamos ranuras secuencialmente
+                    // Si es una fuente nueva a >30º: asignamos ranuras y sumamos al contador acumulativo
                     if (!isInsideExistingCone) {
                       if (!slotLight3.isAnchored && slotLight3.state === 'idle') {
                         iniciarFadeInSlot(slotLight3, candidatePos, baseDirectIntensity, rayDir, now);
+                        totalLightsDetected++;
+                        actualizarContadorLuces();
                       } else if (!slotLight4.isAnchored && slotLight4.state === 'idle') {
                         iniciarFadeInSlot(slotLight4, candidatePos, baseDirectIntensity, rayDir, now);
+                        totalLightsDetected++;
+                        actualizarContadorLuces();
                       } else {
-                        // Las 3 ranuras están ocupadas: reciclamos la LRU más antigua
+                        // Las 3 ranuras están ocupadas: reciclamos la ranura LRU más antigua
                         let lruSlot = null;
                         let oldestTime = Infinity;
                         carruselSlots.forEach(slot => {
@@ -610,19 +646,28 @@
 
                         if (lruSlot) {
                           iniciarFadeOutLRU(lruSlot, candidatePos, baseDirectIntensity, rayDir, now);
+                          totalLightsDetected++;
+                          actualizarContadorLuces();
                         }
                       }
                     }
                   }
 
-                  // --- CONSERVACIÓN DE ENERGÍA Y CONTROL DEL PMREM ---
-                  const totalDirectEnergy = (slotLight2.light ? slotLight2.light.intensity : 0) +
-                                            (slotLight3.light ? slotLight3.light.intensity : 0) +
-                                            (slotLight4.light ? slotLight4.light.intensity : 0);
-                  const maxDirectBudget = LIGHTING_CONFIG.light_maxIntensity * 3.0;
-                  const energyDamping = 1.0 - (totalDirectEnergy / maxDirectBudget) * LIGHTING_CONFIG.pmrem_energy_damping;
+                  // --- BALANCE ESCALONADO PMREM vs LUCES (60% -> 55% -> 50%) ---
+                  let activeLightsCount = 0;
+                  carruselSlots.forEach(s => {
+                    if (s.state === 'active' || s.state === 'fading_in') activeLightsCount++;
+                  });
+                  activeLightsCount = Math.max(1, activeLightsCount);
 
-                  targetExposure = normalizedBrightness * LIGHTING_CONFIG.exposure_mult * Math.max(0.65, energyDamping);
+                  let pmremScale = 0.60;
+                  if (activeLightsCount === 2) {
+                    pmremScale = 0.55;
+                  } else if (activeLightsCount >= 3) {
+                    pmremScale = 0.50;
+                  }
+
+                  targetExposure = normalizedBrightness * LIGHTING_CONFIG.exposure_mult * pmremScale;
 
                   // --- SOMBRAS INTERACTIVAS SUAVES ---
                   if (_baseLight1 && _baseLight1.shadow) {
@@ -687,6 +732,9 @@
 
                 // Exposición adaptativa templada
                 renderer.toneMappingExposure += (targetExposure - renderer.toneMappingExposure) * LIGHTING_CONFIG.reaction_speed;
+
+                // Suelo de rugosidad dinámico para proteger los tomates cherry
+                aplicarSueloRugosidad();
 
                 // 4. ACTUALIZACIÓN PMREM (Reflejo de cámara puro sin deformaciones)
                 envTexture.needsUpdate = true;
