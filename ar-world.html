@@ -1,4 +1,4 @@
-<!-- 9th Wall v3.17 Apple Probe -->
+<!-- 9th Wall v3.18 Apple Probe -->
 <html>
 <head>
   <meta charset="UTF-8">
@@ -18,7 +18,7 @@
     style="position:fixed;top:10px;right:10px;z-index:1000000;background:rgba(0,0,0,0.9);color:#0f0;font-family:monospace;font-size:12px;padding:8px;border-radius:4px;cursor:pointer;line-height:1.2;border:1px solid #0f0;">
     <div id="debugTitle">FPS: --</div>
     <div id="debugContent">
-      ar-world: v3.17<br>
+      ar-world: v3.18<br>
       bundle: v3.10y<br>
       <span id="lightsCountSpan" style="color:#0f0;">Luces: 1</span><br>
       <span id="latencySpan" style="color:#0f0;">Latencia: -- ms</span>
@@ -41,19 +41,19 @@
 
   <script>
     // =====================================================================================
-    // === CONTROL DE ILUMINACIÓN (Consola Central de Calibración v3.17) ===
+    // === CONTROL DE ILUMINACIÓN (Consola Central de Calibración v3.18) ===
     // =====================================================================================
     const LIGHTING_CONFIG = {
-      // --- INTENSIDADES BASE (+10% / +20% v3.17) ---
-      light1_intensity: 0.10,        // Luz 1 (ECS Ground / AO): 0.10 contacto cenital suave
-      light_maxIntensity: 2.85,      // Techo máximo rotundo (+10% sobre v3.16)
-      light2_initialRatio: 0.72,     // Potencia inicial de Luz 2 a 45º (+20% base = ~2.05 para modelado inmediato)
+      // --- INTENSIDADES BASE (+10% / +20% v3.18) ---
+      light1_intensity: 0.25,        // Luz 1 (ECS Ground / AO): 0.25 para especulares cenitales
+      light_maxIntensity: 2.85,      // Techo máximo rotundo para luces directas
+      light2_initialRatio: 0.72,     // Potencia inicial de Luz 2 a 45º (~2.05 para modelado inmediato)
       
       // --- SOBREIMPULSO POR FUENTES DIRECTAS POTENTES (> 235) ---
       boost_lum_threshold: 235,      // Umbral de luminancia para activar sobreimpulso (235-255)
       boost_multiplier: 1.25,        // Multiplicador contenido para lámparas reales
       
-      // --- SOMBRAS DINÁMICAS FIJAS (v3.17) ---
+      // --- SOMBRAS DINÁMICAS FIJAS (v3.18) ---
       light1_castShadow: true,       // Sombra base de contacto en el suelo (Ground)
       shadow_radius_fixed: 4.0,      // Radio de sombra suave difusa ambiental fija
       ground_opacity_fixed: 0.45,    // Opacidad fija del suelo (contacto sólido constante)
@@ -61,7 +61,7 @@
       light3_castShadow: false,
       light4_castShadow: false,
       
-      // --- RESTRICCIONES ESPACIALES Y TIEMPOS (v3.17) ---
+      // --- RESTRICCIONES ESPACIALES Y TIEMPOS (v3.18) ---
       light2_distance: 2.2,          // Distancia de proyección espacial
       min_light_height: 0.25,        // Altura mínima obligatoria sobre el plano de la mesa (25 cm)
       max_light_radius: 2.0,         // Radio espacial máximo respecto al centro [0,0,0] (2 metros)
@@ -71,17 +71,18 @@
       wake_duration_ms: 800,         // Encendido rápido y reactivo al detectar foco (800 ms)
       decay_duration_ms: 4000,       // Caída suave y amortiguada al salir de cuadro (4000 ms)
       fade_out_duration_ms: 2500,    // Apagado progresivo de Luz 2 al activarse Luz 4 (2500 ms)
-      out_of_frame_retention: 0.66,  // Retención física del 66% (+10%) en el mundo AR al girar la cámara
+      out_of_frame_retention: 0.66,  // Retención física del 66% en el mundo AR al girar la cámara
       
-      // --- DETECCIÓN ULTRA-ESTRICTA ANTI-FALSOS POSITIVOS (v3.17) ---
-      emitter_clipping_threshold: 248,// Saturación casi absoluta del sensor en canales RGB
-      min_core_pixels: 4,            // Mínimo de 4 píxeles contiguos saturados (evita ruido de sensor)
-      max_core_area_ratio: 0.025,    // Máximo 2.5% de área (descarta pantallas de TV grandes y cielo diurno)
-      iso_drop_threshold: 40,        // Caída brusca de brillo medio temporal (ΔavgLum >= 40)
-      dark_background_threshold: 75, // O fondo general oscurecido (avgLum <= 75) por la adaptación de la cámara
-      halo_drop_threshold: 70,       // Caída radial en cruz: los bordes inmediatos deben caer >70 unidades
+      // --- DETECCIÓN INTELIGENTE ROBUSTA (v3.18: Compatible con luces cálidas y frías) ---
+      emitter_lum_threshold: 232,    // Luminancia de núcleo saturado (compatible con lámparas cálidas)
+      min_core_pixels: 2,            // Mínimo de 2 píxeles contiguos de núcleo
+      max_core_area_ratio: 0.045,    // Máximo 4.5% de área (descarta pantallas de TV grandes y cielo diurno)
+      contrast_delta_threshold: 85,  // Diferencia mínima foco vs fondo de la sala
+      temporal_drop_threshold: 15,   // Caída de brillo que delata reacción ISO
+      halo_radius_px: 8,             // Radio de muestreo de halo adaptado a 128x128
+      halo_drop_threshold: 40,       // Caída radial necesaria a radio R=8 para confirmar punto emisor
       upper_half_limit: 0.45,        // Límite vertical: solo se buscan emisores en el 45% superior
-      debounce_cycles: 2,            // Persistencia obligatoria: 2 ciclos consecutivos (~800 ms) para anclar
+      debounce_cycles: 1,            // 1 ciclo para respuesta instantánea una vez confirmado el halo
       
       // --- SUELO DE RUGOSIDAD DINÁMICO (PROTECCIÓN ANTI-TITILEO EN DIELÉCTRICOS) ---
       min_material_roughness: 0.20,  // Suelo de rugosidad en 0.20 para evitar parpadeo estrellado en tomates/vajilla
@@ -367,7 +368,7 @@
                }, lightEstimationInterval);
             ===================================================================================== */
 
-            // === CONFIGURACIÓN DEL PMREM (v3.17: 128x128 a 400 ms) ===
+            // === CONFIGURACIÓN DEL PMREM (v3.18: 128x128 a 400 ms) ===
             const pmremSize = LIGHTING_CONFIG.pmrem_resolution;
             const pmremInterval = LIGHTING_CONFIG.pmrem_interval_ms;
             const pmremCanvas = document.createElement('canvas');
@@ -409,6 +410,7 @@
               slot.transition.destPos.copy(destPos);
               slot.transition.destDir.copy(newDir);
               slot.anchoredDir.copy(newDir);
+              slot.anchoredIntensity = destIntensity;
               if (slot.light) slot.light.position.copy(destPos);
             };
 
@@ -449,7 +451,7 @@
                 // 1. DIBUJAMOS EL VÍDEO REAL LIMPIO
                 pmremCtx.drawImage(video, 0, 0, pmremSize, pmremSize);
 
-                // 2. ESCANEO AMBIENTAL Y ANÁLISIS DE FOCOS (v3.17: 400 ms)
+                // 2. ESCANEO AMBIENTAL Y ANÁLISIS DE FOCOS (v3.18: 400 ms)
                 if (now - lastScanTime > scanInterval) {
                   lastScanTime = now;
                   
@@ -461,8 +463,8 @@
                   let maxLum = 0;
                   let maxLumX = pmremSize * 0.5, maxLumY = pmremSize * 0.3;
                   let count = 0;
-                  let clippingCount = 0;
-                  let clippingSumX = 0, clippingSumY = 0;
+                  let corePixelCount = 0;
+                  let coreSumX = 0, coreSumY = 0;
 
                   // Cuantización de color en 8 bins para gradiente dominante de mesa
                   const colorBins = new Int32Array(8);
@@ -497,14 +499,11 @@
                       maxLumY = py;
                     }
 
-                    // Detección estricta de emisor real (clipping RGB en mitad superior)
-                    if (py < scanEmitterHeight && 
-                        r >= LIGHTING_CONFIG.emitter_clipping_threshold && 
-                        g >= LIGHTING_CONFIG.emitter_clipping_threshold && 
-                        b >= LIGHTING_CONFIG.emitter_clipping_threshold) {
-                      clippingCount++;
-                      clippingSumX += px;
-                      clippingSumY += py;
+                    // Detección de núcleo saturado por luminancia (compatible con cálidos y fríos)
+                    if (py < scanEmitterHeight && lum >= LIGHTING_CONFIG.emitter_lum_threshold) {
+                      corePixelCount++;
+                      coreSumX += px;
+                      coreSumY += py;
                     }
 
                     // Clasificación cromática en 8 bins para gradiente de superficie
@@ -534,14 +533,14 @@
 
                   const effectiveIlluminance = (avgLum * LIGHTING_CONFIG.avg_weight) + (p90Lum * LIGHTING_CONFIG.p90_weight);
 
-                  // --- ANÁLISIS DE HALO RADIAL EN CRUZ Y CAÍDA DE ISO ---
+                  // --- ANÁLISIS DE HALO RADIAL CALIBRADO A R=8 PÍXELES ---
                   const temporalDrop = previousAvgLum - avgLum;
                   previousAvgLum = avgLum;
 
-                  const candidateX = clippingCount > 0 ? (clippingSumX / clippingCount) : maxLumX;
-                  const candidateY = clippingCount > 0 ? (clippingSumY / clippingCount) : maxLumY;
+                  const candidateX = corePixelCount > 0 ? (coreSumX / corePixelCount) : maxLumX;
+                  const candidateY = corePixelCount > 0 ? (coreSumY / corePixelCount) : maxLumY;
 
-                  // Función auxiliar para leer luminancia en coordenadas de canvas
+                  // Función auxiliar para leer luminancia
                   const getPixelLum = (px, py) => {
                     const cx = Math.max(0, Math.min(pmremSize - 1, Math.floor(px)));
                     const cy = Math.max(0, Math.min(pmremSize - 1, Math.floor(py)));
@@ -549,8 +548,8 @@
                     return data[pIdx] * 0.299 + data[pIdx + 1] * 0.587 + data[pIdx + 2] * 0.114;
                   };
 
-                  // Comprobación de gradiente radial en cruz (radio R = 4 píxeles)
-                  const R = 4;
+                  // Comprobación de halo a radio R=8
+                  const R = LIGHTING_CONFIG.halo_radius_px;
                   const coreLum = getPixelLum(candidateX, candidateY);
                   const dropRight = coreLum - getPixelLum(candidateX + R, candidateY);
                   const dropLeft = coreLum - getPixelLum(candidateX - R, candidateY);
@@ -563,63 +562,14 @@
                   if (dropDown >= LIGHTING_CONFIG.halo_drop_threshold) steepDrops++;
                   if (dropUp >= LIGHTING_CONFIG.halo_drop_threshold) steepDrops++;
 
-                  const hasRadialHalo = (steepDrops >= 3); // Cae bruscamente en al menos 3 direcciones
+                  const hasRadialHalo = (steepDrops >= 2); // Cae en al menos 2 direcciones
                   const maxAreaLimit = count * LIGHTING_CONFIG.max_core_area_ratio;
-                  const hasCompactCore = (clippingCount >= LIGHTING_CONFIG.min_core_pixels) && (clippingCount <= maxAreaLimit);
-                  const hasIsoCollapse = (temporalDrop >= LIGHTING_CONFIG.iso_drop_threshold) || (avgLum <= LIGHTING_CONFIG.dark_background_threshold);
+                  const hasCompactCore = (corePixelCount >= LIGHTING_CONFIG.min_core_pixels) && (corePixelCount <= maxAreaLimit);
+                  const contrastDelta = coreLum - avgLum;
+                  const hasSufficientContrast = (contrastDelta >= LIGHTING_CONFIG.contrast_delta_threshold) || (temporalDrop >= LIGHTING_CONFIG.temporal_drop_threshold);
 
-                  // Luz real confirmada únicamente si cumple TODAS las condiciones simultáneas
-                  const isConfirmedRealLight = (candidateY < scanEmitterHeight) && hasCompactCore && hasRadialHalo && hasIsoCollapse;
-
-                  // --- POSICIONAMIENTO INICIAL INTELIGENTE DE LUZ 2 (Frame 1) ---
-                  if (!light2InitialPlaced && _activeCamera) {
-                    let initTargetX = pmremSize * 0.5;
-                    let initTargetY = pmremSize * 0.4;
-
-                    // 1. Si hay luz real visible en el arranque, orientar hacia ella
-                    if (isConfirmedRealLight) {
-                      initTargetX = candidateX;
-                      initTargetY = candidateY;
-                    } else {
-                      // 2. Si no, buscar el gradiente dominante en la superficie de la mesa
-                      let dominantBin = 0, maxBinCount = 0;
-                      for (let c = 0; c < 8; c++) {
-                        if (colorBins[c] > maxBinCount) {
-                          maxBinCount = colorBins[c];
-                          dominantBin = c;
-                        }
-                      }
-                      if (maxBinCount > (count * 0.30) && colorBinWeight[dominantBin] > 0) {
-                        initTargetX = colorBinLumSumX[dominantBin] / colorBinWeight[dominantBin];
-                        initTargetY = colorBinLumSumY[dominantBin] / colorBinWeight[dominantBin];
-                      }
-                    }
-
-                    const ndcX = (initTargetX / pmremSize) * 2 - 1;
-                    const ndcY = 1 - (initTargetY / pmremSize) * 2;
-
-                    _activeCamera.getWorldPosition(camWorldPos);
-                    probeNDC.set(ndcX, ndcY, 0.5);
-                    probeNDC.unproject(_activeCamera);
-                    rayDir.subVectors(probeNDC, camWorldPos).normalize();
-
-                    // Forzar acimut del gradiente con elevación a 45º fija
-                    const elevAngle = Math.PI / 4.0;
-                    const r = LIGHTING_CONFIG.light2_distance;
-                    const initY = Math.max(LIGHTING_CONFIG.min_light_height, Math.sin(elevAngle) * r);
-                    const initXZ = Math.cos(elevAngle) * r;
-                    const azimLen = Math.hypot(rayDir.x, rayDir.z) || 1.0;
-
-                    if (slotLight2.light) {
-                      slotLight2.light.position.set((rayDir.x / azimLen) * initXZ, initY, (rayDir.z / azimLen) * initXZ);
-                      slotLight2.anchoredDir.copy(slotLight2.light.position).normalize();
-                      slotLight2.isAnchored = true;
-                      slotLight2.state = 'active';
-                      slotLight2.lastAnchorTime = now;
-                      light2InitialPlaced = true;
-                      actualizarContadorLuces();
-                    }
-                  }
+                  // Confirmación de luz real equilibrada
+                  const isConfirmedRealLight = (candidateY < scanEmitterHeight) && hasCompactCore && hasRadialHalo && hasSufficientContrast;
 
                   // Luminancia y sobreimpulso
                   smoothedBrightness += (effectiveIlluminance - smoothedBrightness) * LIGHTING_CONFIG.reaction_speed;
@@ -636,6 +586,56 @@
                   slotLight3.targetIntensity = baseDirectIntensity;
                   slotLight4.targetIntensity = baseDirectIntensity;
 
+                  // --- POSICIONAMIENTO INICIAL INTELIGENTE DE LUZ 2 (Frame 1 con potencia viva) ---
+                  if (!light2InitialPlaced && _activeCamera) {
+                    let initTargetX = pmremSize * 0.5;
+                    let initTargetY = pmremSize * 0.4;
+
+                    if (isConfirmedRealLight) {
+                      initTargetX = candidateX;
+                      initTargetY = candidateY;
+                    } else {
+                      let dominantBin = 0, maxBinCount = 0;
+                      for (let c = 0; c < 8; c++) {
+                        if (colorBins[c] > maxBinCount) {
+                          maxBinCount = colorBins[c];
+                          dominantBin = c;
+                        }
+                      }
+                      if (maxBinCount > (count * 0.25) && colorBinWeight[dominantBin] > 0) {
+                        initTargetX = colorBinLumSumX[dominantBin] / colorBinWeight[dominantBin];
+                        initTargetY = colorBinLumSumY[dominantBin] / colorBinWeight[dominantBin];
+                      }
+                    }
+
+                    const ndcX = (initTargetX / pmremSize) * 2 - 1;
+                    const ndcY = 1 - (initTargetY / pmremSize) * 2;
+
+                    _activeCamera.getWorldPosition(camWorldPos);
+                    probeNDC.set(ndcX, ndcY, 0.5);
+                    probeNDC.unproject(_activeCamera);
+                    rayDir.subVectors(probeNDC, camWorldPos).normalize();
+
+                    const elevAngle = Math.PI / 4.0;
+                    const r = LIGHTING_CONFIG.light2_distance;
+                    const initY = Math.max(LIGHTING_CONFIG.min_light_height, Math.sin(elevAngle) * r);
+                    const initXZ = Math.cos(elevAngle) * r;
+                    const azimLen = Math.hypot(rayDir.x, rayDir.z) || 1.0;
+
+                    if (slotLight2.light) {
+                      slotLight2.light.position.set((rayDir.x / azimLen) * initXZ, initY, (rayDir.z / azimLen) * initXZ);
+                      slotLight2.anchoredDir.copy(slotLight2.light.position).normalize();
+                      slotLight2.isAnchored = true;
+                      slotLight2.state = 'active';
+                      slotLight2.anchoredIntensity = slotLight2.targetIntensity; // Inicialización con potencia real
+                      slotLight2.lastAnchorTime = now;
+                      light2InitialPlaced = true;
+                      actualizarContadorLuces();
+                    }
+                  } else if (slotLight2.state === 'active' && totalRealLightsAnchored === 0) {
+                    slotLight2.anchoredIntensity = slotLight2.targetIntensity;
+                  }
+
                   // --- MÁQUINA DE ESTADOS ESTRICTA "MÁXIMO 2 LUCES ACTIVAS" ---
                   if (!detectionPermanentlyStopped && _activeCamera && isConfirmedRealLight) {
                     const ndcX = (candidateX / pmremSize) * 2 - 1;
@@ -648,7 +648,6 @@
 
                     aplicarRestriccionesMesa(candidatePos, camWorldPos, rayDir, LIGHTING_CONFIG.light2_distance);
 
-                    // Comprobación inviolable de separación de 30º respecto a ranuras ya ancladas
                     let isInsideExistingCone = false;
                     carruselSlots.forEach(slot => {
                       if (slot.isAnchored && slot.state !== 'fading_out_final') {
@@ -658,11 +657,10 @@
                       }
                     });
 
-                    // Filtro de persistencia temporal (Debounce de 2 ciclos = ~800 ms)
                     if (!isInsideExistingCone) {
                       if (candidateDebounce.active && 
-                          Math.abs(candidateDebounce.screenX - candidateX) < 12 && 
-                          Math.abs(candidateDebounce.screenY - candidateY) < 12) {
+                          Math.abs(candidateDebounce.screenX - candidateX) < 16 && 
+                          Math.abs(candidateDebounce.screenY - candidateY) < 16) {
                         candidateDebounce.consecutiveCycles++;
                       } else {
                         candidateDebounce.active = true;
