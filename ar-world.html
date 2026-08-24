@@ -1,4 +1,4 @@
-<!-- 9th Wall v3.36 Apple Probe -->
+<!-- 9th Wall v3.37 Apple Probe -->
 <html>
 <head>
   <meta charset="UTF-8">
@@ -18,7 +18,7 @@
     style="position:fixed;top:10px;right:10px;z-index:1000000;background:rgba(0,0,0,0.9);color:#0f0;font-family:monospace;font-size:12px;padding:8px;border-radius:4px;cursor:pointer;line-height:1.2;border:1px solid #0f0;">
     <div id="debugTitle">FPS: --</div>
     <div id="debugContent">
-      ar-world: v3.36<br>
+      ar-world: v3.37<br>
       bundle: v3.10y<br>
       <span id="lightsCountSpan" style="color:#0f0;">Luces: 3</span><br>
       <span id="latencySpan" style="color:#0f0;">Latencia: -- ms</span>
@@ -41,7 +41,7 @@
 
   <script>
     // =====================================================================================
-    // === CONTROL DE ILUMINACIÓN (Consola Central de Calibración v3.36) ===
+    // === CONTROL DE ILUMINACIÓN (Consola Central de Calibración v3.37) ===
     // =====================================================================================
     const LIGHTING_CONFIG = {
       // --- INTENSIDADES BASE ---
@@ -55,13 +55,12 @@
       boost_lum_threshold: 235,      // Umbral de luminancia para sobreimpulso
       boost_multiplier: 1.25,        // Multiplicador contenido
       
-      // --- SOMBRAS DINÁMICAS (MAPA 1024x1024 Y OPACIDAD DIFERENCIADA) ---
+      // --- SOMBRAS DINÁMICAS (MAPA 1024x1024 Y DUAL RADIUS) ---
       shadow_map_size: 1024,         // Resolución de ShadowMap fijada a 1024x1024
       light1_castShadow: true,       // Sombra base cenital de contacto en el suelo (Ground)
-      shadow_radius_fixed: 12.0,     // Radio difuso suave para Luz 1 (Ground AO) en mapa 1024
+      shadow_radius_fixed: 12.0,     // Radio difuso suave para Luz 1 (Ground AO)
       shadow_radius_light2: 2.0,     // Radio nítido para Luz 2 (definida y sutil)
-      ground_opacity_fixed: 0.50,    // Opacidad base de sombra en suelo (Luz 1 al 100%)
-      light2_shadow_weight: 0.125,   // Opacidad propia de Luz 2 (1/8 exacto de la sombra de Luz 1)
+      ground_opacity_fixed: 0.40,    // Opacidad fija equilibrada del suelo (0.40)
       light2_castShadow: true,       // Sombra direccional activa en Luz 2
       light3_castShadow: false,
       light4_castShadow: false,
@@ -178,29 +177,16 @@
                 _renderer.shadowMap.enabled = true;
                 _renderer.toneMapping = nativeTHREE.ACESFilmicToneMapping;
 
-                // Modificación quirúrgica y segura del Chunk nativo de sombras de Three.js
-                if (nativeTHREE.ShaderChunk && nativeTHREE.ShaderChunk.shadowmask_pars_fragment) {
-                  const origChunk = nativeTHREE.ShaderChunk.shadowmask_pars_fragment;
-                  if (!nativeTHREE.ShaderChunk._shadowWeightPatched) {
-                    nativeTHREE.ShaderChunk.shadowmask_pars_fragment = origChunk.replace(
-                      /shadow\s*\*=\s*(.+?);/,
-                      'float s = $1; float weight = (i == 0) ? 1.0 : ' + LIGHTING_CONFIG.light2_shadow_weight.toFixed(4) + '; shadow *= (1.0 - (1.0 - s) * weight);'
-                    );
-                    nativeTHREE.ShaderChunk._shadowWeightPatched = true;
-                  }
-                }
-
                 carruselSlots.forEach(slot => {
                   slot.anchoredDir = new nativeTHREE.Vector3(0, 1, 0);
                 });
 
-                // Captura del Ground y Luz 1 (Ajuste de ShadowCamera a 50cm, radio 12.0 y opacidad 0.50)
+                // Captura del Ground y Luz 1 (Ajuste de ShadowCamera a 50cm, radio 12.0 y opacidad equilibrada a 0.40)
                 _scene.traverse((node) => {
                   if (node.isMesh && node.material && (node.material.type === 'ShadowMaterial' || node.name === 'Ground')) {
                     _groundMesh = node;
                     if (_groundMesh.material) {
                       _groundMesh.material.opacity = LIGHTING_CONFIG.ground_opacity_fixed;
-                      _groundMesh.material.needsUpdate = true;
                     }
                   }
                   if (node.isDirectionalLight) {
