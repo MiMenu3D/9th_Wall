@@ -1,4 +1,4 @@
-<!-- 9th Wall v3.21 Apple Probe -->
+<!-- 9th Wall v3.18 Apple Probe -->
 <html>
 <head>
   <meta charset="UTF-8">
@@ -18,9 +18,9 @@
     style="position:fixed;top:10px;right:10px;z-index:1000000;background:rgba(0,0,0,0.9);color:#0f0;font-family:monospace;font-size:12px;padding:8px;border-radius:4px;cursor:pointer;line-height:1.2;border:1px solid #0f0;">
     <div id="debugTitle">FPS: --</div>
     <div id="debugContent">
-      ar-world: v3.21<br>
+      ar-world: v3.18<br>
       bundle: v3.10y<br>
-      <span id="lightsCountSpan" style="color:#0f0;">Luces: 2</span><br>
+      <span id="lightsCountSpan" style="color:#0f0;">Luces: 1</span><br>
       <span id="latencySpan" style="color:#0f0;">Latencia: -- ms</span>
     </div>
   </div>
@@ -41,64 +41,65 @@
 
   <script>
     // =====================================================================================
-    // === CONTROL DE ILUMINACIÓN (Consola Central de Calibración v3.21) ===
+    // === CONTROL DE ILUMINACIÓN (Consola Central de Calibración v3.18) ===
     // =====================================================================================
     const LIGHTING_CONFIG = {
-      // --- INTENSIDADES BASE Y MODELADO (v3.21) ---
-      light1_intensity: 0.10,        // Luz 1 (ECS Ground / Relleno cenital tenue a 0.10)
-      light_maxIntensity: 3.00,      // Techo base de potencia para luces directas
-      light2_ratio: 1.40,            // Luz 2 al doble de intensidad (potencia ~4.20)
-      light3_ratio: 1.40,            // Luz 3 (+40% de potencia: ~4.20)
-      light4_ratio: 0.70,            // Luz 4 fija opuesta (potencia ~2.10, fija desde Frame 1)
+      // --- INTENSIDADES BASE (+10% / +20% v3.18) ---
+      light1_intensity: 0.25,        // Luz 1 (ECS Ground / AO): 0.25 para especulares cenitales
+      light_maxIntensity: 2.85,      // Techo máximo rotundo para luces directas
+      light2_initialRatio: 0.72,     // Potencia inicial de Luz 2 a 45º (~2.05 para modelado inmediato)
       
       // --- SOBREIMPULSO POR FUENTES DIRECTAS POTENTES (> 235) ---
       boost_lum_threshold: 235,      // Umbral de luminancia para activar sobreimpulso (235-255)
-      boost_multiplier: 1.30,        // Multiplicador contenido para lámparas reales / sol
+      boost_multiplier: 1.25,        // Multiplicador contenido para lámparas reales
       
-      // --- SOMBRAS DINÁMICAS FIJAS (v3.21: Opacidad 0.60 y Radio 8.0) ---
+      // --- SOMBRAS DINÁMICAS FIJAS (v3.18) ---
       light1_castShadow: true,       // Sombra base de contacto en el suelo (Ground)
-      shadow_radius_fixed: 8.0,      // Radio de sombra suave difusa ambiental fija (8.0)
-      ground_opacity_fixed: 0.60,    // Opacidad fija del suelo (contacto sólido constante)
+      shadow_radius_fixed: 4.0,      // Radio de sombra suave difusa ambiental fija
+      ground_opacity_fixed: 0.45,    // Opacidad fija del suelo (contacto sólido constante)
       light2_castShadow: false,      // Desactivadas para optimizar rendimiento móvil
       light3_castShadow: false,
       light4_castShadow: false,
       
-      // --- RESTRICCIONES ESPACIALES Y TIEMPOS (v3.21) ---
+      // --- RESTRICCIONES ESPACIALES Y TIEMPOS (v3.18) ---
       light2_distance: 2.2,          // Distancia de proyección espacial
       min_light_height: 0.25,        // Altura mínima obligatoria sobre el plano de la mesa (25 cm)
       max_light_radius: 2.0,         // Radio espacial máximo respecto al centro [0,0,0] (2 metros)
+      light3_default_pos: [1.3, 0.25, 0.0],  // Posición inicial de espera Luz 3
+      light4_default_pos: [-1.3, 0.25, 0.0], // Posición inicial de espera Luz 4
       min_separation_angle: 0.52,    // Separación angular mínima (~30º) entre focos fijos
-      wake_duration_visible_ms: 3000,// Encendido suave si el modelo es visible en cámara (3000 ms)
-      decay_duration_ms: 3500,       // Caída suave y amortiguada al salir de cuadro (3500 ms)
-      hunting_timeout_ms: 5000,      // Timeout límite: 5 segundos para cazar la Luz 3 o apagarse para siempre
+      wake_duration_ms: 800,         // Encendido rápido y reactivo al detectar foco (800 ms)
+      decay_duration_ms: 4000,       // Caída suave y amortiguada al salir de cuadro (4000 ms)
+      fade_out_duration_ms: 2500,    // Apagado progresivo de Luz 2 al activarse Luz 4 (2500 ms)
       out_of_frame_retention: 0.66,  // Retención física del 66% en el mundo AR al girar la cámara
       
-      // --- DETECCIÓN INTELIGENTE PERMISIVA (Solo para Luz 3) ---
-      emitter_lum_threshold: 220,    // Umbral de núcleo permisivo para lámparas y ventanas
-      contrast_delta_threshold: 60,  // Diferencia mínima foco vs fondo de la sala
-      temporal_drop_threshold: 10,   // Caída de brillo que delata reacción ISO
-      upper_third_limit: 0.35,       // Búsqueda de focos solo en el 35% superior
-      debounce_cycles: 1,            // Respuesta inmediata en 1 ciclo
+      // --- DETECCIÓN INTELIGENTE ROBUSTA (v3.18: Compatible con luces cálidas y frías) ---
+      emitter_lum_threshold: 232,    // Luminancia de núcleo saturado (compatible con lámparas cálidas)
+      min_core_pixels: 2,            // Mínimo de 2 píxeles contiguos de núcleo
+      max_core_area_ratio: 0.045,    // Máximo 4.5% de área (descarta pantallas de TV grandes y cielo diurno)
+      contrast_delta_threshold: 85,  // Diferencia mínima foco vs fondo de la sala
+      temporal_drop_threshold: 15,   // Caída de brillo que delata reacción ISO
+      halo_radius_px: 8,             // Radio de muestreo de halo adaptado a 128x128
+      halo_drop_threshold: 40,       // Caída radial necesaria a radio R=8 para confirmar punto emisor
+      upper_half_limit: 0.45,        // Límite vertical: solo se buscan emisores en el 45% superior
+      debounce_cycles: 1,            // 1 ciclo para respuesta instantánea una vez confirmado el halo
       
-      // --- CALIBRACIÓN LOOK SCENE VIEWER (MATERIALES, PEDESTAL Y COLOR) ---
-      min_material_roughness: 0.20,     // Suelo de rugosidad en 0.20 para evitar parpadeo en dieléctricos
+      // --- SUELO DE RUGOSIDAD DINÁMICO (PROTECCIÓN ANTI-TITILEO EN DIELÉCTRICOS) ---
+      min_material_roughness: 0.20,  // Suelo de rugosidad en 0.20 para evitar parpadeo estrellado en tomates/vajilla
       metalness_bypass_threshold: 0.50, // Bypass: metales puros (> 0.5) se mantienen como espejos nítidos
-      emissive_pedestal: 0.095,         // Pedestal emisivo (+5% extra: 9.5% gris base para levantar negros)
-      albedo_desaturation: 0.13,        // Desaturación del 13% en materiales para neutralizar el tono cálido
-      light_chroma_tint_strength: 0.15, // Luces direccionales con 85% blanco neutro (evita teñir la comida)
       
-      // --- AMBIENTE, TONE MAPPING Y PMREM (v3.21: Base sólida anti-apagones) ---
-      exposure_base: 0.55,           // Suelo base garantizado (evita que el modo CAM se vuelva negro)
-      exposure_mult: 1.40,           // Rango dinámico ambiental (exposición final entre ~0.55 y ~1.95)
-      reaction_speed: 0.35,          // Factor de respuesta fluida para exposición y PMREM
-      p90_max_delta: 50,             // Delta Clamp: protección servilleta sin saturación por proximidad
-      p90_weight: 0.60,              // Peso del Delta P90 en la luminancia efectiva
+      // --- AMBIENTE, TONE MAPPING Y ESTRATEGIA SERVILLETA (P90) ---
+      exposure_base: 0.00,           // Exposición en oscuridad total
+      exposure_mult: 2.20,           // Multiplicador ambiental PMREM base (+10% de ganancia)
+      reaction_speed: 0.35,          // Factor de respuesta fluida para PMREM y exposición
+      p90_weight: 0.70,              // Peso del Percentil P90 (Solución Servilleta al 100% de la pantalla)
+      avg_weight: 0.30,              // Peso del promedio global
       
-      // --- RENDIMIENTO Y MICRO-CANVAS ---
-      pmrem_resolution: 128,         // Tamaño del canvas PMREM GPU (128x128 píxeles)
-      pmrem_interval_ms: 300,        // Frecuencia de actualización PMREM GPU (cada 300 ms)
-      micro_scan_size: 16,           // Micro-Canvas CPU de 16x16 (256 píxeles para 0 latencia)
-      scan_interval_ms: 150          // Frecuencia de escaneo CPU (cada 150 ms)
+      // --- LIGHT ESTIMATION: RESOLUCIÓN 128x128 Y ESCANEO A 400 MS ---
+      pmrem_resolution: 128,         // Tamaño del canvas PMREM (128x128 píxeles)
+      pmrem_interval_ms: 400,        // Frecuencia de actualización PMREM (cada 400 ms)
+      scan_interval_ms: 400,         // Frecuencia de escaneo (cada 400 ms)
+      scan_pixel_step: 16            // Muestreo en bytes (cada 4 píxeles)
     };
     // =====================================================================================
 
@@ -125,6 +126,7 @@
 
     let pmremGenerator = null, cameraRT = null, originalEnv = null;
     let envMode = 'cam';
+    let envInterval = null;
     let _scene = null, _renderer = null, _activeCamera = null, _groundMesh = null, _baseLight1 = null;
 
     // Estructura para cada ranura de luz direccional
@@ -135,8 +137,7 @@
       anchoredIntensity: 0.0,
       targetIntensity: 0.0,
       lastAnchorTime: 0,
-      state: 'idle', // 'idle' | 'active' | 'fading_in'
-      wakeDuration: 0,
+      state: 'idle', // 'idle' | 'active' | 'fading_in' | 'fading_out_final'
       transition: {
         startTime: 0,
         startIntensity: 0.0,
@@ -152,12 +153,11 @@
     const carruselSlots = [slotLight2, slotLight3, slotLight4];
 
     let previousAvgLum = 128;
-    let tableGradientCalculated = false; // Se calcula 1 sola vez en alta resolución y se apaga
-    let sessionStartTime = 0;
+    let light2InitialPlaced = false;
     let lastFrameTime = performance.now();
-    let totalLightsDetected = 2; // Inicia en 2 por Luz 2 + Luz 4 fija opuesta
-    let totalRealLightsAnchored = 0; // Foco real Luz 3 confirmado (máx 1)
-    let detectionPermanentlyStopped = false; // Se congela tras cazar Luz 3 o al pasar 5s
+    let totalLightsDetected = 1; // Inicia en 1 por la Luz 2 inicial
+    let totalRealLightsAnchored = 0; // Focos reales confirmados (máx 2)
+    let detectionPermanentlyStopped = false; // Se congela para siempre tras Luz 4
 
     // Estructura de persistencia temporal (Debounce)
     const candidateDebounce = {
@@ -208,7 +208,6 @@
               if (nativeTHREE) {
                 _renderer.shadowMap.enabled = true;
                 _renderer.toneMapping = nativeTHREE.ACESFilmicToneMapping;
-                _renderer.toneMappingExposure = 1.0;
 
                 candidateDebounce.dir = new nativeTHREE.Vector3();
 
@@ -218,7 +217,7 @@
                   slot.transition.destDir = new nativeTHREE.Vector3();
                 });
 
-                // Captura del Ground y Luz 1 (Ajuste de ShadowCamera a 50cm, radio 8.0 y opacidad 0.60)
+                // Captura del Ground y Luz 1 (Ajuste de ShadowCamera a 50cm y sombra fija)
                 _scene.traverse((node) => {
                   if (node.isMesh && node.material && (node.material.type === 'ShadowMaterial' || node.name === 'Ground')) {
                     _groundMesh = node;
@@ -249,23 +248,31 @@
                   }
                 });
 
-                // 1. Instanciamos Luz 2 (Activa inicial a 45º)
+                // 1. Instanciamos Luz 2 (Activa inicial con modelado a 45º)
                 slotLight2.light = new nativeTHREE.DirectionalLight(0xffffff, 0.0);
                 slotLight2.light.position.set(0, 1.5, -1.5);
                 slotLight2.light.castShadow = LIGHTING_CONFIG.light2_castShadow;
                 _scene.add(slotLight2.light);
                 _scene.add(slotLight2.light.target);
 
-                // 2. Instanciamos Luz 3 (Durmiente inicial / Única cazable)
+                // 2. Instanciamos Luz 3 (Durmiente inicial)
                 slotLight3.light = new nativeTHREE.DirectionalLight(0xffffff, 0.0);
-                slotLight3.light.position.set(1.3, 0.25, 0.0);
+                slotLight3.light.position.set(
+                  LIGHTING_CONFIG.light3_default_pos[0],
+                  LIGHTING_CONFIG.light3_default_pos[1],
+                  LIGHTING_CONFIG.light3_default_pos[2]
+                );
                 slotLight3.light.castShadow = LIGHTING_CONFIG.light3_castShadow;
                 _scene.add(slotLight3.light);
                 _scene.add(slotLight3.light.target);
 
-                // 3. Instanciamos Luz 4 (Fija desde el inicio: opuesta a Luz 2)
+                // 3. Instanciamos Luz 4 (Durmiente inicial)
                 slotLight4.light = new nativeTHREE.DirectionalLight(0xffffff, 0.0);
-                slotLight4.light.position.set(0, 1.5, 1.5);
+                slotLight4.light.position.set(
+                  LIGHTING_CONFIG.light4_default_pos[0],
+                  LIGHTING_CONFIG.light4_default_pos[1],
+                  LIGHTING_CONFIG.light4_default_pos[2]
+                );
                 slotLight4.light.castShadow = LIGHTING_CONFIG.light4_castShadow;
                 _scene.add(slotLight4.light);
                 _scene.add(slotLight4.light.target);
@@ -331,7 +338,6 @@
           const video = document.querySelector('video');
           if (video && video.readyState >= 2) {
             clearInterval(waitForVideo);
-            sessionStartTime = performance.now();
 
             /* =====================================================================================
                SISTEMA LIGHT ESTIMATION ANTERIOR (v2.94) - COMENTADO PARA RECUPERACIÓN FUTURA
@@ -362,8 +368,9 @@
                }, lightEstimationInterval);
             ===================================================================================== */
 
-            // === 1. CANVAS PMREM GPU (128x128 - Exclusivo WebGL) ===
+            // === CONFIGURACIÓN DEL PMREM (v3.18: 128x128 a 400 ms) ===
             const pmremSize = LIGHTING_CONFIG.pmrem_resolution;
+            const pmremInterval = LIGHTING_CONFIG.pmrem_interval_ms;
             const pmremCanvas = document.createElement('canvas');
             pmremCanvas.width = pmremSize;
             pmremCanvas.height = pmremSize;
@@ -375,28 +382,15 @@
               envTexture.encoding = THREE_INSTANCE.sRGBEncoding;
             }
 
-            // === 2. MICRO-CANVAS CPU OFFLINE (16x16 = 256 píxeles para 0 latencia) ===
-            const microSize = LIGHTING_CONFIG.micro_scan_size;
-            const microCanvas = document.createElement('canvas');
-            microCanvas.width = microSize;
-            microCanvas.height = microSize;
-            const microCtx = microCanvas.getContext('2d', { willReadFrequently: true });
-
-            let smoothedBrightness = 128;
+            let smoothedBrightness = 0;
             let lastScanTime = 0;
             const scanInterval = LIGHTING_CONFIG.scan_interval_ms;
-            let targetExposure = 1.0;
+            let targetExposure = 0.0;
 
             const probeNDC = new THREE_INSTANCE.Vector3();
             const camWorldPos = new THREE_INSTANCE.Vector3();
             const rayDir = new THREE_INSTANCE.Vector3();
             const candidatePos = new THREE_INSTANCE.Vector3();
-            const rawEmitterColor = new THREE_INSTANCE.Color(0xffffff);
-            const targetEmitterColor = new THREE_INSTANCE.Color(0xffffff);
-
-            const frustum = new THREE_INSTANCE.Frustum();
-            const projScreenMatrix = new THREE_INSTANCE.Matrix4();
-            const modelOrigin = new THREE_INSTANCE.Vector3(0, 0, 0);
 
             const aplicarRestriccionesMesa = (outVec, origin, dir, dist) => {
               outVec.copy(origin).addScaledVector(dir, dist);
@@ -406,70 +400,38 @@
               outVec.y = Math.max(LIGHTING_CONFIG.min_light_height, outVec.y);
             };
 
-            const isModelInFrustum = () => {
-              if (!_activeCamera) return true;
-              projScreenMatrix.multiplyMatrices(_activeCamera.projectionMatrix, _activeCamera.matrixWorldInverse);
-              frustum.setFromProjectionMatrix(projScreenMatrix);
-              return frustum.containsPoint(modelOrigin);
+            const iniciarFadeInSlot = (slot, destPos, destIntensity, newDir, now) => {
+              slot.state = 'fading_in';
+              slot.isAnchored = true; // Sello inmediato en t=0 del cono de 30º
+              slot.lastAnchorTime = now;
+              slot.transition.startTime = now;
+              slot.transition.startIntensity = slot.light ? slot.light.intensity : 0.0;
+              slot.transition.destIntensity = destIntensity;
+              slot.transition.destPos.copy(destPos);
+              slot.transition.destDir.copy(newDir);
+              slot.anchoredDir.copy(newDir);
+              slot.anchoredIntensity = destIntensity;
+              if (slot.light) slot.light.position.copy(destPos);
             };
 
-            const iniciarFadeInSlot3 = (destPos, destIntensity, newDir, now, color) => {
-              slotLight3.state = 'fading_in';
-              slotLight3.isAnchored = true;
-              slotLight3.lastAnchorTime = now;
-              slotLight3.transition.startTime = now;
-              slotLight3.transition.startIntensity = 0.0;
-              slotLight3.transition.destIntensity = destIntensity;
-              slotLight3.transition.destPos.copy(destPos);
-              slotLight3.transition.destDir.copy(newDir);
-              slotLight3.anchoredDir.copy(newDir);
-              slotLight3.anchoredIntensity = destIntensity;
-
-              slotLight3.wakeDuration = isModelInFrustum() ? LIGHTING_CONFIG.wake_duration_visible_ms : 0;
-
-              if (slotLight3.light) {
-                slotLight3.light.position.copy(destPos);
-                if (color) slotLight3.light.color.copy(color);
-                if (slotLight3.wakeDuration === 0) {
-                  slotLight3.light.intensity = destIntensity;
-                  slotLight3.state = 'active';
-                }
-              }
+            const iniciarFadeOutFinalLuz2 = (now) => {
+              slotLight2.state = 'fading_out_final';
+              slotLight2.transition.startTime = now;
+              slotLight2.transition.startIntensity = slotLight2.light ? slotLight2.light.intensity : 0.0;
+              slotLight2.transition.destIntensity = 0.0;
             };
 
-            // Look Scene Viewer: Suelo de rugosidad, pedestal emisivo para levantar negros y desaturación
-            const aplicarAjustesSceneViewer = () => {
+            // Suelo de rugosidad a 0.20 para evitar el parpadeo en tomates y vajillas brillantes
+            const aplicarSueloRugosidad = () => {
               if (!_scene) return;
               _scene.traverse((child) => {
                 if (child.isMesh && child.material) {
                   const mats = Array.isArray(child.material) ? child.material : [child.material];
                   mats.forEach((mat) => {
-                    // Solo aplicamos a materiales PBR reales del modelo, evitando Ground o Hiders
-                    const isPBR = (mat.type === 'MeshStandardMaterial' || mat.type === 'MeshPhysicalMaterial');
-                    if (!isPBR) return;
-
                     const isMetal = mat.metalness !== undefined && mat.metalness > LIGHTING_CONFIG.metalness_bypass_threshold;
-                    
-                    // 1. Suelo de rugosidad anti-titileo
                     if (!isMetal && mat.roughness !== undefined && mat.roughness < LIGHTING_CONFIG.min_material_roughness) {
                       mat.roughness = LIGHTING_CONFIG.min_material_roughness;
-                    }
-
-                    // 2. Pedestal emisivo (+5% extra: 0.095 para levantar negros sin lavar la imagen)
-                    if (mat.emissive !== undefined) {
-                      const p = LIGHTING_CONFIG.emissive_pedestal;
-                      if (mat.emissive.r < p && mat.emissive.g < p && mat.emissive.b < p) {
-                        mat.emissive.setRGB(p, p, p);
-                      }
-                    }
-
-                    // 3. Desaturación albedo (13%)
-                    if (mat.color && !mat._desaturated) {
-                      const hsl = { h: 0, s: 0, l: 0 };
-                      mat.color.getHSL(hsl);
-                      hsl.s = Math.max(0.0, hsl.s * (1.0 - LIGHTING_CONFIG.albedo_desaturation));
-                      mat.color.setHSL(hsl.h, hsl.s, hsl.l);
-                      mat._desaturated = true;
+                      mat.needsUpdate = true;
                     }
                   });
                 }
@@ -486,34 +448,25 @@
                 const deltaSec = Math.max(0.001, (now - lastFrameTime) / 1000.0);
                 lastFrameTime = now;
 
-                // Timeout de 5 segundos para la caza de Luz 3
-                if (!detectionPermanentlyStopped && (now - sessionStartTime > LIGHTING_CONFIG.hunting_timeout_ms)) {
-                  detectionPermanentlyStopped = true;
-                  candidateDebounce.active = false;
-                }
-
-                // 1. DIBUJAMOS EL VÍDEO EN EL CANVAS PMREM (GPU)
+                // 1. DIBUJAMOS EL VÍDEO REAL LIMPIO
                 pmremCtx.drawImage(video, 0, 0, pmremSize, pmremSize);
 
-                // 2. ESCANEO DEL MICRO-CANVAS CPU (16x16 = 256 píxeles, sin bloqueo de GPU)
+                // 2. ESCANEO AMBIENTAL Y ANÁLISIS DE FOCOS (v3.18: 400 ms)
                 if (now - lastScanTime > scanInterval) {
                   lastScanTime = now;
                   
-                  microCtx.drawImage(video, 0, 0, microSize, microSize);
-                  const imgData = microCtx.getImageData(0, 0, microSize, microSize);
+                  const scanEmitterHeight = Math.floor(pmremSize * LIGHTING_CONFIG.upper_half_limit);
+                  const imgData = pmremCtx.getImageData(0, 0, pmremSize, pmremSize);
                   const data = imgData.data;
 
                   let sumR = 0, sumG = 0, sumB = 0;
                   let maxLum = 0;
+                  let maxLumX = pmremSize * 0.5, maxLumY = pmremSize * 0.3;
                   let count = 0;
+                  let corePixelCount = 0;
+                  let coreSumX = 0, coreSumY = 0;
 
-                  // Búsqueda de foco Luz 3 en el tercio superior
-                  const scanUpperLimitY = Math.floor(microSize * LIGHTING_CONFIG.upper_third_limit);
-                  let upperMaxLum = 0;
-                  let upperSumX = 0, upperSumY = 0, upperCount = 0;
-                  let upperR = 0, upperG = 0, upperB = 0;
-
-                  // Cuantización de color en 8 bins para gradiente de mesa (Frame 1)
+                  // Cuantización de color en 8 bins para gradiente dominante de mesa
                   const colorBins = new Int32Array(8);
                   const colorBinLumSumX = new Float32Array(8);
                   const colorBinLumSumY = new Float32Array(8);
@@ -521,15 +474,16 @@
 
                   lumaBins.fill(0);
 
-                  for (let idx = 0; idx < data.length; idx += 4) {
+                  // Escaneo del 100% de la pantalla (Estrategia Servilleta P90 + Gradiente de Mesa)
+                  for (let idx = 0; idx < data.length; idx += LIGHTING_CONFIG.scan_pixel_step) {
                     const r = data[idx];
                     const g = data[idx + 1];
                     const b = data[idx + 2];
                     const lum = (r * 0.299 + g * 0.587 + b * 0.114);
 
                     const pixelIdx = idx / 4;
-                    const px = pixelIdx % microSize;
-                    const py = Math.floor(pixelIdx / microSize);
+                    const px = pixelIdx % pmremSize;
+                    const py = Math.floor(pixelIdx / pmremSize);
 
                     sumR += r;
                     sumG += g;
@@ -539,27 +493,25 @@
                     const binIdx = Math.min(15, Math.floor((lum / 256) * 16));
                     lumaBins[binIdx]++;
 
-                    if (lum > maxLum) maxLum = lum;
-
-                    // Detección exclusiva para Luz 3 (tercio superior)
-                    if (!detectionPermanentlyStopped && py < scanUpperLimitY && lum >= LIGHTING_CONFIG.emitter_lum_threshold) {
-                      upperSumX += px * lum;
-                      upperSumY += py * lum;
-                      upperR += r * lum;
-                      upperG += g * lum;
-                      upperB += b * lum;
-                      upperCount += lum;
-                      if (lum > upperMaxLum) upperMaxLum = lum;
+                    if (lum > maxLum) {
+                      maxLum = lum;
+                      maxLumX = px;
+                      maxLumY = py;
                     }
 
-                    // Datos para el gradiente de mesa (Frame 1)
-                    if (!tableGradientCalculated) {
-                      const cBin = ((r > 100 ? 1 : 0) << 2) | ((g > 100 ? 1 : 0) << 1) | (b > 100 ? 1 : 0);
-                      colorBins[cBin]++;
-                      colorBinLumSumX[cBin] += px * lum;
-                      colorBinLumSumY[cBin] += py * lum;
-                      colorBinWeight[cBin] += lum;
+                    // Detección de núcleo saturado por luminancia (compatible con cálidos y fríos)
+                    if (py < scanEmitterHeight && lum >= LIGHTING_CONFIG.emitter_lum_threshold) {
+                      corePixelCount++;
+                      coreSumX += px;
+                      coreSumY += py;
                     }
+
+                    // Clasificación cromática en 8 bins para gradiente de superficie
+                    const cBin = ((r > 100 ? 1 : 0) << 2) | ((g > 100 ? 1 : 0) << 1) | (b > 100 ? 1 : 0);
+                    colorBins[cBin]++;
+                    colorBinLumSumX[cBin] += px * lum;
+                    colorBinLumSumY[cBin] += py * lum;
+                    colorBinWeight[cBin] += lum;
                   }
 
                   const avgR = count > 0 ? sumR / count : 0;
@@ -567,7 +519,7 @@
                   const avgB = count > 0 ? sumB / count : 0;
                   const avgLum = (avgR * 0.299 + avgG * 0.587 + avgB * 0.114);
 
-                  // Extracción P90 con Delta Clamp
+                  // Extracción P90 al 100% de la pantalla (Solución Servilleta)
                   let p90Lum = avgLum;
                   let accumulated = 0;
                   const p90Target = count * 0.90;
@@ -579,13 +531,47 @@
                     }
                   }
 
-                  const p90Delta = Math.min(LIGHTING_CONFIG.p90_max_delta, Math.max(0, p90Lum - avgLum));
-                  const effectiveIlluminance = avgLum + (p90Delta * LIGHTING_CONFIG.p90_weight);
+                  const effectiveIlluminance = (avgLum * LIGHTING_CONFIG.avg_weight) + (p90Lum * LIGHTING_CONFIG.p90_weight);
 
-                  // Reacción de auto-exposición (ISO)
+                  // --- ANÁLISIS DE HALO RADIAL CALIBRADO A R=8 PÍXELES ---
                   const temporalDrop = previousAvgLum - avgLum;
                   previousAvgLum = avgLum;
 
+                  const candidateX = corePixelCount > 0 ? (coreSumX / corePixelCount) : maxLumX;
+                  const candidateY = corePixelCount > 0 ? (coreSumY / corePixelCount) : maxLumY;
+
+                  // Función auxiliar para leer luminancia
+                  const getPixelLum = (px, py) => {
+                    const cx = Math.max(0, Math.min(pmremSize - 1, Math.floor(px)));
+                    const cy = Math.max(0, Math.min(pmremSize - 1, Math.floor(py)));
+                    const pIdx = (cy * pmremSize + cx) * 4;
+                    return data[pIdx] * 0.299 + data[pIdx + 1] * 0.587 + data[pIdx + 2] * 0.114;
+                  };
+
+                  // Comprobación de halo a radio R=8
+                  const R = LIGHTING_CONFIG.halo_radius_px;
+                  const coreLum = getPixelLum(candidateX, candidateY);
+                  const dropRight = coreLum - getPixelLum(candidateX + R, candidateY);
+                  const dropLeft = coreLum - getPixelLum(candidateX - R, candidateY);
+                  const dropDown = coreLum - getPixelLum(candidateX, candidateY + R);
+                  const dropUp = coreLum - getPixelLum(candidateX, candidateY - R);
+
+                  let steepDrops = 0;
+                  if (dropRight >= LIGHTING_CONFIG.halo_drop_threshold) steepDrops++;
+                  if (dropLeft >= LIGHTING_CONFIG.halo_drop_threshold) steepDrops++;
+                  if (dropDown >= LIGHTING_CONFIG.halo_drop_threshold) steepDrops++;
+                  if (dropUp >= LIGHTING_CONFIG.halo_drop_threshold) steepDrops++;
+
+                  const hasRadialHalo = (steepDrops >= 2); // Cae en al menos 2 direcciones
+                  const maxAreaLimit = count * LIGHTING_CONFIG.max_core_area_ratio;
+                  const hasCompactCore = (corePixelCount >= LIGHTING_CONFIG.min_core_pixels) && (corePixelCount <= maxAreaLimit);
+                  const contrastDelta = coreLum - avgLum;
+                  const hasSufficientContrast = (contrastDelta >= LIGHTING_CONFIG.contrast_delta_threshold) || (temporalDrop >= LIGHTING_CONFIG.temporal_drop_threshold);
+
+                  // Confirmación de luz real equilibrada
+                  const isConfirmedRealLight = (candidateY < scanEmitterHeight) && hasCompactCore && hasRadialHalo && hasSufficientContrast;
+
+                  // Luminancia y sobreimpulso
                   smoothedBrightness += (effectiveIlluminance - smoothedBrightness) * LIGHTING_CONFIG.reaction_speed;
                   const normalizedBrightness = Math.max(0.0, Math.min(1.0, smoothedBrightness / 255));
 
@@ -596,29 +582,34 @@
                   }
 
                   const baseDirectIntensity = normalizedBrightness * LIGHTING_CONFIG.light_maxIntensity * boostFactor;
-                  slotLight2.targetIntensity = baseDirectIntensity * LIGHTING_CONFIG.light2_ratio; // Doble de intensidad
-                  slotLight3.targetIntensity = baseDirectIntensity * LIGHTING_CONFIG.light3_ratio; // +40% de intensidad
-                  slotLight4.targetIntensity = baseDirectIntensity * LIGHTING_CONFIG.light4_ratio; // Fija (intensidad v3.19 de Luz 2)
+                  slotLight2.targetIntensity = baseDirectIntensity * LIGHTING_CONFIG.light2_initialRatio;
+                  slotLight3.targetIntensity = baseDirectIntensity;
+                  slotLight4.targetIntensity = baseDirectIntensity;
 
-                  // --- FRAME 1: POSICIONAMIENTO DE LUZ 2 Y LUZ 4 OPUESTA (1 sola vez de por vida) ---
-                  if (!tableGradientCalculated && _activeCamera) {
-                    let initTargetX = microSize * 0.5;
-                    let initTargetY = microSize * 0.35;
+                  // --- POSICIONAMIENTO INICIAL INTELIGENTE DE LUZ 2 (Frame 1 con potencia viva) ---
+                  if (!light2InitialPlaced && _activeCamera) {
+                    let initTargetX = pmremSize * 0.5;
+                    let initTargetY = pmremSize * 0.4;
 
-                    let dominantBin = 0, maxBinCount = 0;
-                    for (let c = 0; c < 8; c++) {
-                      if (colorBins[c] > maxBinCount) {
-                        maxBinCount = colorBins[c];
-                        dominantBin = c;
+                    if (isConfirmedRealLight) {
+                      initTargetX = candidateX;
+                      initTargetY = candidateY;
+                    } else {
+                      let dominantBin = 0, maxBinCount = 0;
+                      for (let c = 0; c < 8; c++) {
+                        if (colorBins[c] > maxBinCount) {
+                          maxBinCount = colorBins[c];
+                          dominantBin = c;
+                        }
+                      }
+                      if (maxBinCount > (count * 0.25) && colorBinWeight[dominantBin] > 0) {
+                        initTargetX = colorBinLumSumX[dominantBin] / colorBinWeight[dominantBin];
+                        initTargetY = colorBinLumSumY[dominantBin] / colorBinWeight[dominantBin];
                       }
                     }
-                    if (maxBinCount > (count * 0.20) && colorBinWeight[dominantBin] > 0) {
-                      initTargetX = colorBinLumSumX[dominantBin] / colorBinWeight[dominantBin];
-                      initTargetY = colorBinLumSumY[dominantBin] / colorBinWeight[dominantBin];
-                    }
 
-                    const ndcX = (initTargetX / microSize) * 2 - 1;
-                    const ndcY = 1 - (initTargetY / microSize) * 2;
+                    const ndcX = (initTargetX / pmremSize) * 2 - 1;
+                    const ndcY = 1 - (initTargetY / pmremSize) * 2;
 
                     _activeCamera.getWorldPosition(camWorldPos);
                     probeNDC.set(ndcX, ndcY, 0.5);
@@ -631,107 +622,93 @@
                     const initXZ = Math.cos(elevAngle) * r;
                     const azimLen = Math.hypot(rayDir.x, rayDir.z) || 1.0;
 
-                    const posX = (rayDir.x / azimLen) * initXZ;
-                    const posZ = (rayDir.z / azimLen) * initXZ;
-
-                    // 1. Luz 2 activa inicial
                     if (slotLight2.light) {
-                      slotLight2.light.position.set(posX, initY, posZ);
+                      slotLight2.light.position.set((rayDir.x / azimLen) * initXZ, initY, (rayDir.z / azimLen) * initXZ);
                       slotLight2.anchoredDir.copy(slotLight2.light.position).normalize();
                       slotLight2.isAnchored = true;
                       slotLight2.state = 'active';
-                      slotLight2.anchoredIntensity = slotLight2.targetIntensity;
+                      slotLight2.anchoredIntensity = slotLight2.targetIntensity; // Inicialización con potencia real
                       slotLight2.lastAnchorTime = now;
+                      light2InitialPlaced = true;
+                      actualizarContadorLuces();
                     }
-
-                    // 2. Luz 4 fija inicial: posición espejo opuesta a Luz 2
-                    if (slotLight4.light) {
-                      slotLight4.light.position.set(-posX, initY, -posZ);
-                      slotLight4.anchoredDir.copy(slotLight4.light.position).normalize();
-                      slotLight4.isAnchored = true;
-                      slotLight4.state = 'active';
-                      slotLight4.anchoredIntensity = slotLight4.targetIntensity;
-                      slotLight4.lastAnchorTime = now;
-                    }
-
-                    tableGradientCalculated = true; // ¡Gradiente y luces 2 y 4 fijadas de por vida!
-                    actualizarContadorLuces();
-                  } else {
-                    if (slotLight2.state === 'active') slotLight2.anchoredIntensity = slotLight2.targetIntensity;
-                    if (slotLight4.state === 'active') slotLight4.anchoredIntensity = slotLight4.targetIntensity;
+                  } else if (slotLight2.state === 'active' && totalRealLightsAnchored === 0) {
+                    slotLight2.anchoredIntensity = slotLight2.targetIntensity;
                   }
 
-                  // --- RASTREO EXCLUSIVO PARA LUZ 3 (Máx 5 segundos) ---
-                  if (!detectionPermanentlyStopped && _activeCamera && upperCount > 0) {
-                    const candX = upperSumX / upperCount;
-                    const candY = upperSumY / upperCount;
-                    const contrastDelta = upperMaxLum - avgLum;
-                    
-                    const isConfirmedRealLight = (contrastDelta >= LIGHTING_CONFIG.contrast_delta_threshold) || 
-                                                (temporalDrop >= LIGHTING_CONFIG.temporal_drop_threshold) || 
-                                                (upperMaxLum >= 240);
+                  // --- MÁQUINA DE ESTADOS ESTRICTA "MÁXIMO 2 LUCES ACTIVAS" ---
+                  if (!detectionPermanentlyStopped && _activeCamera && isConfirmedRealLight) {
+                    const ndcX = (candidateX / pmremSize) * 2 - 1;
+                    const ndcY = 1 - (candidateY / pmremSize) * 2;
 
-                    if (isConfirmedRealLight) {
-                      const ndcX = (candX / microSize) * 2 - 1;
-                      const ndcY = 1 - (candY / microSize) * 2;
+                    _activeCamera.getWorldPosition(camWorldPos);
+                    probeNDC.set(ndcX, ndcY, 0.5);
+                    probeNDC.unproject(_activeCamera);
+                    rayDir.subVectors(probeNDC, camWorldPos).normalize();
 
-                      _activeCamera.getWorldPosition(camWorldPos);
-                      probeNDC.set(ndcX, ndcY, 0.5);
-                      probeNDC.unproject(_activeCamera);
-                      rayDir.subVectors(probeNDC, camWorldPos).normalize();
+                    aplicarRestriccionesMesa(candidatePos, camWorldPos, rayDir, LIGHTING_CONFIG.light2_distance);
 
-                      aplicarRestriccionesMesa(candidatePos, camWorldPos, rayDir, LIGHTING_CONFIG.light2_distance);
-
-                      let isInsideExistingCone = false;
-                      carruselSlots.forEach(slot => {
-                        if (slot.isAnchored) {
-                          if (rayDir.angleTo(slot.anchoredDir) < LIGHTING_CONFIG.min_separation_angle) {
-                            isInsideExistingCone = true;
-                          }
+                    let isInsideExistingCone = false;
+                    carruselSlots.forEach(slot => {
+                      if (slot.isAnchored && slot.state !== 'fading_out_final') {
+                        if (rayDir.angleTo(slot.anchoredDir) < LIGHTING_CONFIG.min_separation_angle) {
+                          isInsideExistingCone = true;
                         }
-                      });
+                      }
+                    });
 
-                      if (!isInsideExistingCone) {
-                        if (candidateDebounce.active && 
-                            Math.abs(candidateDebounce.screenX - candX) < 3 && 
-                            Math.abs(candidateDebounce.screenY - candY) < 3) {
-                          candidateDebounce.consecutiveCycles++;
-                        } else {
-                          candidateDebounce.active = true;
-                          candidateDebounce.screenX = candX;
-                          candidateDebounce.screenY = candY;
-                          candidateDebounce.consecutiveCycles = 1;
-                          candidateDebounce.dir.copy(rayDir);
-                        }
-
-                        if (candidateDebounce.consecutiveCycles >= LIGHTING_CONFIG.debounce_cycles) {
-                          candidateDebounce.active = false;
-                          candidateDebounce.consecutiveCycles = 0;
-
-                          rawEmitterColor.setRGB((upperR / upperCount) / 255, (upperG / upperCount) / 255, (upperB / upperCount) / 255);
-                          targetEmitterColor.setRGB(1, 1, 1).lerp(rawEmitterColor, LIGHTING_CONFIG.light_chroma_tint_strength);
-
-                          // Despierta Luz 3 y apaga el rastreador para siempre
-                          if (!slotLight3.isAnchored && slotLight3.state === 'idle') {
-                            iniciarFadeInSlot3(candidatePos, baseDirectIntensity * LIGHTING_CONFIG.light3_ratio, rayDir, now, targetEmitterColor);
-                            totalRealLightsAnchored = 1;
-                            totalLightsDetected = 3;
-                            actualizarContadorLuces();
-                            detectionPermanentlyStopped = true; // ¡Se apaga la búsqueda para siempre!
-                          }
-                        }
+                    if (!isInsideExistingCone) {
+                      if (candidateDebounce.active && 
+                          Math.abs(candidateDebounce.screenX - candidateX) < 16 && 
+                          Math.abs(candidateDebounce.screenY - candidateY) < 16) {
+                        candidateDebounce.consecutiveCycles++;
                       } else {
+                        candidateDebounce.active = true;
+                        candidateDebounce.screenX = candidateX;
+                        candidateDebounce.screenY = candidateY;
+                        candidateDebounce.consecutiveCycles = 1;
+                        candidateDebounce.dir.copy(rayDir);
+                      }
+
+                      if (candidateDebounce.consecutiveCycles >= LIGHTING_CONFIG.debounce_cycles) {
                         candidateDebounce.active = false;
                         candidateDebounce.consecutiveCycles = 0;
+
+                        // 1.er Foco Real Confirmado -> Nace Luz 3 (Activas: Luz 2 + Luz 3)
+                        if (!slotLight3.isAnchored && slotLight3.state === 'idle') {
+                          iniciarFadeInSlot(slotLight3, candidatePos, baseDirectIntensity, rayDir, now);
+                          totalRealLightsAnchored = 1;
+                          totalLightsDetected = 2;
+                          actualizarContadorLuces();
+                        } 
+                        // 2.º Foco Real Confirmado -> Nace Luz 4, Luz 2 se apaga despacio y se BLOQUEA la detección
+                        else if (!slotLight4.isAnchored && slotLight4.state === 'idle') {
+                          iniciarFadeInSlot(slotLight4, candidatePos, baseDirectIntensity, rayDir, now);
+                          iniciarFadeOutFinalLuz2(now);
+                          totalRealLightsAnchored = 2;
+                          totalLightsDetected = 3;
+                          actualizarContadorLuces();
+                          detectionPermanentlyStopped = true; // ¡SE APAGA LA DETECCIÓN PARA SIEMPRE!
+                        }
                       }
+                    } else {
+                      candidateDebounce.active = false;
+                      candidateDebounce.consecutiveCycles = 0;
                     }
                   }
 
-                  // --- EXPOSICIÓN AMBIENTAL PMREM (Suelo base 0.55 garantizado anti-apagones) ---
-                  targetExposure = LIGHTING_CONFIG.exposure_base + (normalizedBrightness * LIGHTING_CONFIG.exposure_mult);
+                  // --- BALANCE ESCALONADO PMREM (60% con 1 luz / 50% con 2 luces) ---
+                  let activeLightsCount = 0;
+                  carruselSlots.forEach(s => {
+                    if (s.state === 'active' || s.state === 'fading_in') activeLightsCount++;
+                  });
+                  activeLightsCount = Math.max(1, activeLightsCount);
+
+                  const pmremScale = (activeLightsCount === 1) ? 0.60 : 0.50;
+                  targetExposure = normalizedBrightness * LIGHTING_CONFIG.exposure_mult * pmremScale;
                 }
 
-                // 3. ACTUALIZACIÓN CINEMÁTICA Y LERPS DE LUCES
+                // 3. ACTUALIZACIÓN CINEMÁTICA CON CURVAS CALIBRADAS
                 if (_activeCamera) {
                   _activeCamera.getWorldDirection(rayDir);
                 }
@@ -740,10 +717,19 @@
                   if (!slot.light) return;
                   slot.light.target.position.set(0, 0, 0);
 
-                  if (slot.state === 'fading_in') {
+                  if (slot.state === 'fading_out_final') {
                     const elapsed = now - slot.transition.startTime;
-                    const duration = Math.max(1, slot.wakeDuration);
-                    const progress = Math.min(1.0, elapsed / duration);
+                    const progress = Math.min(1.0, elapsed / LIGHTING_CONFIG.fade_out_duration_ms);
+                    slot.light.intensity = THREE_INSTANCE.MathUtils.lerp(slot.transition.startIntensity, 0.0, progress);
+
+                    if (progress >= 1.0) {
+                      slot.state = 'idle';
+                      slot.isAnchored = false;
+                      slot.light.intensity = 0.0;
+                    }
+                  } else if (slot.state === 'fading_in') {
+                    const elapsed = now - slot.transition.startTime;
+                    const progress = Math.min(1.0, elapsed / LIGHTING_CONFIG.wake_duration_ms);
                     slot.light.intensity = THREE_INSTANCE.MathUtils.lerp(slot.transition.startIntensity, slot.transition.destIntensity, progress);
 
                     if (progress >= 1.0) {
@@ -756,8 +742,9 @@
                       ? slot.targetIntensity 
                       : (slot.anchoredIntensity * LIGHTING_CONFIG.out_of_frame_retention);
 
+                    // Curva asimétrica: 800 ms subida / 4000 ms caída fuera de cuadro
                     const isRising = effectiveTarget > slot.light.intensity;
-                    const speed = isRising ? (1000.0 / 800.0) : (1000.0 / LIGHTING_CONFIG.decay_duration_ms);
+                    const speed = isRising ? (1000.0 / LIGHTING_CONFIG.wake_duration_ms) : (1000.0 / LIGHTING_CONFIG.decay_duration_ms);
                     const lerpStep = Math.min(1.0, speed * deltaSec);
                     
                     slot.light.intensity += (effectiveTarget - slot.light.intensity) * lerpStep;
@@ -766,13 +753,13 @@
                   }
                 });
 
-                // Exposición adaptativa
+                // Exposición adaptativa templada
                 renderer.toneMappingExposure += (targetExposure - renderer.toneMappingExposure) * LIGHTING_CONFIG.reaction_speed;
 
-                // Calibración Scene Viewer (Pedestal y Suelo de rugosidad)
-                aplicarAjustesSceneViewer();
+                // Suelo de rugosidad dinámico para proteger los tomates cherry
+                aplicarSueloRugosidad();
 
-                // 4. ACTUALIZACIÓN PMREM GPU
+                // 4. ACTUALIZACIÓN PMREM (128x128)
                 envTexture.needsUpdate = true;
                 const oldRT = cameraRT;
                 cameraRT = pmremGenerator.fromEquirectangular(envTexture);
