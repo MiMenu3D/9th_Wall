@@ -1,4 +1,4 @@
-<!-- 9th Wall v3.20 Apple Probe -->
+<!-- 9th Wall v3.21 Apple Probe -->
 <html>
 <head>
   <meta charset="UTF-8">
@@ -18,7 +18,7 @@
     style="position:fixed;top:10px;right:10px;z-index:1000000;background:rgba(0,0,0,0.9);color:#0f0;font-family:monospace;font-size:12px;padding:8px;border-radius:4px;cursor:pointer;line-height:1.2;border:1px solid #0f0;">
     <div id="debugTitle">FPS: --</div>
     <div id="debugContent">
-      ar-world: v3.20<br>
+      ar-world: v3.21<br>
       bundle: v3.10y<br>
       <span id="lightsCountSpan" style="color:#0f0;">Luces: 2</span><br>
       <span id="latencySpan" style="color:#0f0;">Latencia: -- ms</span>
@@ -41,21 +41,21 @@
 
   <script>
     // =====================================================================================
-    // === CONTROL DE ILUMINACIÓN (Consola Central de Calibración v3.20) ===
+    // === CONTROL DE ILUMINACIÓN (Consola Central de Calibración v3.21) ===
     // =====================================================================================
     const LIGHTING_CONFIG = {
-      // --- INTENSIDADES BASE Y MODELADO (v3.20) ---
+      // --- INTENSIDADES BASE Y MODELADO (v3.21) ---
       light1_intensity: 0.10,        // Luz 1 (ECS Ground / Relleno cenital tenue a 0.10)
-      light_maxIntensity: 3.40,      // Techo base de potencia para luces directas
-      light2_ratio: 1.40,            // Luz 2 al doble de intensidad (potencia ~4.76)
-      light3_ratio: 1.40,            // Luz 3 (+40% de potencia: ~4.76)
-      light4_ratio: 0.70,            // Luz 4 fija opuesta (potencia ~2.38, igual a Luz 2 en v3.19)
+      light_maxIntensity: 3.00,      // Techo base de potencia para luces directas
+      light2_ratio: 1.40,            // Luz 2 al doble de intensidad (potencia ~4.20)
+      light3_ratio: 1.40,            // Luz 3 (+40% de potencia: ~4.20)
+      light4_ratio: 0.70,            // Luz 4 fija opuesta (potencia ~2.10, fija desde Frame 1)
       
       // --- SOBREIMPULSO POR FUENTES DIRECTAS POTENTES (> 235) ---
       boost_lum_threshold: 235,      // Umbral de luminancia para activar sobreimpulso (235-255)
       boost_multiplier: 1.30,        // Multiplicador contenido para lámparas reales / sol
       
-      // --- SOMBRAS DINÁMICAS FIJAS (v3.20: Opacidad 0.60 y Radio 8.0) ---
+      // --- SOMBRAS DINÁMICAS FIJAS (v3.21: Opacidad 0.60 y Radio 8.0) ---
       light1_castShadow: true,       // Sombra base de contacto en el suelo (Ground)
       shadow_radius_fixed: 8.0,      // Radio de sombra suave difusa ambiental fija (8.0)
       ground_opacity_fixed: 0.60,    // Opacidad fija del suelo (contacto sólido constante)
@@ -63,7 +63,7 @@
       light3_castShadow: false,
       light4_castShadow: false,
       
-      // --- RESTRICCIONES ESPACIALES Y TIEMPOS (v3.20) ---
+      // --- RESTRICCIONES ESPACIALES Y TIEMPOS (v3.21) ---
       light2_distance: 2.2,          // Distancia de proyección espacial
       min_light_height: 0.25,        // Altura mínima obligatoria sobre el plano de la mesa (25 cm)
       max_light_radius: 2.0,         // Radio espacial máximo respecto al centro [0,0,0] (2 metros)
@@ -87,9 +87,9 @@
       albedo_desaturation: 0.13,        // Desaturación del 13% en materiales para neutralizar el tono cálido
       light_chroma_tint_strength: 0.15, // Luces direccionales con 85% blanco neutro (evita teñir la comida)
       
-      // --- AMBIENTE, TONE MAPPING Y P90 CON DELTA CLAMP (v3.20: PMREM +10%) ---
-      exposure_base: 0.00,           // Exposición en oscuridad total
-      exposure_mult: 1.60,           // Multiplicador PMREM (+10% respecto a v3.19: 1.60)
+      // --- AMBIENTE, TONE MAPPING Y PMREM (v3.21: Base sólida anti-apagones) ---
+      exposure_base: 0.55,           // Suelo base garantizado (evita que el modo CAM se vuelva negro)
+      exposure_mult: 1.40,           // Rango dinámico ambiental (exposición final entre ~0.55 y ~1.95)
       reaction_speed: 0.35,          // Factor de respuesta fluida para exposición y PMREM
       p90_max_delta: 50,             // Delta Clamp: protección servilleta sin saturación por proximidad
       p90_weight: 0.60,              // Peso del Delta P90 en la luminancia efectiva
@@ -208,6 +208,7 @@
               if (nativeTHREE) {
                 _renderer.shadowMap.enabled = true;
                 _renderer.toneMapping = nativeTHREE.ACESFilmicToneMapping;
+                _renderer.toneMappingExposure = 1.0;
 
                 candidateDebounce.dir = new nativeTHREE.Vector3();
 
@@ -366,7 +367,7 @@
             const pmremCanvas = document.createElement('canvas');
             pmremCanvas.width = pmremSize;
             pmremCanvas.height = pmremSize;
-            const pmremCtx = pmremCanvas.getContext('2d');
+            const pmremCtx = pmremCanvas.getContext('2d', { willReadFrequently: true });
             
             const envTexture = new THREE_INSTANCE.CanvasTexture(pmremCanvas);
             envTexture.mapping = THREE_INSTANCE.EquirectangularReflectionMapping;
@@ -374,17 +375,17 @@
               envTexture.encoding = THREE_INSTANCE.sRGBEncoding;
             }
 
-            // === 2. MICRO-CANVAS CPU OFFLINE (16x16 - 256 píxeles para 0 latencia) ===
+            // === 2. MICRO-CANVAS CPU OFFLINE (16x16 = 256 píxeles para 0 latencia) ===
             const microSize = LIGHTING_CONFIG.micro_scan_size;
             const microCanvas = document.createElement('canvas');
             microCanvas.width = microSize;
             microCanvas.height = microSize;
             const microCtx = microCanvas.getContext('2d', { willReadFrequently: true });
 
-            let smoothedBrightness = 0;
+            let smoothedBrightness = 128;
             let lastScanTime = 0;
             const scanInterval = LIGHTING_CONFIG.scan_interval_ms;
-            let targetExposure = 0.0;
+            let targetExposure = 1.0;
 
             const probeNDC = new THREE_INSTANCE.Vector3();
             const camWorldPos = new THREE_INSTANCE.Vector3();
@@ -424,7 +425,6 @@
               slotLight3.anchoredDir.copy(newDir);
               slotLight3.anchoredIntensity = destIntensity;
 
-              // Si el modelo está fuera de cámara -> Encendido instantáneo (0 ms); Si es visible -> 3000 ms
               slotLight3.wakeDuration = isModelInFrustum() ? LIGHTING_CONFIG.wake_duration_visible_ms : 0;
 
               if (slotLight3.light) {
@@ -444,12 +444,15 @@
                 if (child.isMesh && child.material) {
                   const mats = Array.isArray(child.material) ? child.material : [child.material];
                   mats.forEach((mat) => {
+                    // Solo aplicamos a materiales PBR reales del modelo, evitando Ground o Hiders
+                    const isPBR = (mat.type === 'MeshStandardMaterial' || mat.type === 'MeshPhysicalMaterial');
+                    if (!isPBR) return;
+
                     const isMetal = mat.metalness !== undefined && mat.metalness > LIGHTING_CONFIG.metalness_bypass_threshold;
                     
                     // 1. Suelo de rugosidad anti-titileo
                     if (!isMetal && mat.roughness !== undefined && mat.roughness < LIGHTING_CONFIG.min_material_roughness) {
                       mat.roughness = LIGHTING_CONFIG.min_material_roughness;
-                      mat.needsUpdate = true;
                     }
 
                     // 2. Pedestal emisivo (+5% extra: 0.095 para levantar negros sin lavar la imagen)
@@ -457,18 +460,16 @@
                       const p = LIGHTING_CONFIG.emissive_pedestal;
                       if (mat.emissive.r < p && mat.emissive.g < p && mat.emissive.b < p) {
                         mat.emissive.setRGB(p, p, p);
-                        mat.needsUpdate = true;
                       }
                     }
 
                     // 3. Desaturación albedo (13%)
                     if (mat.color && !mat._desaturated) {
-                      const hsl = {};
+                      const hsl = { h: 0, s: 0, l: 0 };
                       mat.color.getHSL(hsl);
                       hsl.s = Math.max(0.0, hsl.s * (1.0 - LIGHTING_CONFIG.albedo_desaturation));
                       mat.color.setHSL(hsl.h, hsl.s, hsl.l);
                       mat._desaturated = true;
-                      mat.needsUpdate = true;
                     }
                   });
                 }
@@ -707,7 +708,6 @@
                           candidateDebounce.active = false;
                           candidateDebounce.consecutiveCycles = 0;
 
-                          // Color con 85% blanco neutro
                           rawEmitterColor.setRGB((upperR / upperCount) / 255, (upperG / upperCount) / 255, (upperB / upperCount) / 255);
                           targetEmitterColor.setRGB(1, 1, 1).lerp(rawEmitterColor, LIGHTING_CONFIG.light_chroma_tint_strength);
 
@@ -727,8 +727,8 @@
                     }
                   }
 
-                  // --- EXPOSICIÓN AMBIENTAL PMREM (+10% v3.20) ---
-                  targetExposure = normalizedBrightness * LIGHTING_CONFIG.exposure_mult * 0.65;
+                  // --- EXPOSICIÓN AMBIENTAL PMREM (Suelo base 0.55 garantizado anti-apagones) ---
+                  targetExposure = LIGHTING_CONFIG.exposure_base + (normalizedBrightness * LIGHTING_CONFIG.exposure_mult);
                 }
 
                 // 3. ACTUALIZACIÓN CINEMÁTICA Y LERPS DE LUCES
@@ -772,7 +772,7 @@
                 // Calibración Scene Viewer (Pedestal y Suelo de rugosidad)
                 aplicarAjustesSceneViewer();
 
-                // 4. ACTUALIZACIÓN PMREM GPU (Exclusivo WebGL)
+                // 4. ACTUALIZACIÓN PMREM GPU
                 envTexture.needsUpdate = true;
                 const oldRT = cameraRT;
                 cameraRT = pmremGenerator.fromEquirectangular(envTexture);
