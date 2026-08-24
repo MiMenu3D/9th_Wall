@@ -1,4 +1,4 @@
-<!-- 9th Wall v3.33 Apple Probe -->
+<!-- 9th Wall v3.34 Apple Probe -->
 <html>
 <head>
   <meta charset="UTF-8">
@@ -18,7 +18,7 @@
     style="position:fixed;top:10px;right:10px;z-index:1000000;background:rgba(0,0,0,0.9);color:#0f0;font-family:monospace;font-size:12px;padding:8px;border-radius:4px;cursor:pointer;line-height:1.2;border:1px solid #0f0;">
     <div id="debugTitle">FPS: --</div>
     <div id="debugContent">
-      ar-world: v3.33<br>
+      ar-world: v3.34<br>
       bundle: v3.10y<br>
       <span id="lightsCountSpan" style="color:#0f0;">Luces: 3</span><br>
       <span id="latencySpan" style="color:#0f0;">Latencia: -- ms</span>
@@ -41,34 +41,36 @@
 
   <script>
     // =====================================================================================
-    // === CONTROL DE ILUMINACIÓN (Consola Central de Calibración v3.33) ===
+    // === CONTROL DE ILUMINACIÓN (Consola Central de Calibración v3.34) ===
     // =====================================================================================
     const LIGHTING_CONFIG = {
-      // --- INTENSIDADES BASE ---
+      // --- INTENSIDADES BASE (-25% EN LUCES 2, 3 Y 4) ---
       light1_intensity: 0.00,        // Luz 1 (ECS Ground / Cenital): 0.00 (apagada)
       light_maxIntensity: 3.40,      // Techo base de potencia para luces directas
-      light2_ratio: 2.90,            // Luz 2 ajustada a 2.90 (~9.86 peak) a 30º
-      light3_ratio: 0.27,            // Luz 3 (-50% de potencia: ~0.92) a 30º con cono de 35º
-      light4_ratio: 0.59,            // Luz 4 (+15% de potencia: ~2.00, espejo a 30º)
+      light2_ratio: 2.18,            // Luz 2 (-25%: ~7.41 peak) a 40º
+      light3_ratio: 0.20,            // Luz 3 (-25%: ~0.68) a 30º con cono de 35º
+      light4_ratio: 0.44,            // Luz 4 (-25%: ~1.50, espejo a 40º)
       
       // --- SOBREIMPULSO POR FUENTES DIRECTAS POTENTES (> 235) ---
       boost_lum_threshold: 235,      // Umbral de luminancia para sobreimpulso
       boost_multiplier: 1.25,        // Multiplicador contenido
       
-      // --- SOMBRAS DINÁMICAS (MAPA 1024x1024 Y FRUSTUM MILIMÉTRICO) ---
-      shadow_map_size: 1024,         // Resolución de ShadowMap subida a 1024x1024 para pruebas
+      // --- SOMBRAS DINÁMICAS (MAPA 1024x1024 Y OPACIDAD DIFERENCIADA) ---
+      shadow_map_size: 1024,         // Resolución de ShadowMap fijada a 1024x1024
       light1_castShadow: true,       // Sombra base cenital de contacto en el suelo (Ground)
-      shadow_radius_fixed: 7.0,      // Radio difuso suave para Luz 1 (Ground AO)
-      shadow_radius_light2: 3.5,     // Radio para Luz 2 (la mitad de difuminado que Luz 1)
-      ground_opacity_fixed: 0.50,    // Opacidad fija del suelo (0.50)
-      light2_castShadow: true,       // Sombra direccional activa en Luz 2 con frustum ajustado
+      shadow_radius_fixed: 12.0,     // Radio difuso suave para Luz 1 (Ground AO) en mapa 1024
+      shadow_radius_light2: 2.0,     // Radio nítido para Luz 2 (definida y sutil)
+      ground_opacity_fixed: 0.50,    // Opacidad base de sombra en suelo (Luz 1 al 100%)
+      light2_shadow_weight: 0.125,   // Opacidad propia de Luz 2 (1/8 de la sombra de Luz 1)
+      light2_castShadow: true,       // Sombra direccional activa en Luz 2
       light3_castShadow: false,
       light4_castShadow: false,
       
-      // --- RESTRICCIONES ESPACIALES (LUCES A 30º DE ELEVACIÓN) ---
+      // --- RESTRICCIONES ESPACIALES (LUCES 2/4 A 40º, LUZ 3 A 30º) ---
       light_distance: 2.2,           // Distancia de proyección espacial
       min_light_height: 0.25,        // Altura mínima obligatoria (25 cm sobre el plano SLAM)
-      elevation_angle_lights: (30.0 * Math.PI) / 180.0, // Ángulo rasante fijado a 30º
+      elevation_angle_light2_4: (40.0 * Math.PI) / 180.0, // Ángulo subido 10º para Luces 2 y 4 (40º)
+      elevation_angle_light3: (30.0 * Math.PI) / 180.0,   // Ángulo a 30º para Luz 3
       min_separation_angle: (35.0 * Math.PI) / 180.0,     // Cono de exclusión de 35º respecto a luces 2 y 4
       upper_third_limit: 0.35,       // Tercio superior para posición inicial de Luz 3
       
@@ -180,12 +182,25 @@
                   slot.anchoredDir = new nativeTHREE.Vector3(0, 1, 0);
                 });
 
-                // Captura del Ground y Luz 1 (Ajuste de ShadowCamera a 50cm, radio 7.0 y opacidad 0.50)
+                // Captura del Ground y Luz 1 (Ajuste de ShadowCamera a 50cm, radio 12.0 y opacidad 0.50 con shader ponderado)
                 _scene.traverse((node) => {
                   if (node.isMesh && node.material && (node.material.type === 'ShadowMaterial' || node.name === 'Ground')) {
                     _groundMesh = node;
                     if (_groundMesh.material) {
                       _groundMesh.material.opacity = LIGHTING_CONFIG.ground_opacity_fixed;
+                      
+                      // Inyección en el shader para dar a Luz 2 exactamente 1/8 de la opacidad de Luz 1
+                      _groundMesh.material.onBeforeCompile = (shader) => {
+                        shader.fragmentShader = shader.fragmentShader.replace(
+                          'shadow *= receiveShadow ? getShadow( directionalShadowMap[ i ], directionalLightShadow.shadowMapSize, directionalLightShadow.shadowBias, directionalLightShadow.shadowRadius, vDirectionalShadowCoord[ i ] ) : 1.0;',
+                          `
+                          float currentShadow = receiveShadow ? getShadow( directionalShadowMap[ i ], directionalLightShadow.shadowMapSize, directionalLightShadow.shadowBias, directionalLightShadow.shadowRadius, vDirectionalShadowCoord[ i ] ) : 1.0;
+                          float shadowWeight = (i == 0) ? 1.0 : ${LIGHTING_CONFIG.light2_shadow_weight.toFixed(4)};
+                          shadow *= (1.0 - (1.0 - currentShadow) * shadowWeight);
+                          `
+                        );
+                      };
+                      _groundMesh.material.needsUpdate = true;
                     }
                   }
                   if (node.isDirectionalLight) {
@@ -212,9 +227,9 @@
                   }
                 });
 
-                // 1. Instanciamos Luz 2 (Modelado principal a 30º con frustum milimétrico idéntico a Luz 1)
+                // 1. Instanciamos Luz 2 (Modelado principal a 40º con frustum milimétrico y radio 2.0)
                 slotLight2.light = new nativeTHREE.DirectionalLight(0xffffff, 0.0);
-                slotLight2.light.position.set(0, 1.10, -1.91);
+                slotLight2.light.position.set(0, 1.41, -1.69);
                 slotLight2.light.castShadow = LIGHTING_CONFIG.light2_castShadow;
                 if (slotLight2.light.shadow) {
                   slotLight2.light.shadow.mapSize.width = LIGHTING_CONFIG.shadow_map_size;
@@ -234,16 +249,16 @@
                 _scene.add(slotLight2.light);
                 _scene.add(slotLight2.light.target);
 
-                // 2. Instanciamos Luz 3 (A la misma altura 30º que Luz 2 y con cono de 35º)
+                // 2. Instanciamos Luz 3 (A 30º de elevación y con cono de 35º)
                 slotLight3.light = new nativeTHREE.DirectionalLight(0xffffff, 0.0);
                 slotLight3.light.position.set(1.35, 1.10, -1.35);
                 slotLight3.light.castShadow = LIGHTING_CONFIG.light3_castShadow;
                 _scene.add(slotLight3.light);
                 _scene.add(slotLight3.light.target);
 
-                // 3. Instanciamos Luz 4 (Posición espejo opuesta a 30º)
+                // 3. Instanciamos Luz 4 (Posición espejo opuesta a 40º)
                 slotLight4.light = new nativeTHREE.DirectionalLight(0xffffff, 0.0);
-                slotLight4.light.position.set(0, 1.10, 1.91);
+                slotLight4.light.position.set(0, 1.41, 1.69);
                 slotLight4.light.castShadow = LIGHTING_CONFIG.light4_castShadow;
                 _scene.add(slotLight4.light);
                 _scene.add(slotLight4.light.target);
@@ -496,21 +511,28 @@
                   }
 
                   const baseDirectIntensity = normalizedBrightness * LIGHTING_CONFIG.light_maxIntensity * boostFactor;
-                  slotLight2.targetIntensity = baseDirectIntensity * LIGHTING_CONFIG.light2_ratio; // Luz 2 (2.90 ratio)
-                  slotLight3.targetIntensity = baseDirectIntensity * LIGHTING_CONFIG.light3_ratio; // Luz 3 (-50% potencia: ~0.92)
-                  slotLight4.targetIntensity = baseDirectIntensity * LIGHTING_CONFIG.light4_ratio; // Luz 4 (+15% potencia: ~2.00)
+                  slotLight2.targetIntensity = baseDirectIntensity * LIGHTING_CONFIG.light2_ratio; // Luz 2 (2.18 ratio)
+                  slotLight3.targetIntensity = baseDirectIntensity * LIGHTING_CONFIG.light3_ratio; // Luz 3 (0.20 ratio)
+                  slotLight4.targetIntensity = baseDirectIntensity * LIGHTING_CONFIG.light4_ratio; // Luz 4 (0.44 ratio)
 
                   // =========================================================================
-                  // FRAME 1: POSICIONAMIENTO GEOMÉTRICO (Luces 2, 3 y 4 a 30º, Luz 3 con cono 35º)
+                  // FRAME 1: POSICIONAMIENTO GEOMÉTRICO (Luces 2/4 a 40º, Luz 3 a 30º)
                   // =========================================================================
                   if (!initialLightsPlaced && _activeCamera) {
                     _activeCamera.getWorldPosition(camWorldPos);
                     const r = LIGHTING_CONFIG.light_distance;
-                    const elevAngle = LIGHTING_CONFIG.elevation_angle_lights;
-                    const initY = Math.max(LIGHTING_CONFIG.min_light_height, Math.sin(elevAngle) * r);
-                    const initXZ = Math.cos(elevAngle) * r;
 
-                    // 1. Posición de Luz 2 (Ángulo a 30º de elevación)
+                    // 1. Luces 2 y 4 a 40º de elevación
+                    const elevAngle2_4 = LIGHTING_CONFIG.elevation_angle_light2_4;
+                    const initY2_4 = Math.max(LIGHTING_CONFIG.min_light_height, Math.sin(elevAngle2_4) * r);
+                    const initXZ2_4 = Math.cos(elevAngle2_4) * r;
+
+                    // 2. Luz 3 a 30º de elevación
+                    const elevAngle3 = LIGHTING_CONFIG.elevation_angle_light3;
+                    const initY3 = Math.max(LIGHTING_CONFIG.min_light_height, Math.sin(elevAngle3) * r);
+                    const initXZ3 = Math.cos(elevAngle3) * r;
+
+                    // Posicionamiento de Luz 2
                     let targetX2 = pmremSize * 0.5;
                     let targetY2 = pmremSize * 0.4;
                     let dominantBin = 0, maxBinCount = 0;
@@ -532,23 +554,23 @@
                     rayDir2.subVectors(probeNDC, camWorldPos).normalize();
 
                     const azimLen2 = Math.hypot(rayDir2.x, rayDir2.z) || 1.0;
-                    const posX2 = (rayDir2.x / azimLen2) * initXZ;
-                    const posZ2 = (rayDir2.z / azimLen2) * initXZ;
+                    const posX2 = (rayDir2.x / azimLen2) * initXZ2_4;
+                    const posZ2 = (rayDir2.z / azimLen2) * initXZ2_4;
 
                     if (slotLight2.light) {
-                      slotLight2.light.position.set(posX2, initY, posZ2);
+                      slotLight2.light.position.set(posX2, initY2_4, posZ2);
                       slotLight2.anchoredDir.copy(slotLight2.light.position).normalize();
                       slotLight2.light.intensity = slotLight2.targetIntensity;
                     }
 
-                    // 2. Posición de Luz 4 (Posición espejo opuesta a 30º y misma altura)
+                    // Posicionamiento de Luz 4 (Posición espejo opuesta a 40º)
                     if (slotLight4.light) {
-                      slotLight4.light.position.set(-posX2, initY, -posZ2);
+                      slotLight4.light.position.set(-posX2, initY2_4, -posZ2);
                       slotLight4.anchoredDir.copy(slotLight4.light.position).normalize();
                       slotLight4.light.intensity = slotLight4.targetIntensity;
                     }
 
-                    // 3. Posición de Luz 3 (Misma altura a 30º que Luz 2 y 4, con cono de exclusión de 35º)
+                    // Posicionamiento de Luz 3 (a 30º con cono de exclusión de 35º)
                     let targetX3 = pmremSize * 0.65;
                     let targetY3 = pmremSize * 0.20;
                     if (upperCount > 0) {
@@ -575,11 +597,11 @@
                     }
 
                     const azimLen3 = Math.hypot(rayDir3.x, rayDir3.z) || 1.0;
-                    const posX3 = (rayDir3.x / azimLen3) * initXZ;
-                    const posZ3 = (rayDir3.z / azimLen3) * initXZ;
+                    const posX3 = (rayDir3.x / azimLen3) * initXZ3;
+                    const posZ3 = (rayDir3.z / azimLen3) * initXZ3;
 
                     if (slotLight3.light) {
-                      slotLight3.light.position.set(posX3, initY, posZ3);
+                      slotLight3.light.position.set(posX3, initY3, posZ3);
                       slotLight3.anchoredDir.copy(slotLight3.light.position).normalize();
                       slotLight3.light.intensity = slotLight3.targetIntensity;
                     }
