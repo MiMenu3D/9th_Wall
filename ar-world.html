@@ -1,4 +1,4 @@
-<!-- 9th Wall v3.31 Apple Probe -->
+<!-- 9th Wall v3.32 Apple Probe -->
 <html>
 <head>
   <meta charset="UTF-8">
@@ -18,7 +18,7 @@
     style="position:fixed;top:10px;right:10px;z-index:1000000;background:rgba(0,0,0,0.9);color:#0f0;font-family:monospace;font-size:12px;padding:8px;border-radius:4px;cursor:pointer;line-height:1.2;border:1px solid #0f0;">
     <div id="debugTitle">FPS: --</div>
     <div id="debugContent">
-      ar-world: v3.31<br>
+      ar-world: v3.32<br>
       bundle: v3.10y<br>
       <span id="lightsCountSpan" style="color:#0f0;">Luces: 3</span><br>
       <span id="latencySpan" style="color:#0f0;">Latencia: -- ms</span>
@@ -41,7 +41,7 @@
 
   <script>
     // =====================================================================================
-    // === CONTROL DE ILUMINACIÓN (Consola Central de Calibración v3.31) ===
+    // === CONTROL DE ILUMINACIÓN (Consola Central de Calibración v3.32) ===
     // =====================================================================================
     const LIGHTING_CONFIG = {
       // --- INTENSIDADES BASE ---
@@ -58,15 +58,15 @@
       // --- SOMBRAS DINÁMICAS FIJAS ---
       light1_castShadow: true,       // Sombra base de contacto en el suelo (Ground)
       shadow_radius_fixed: 7.0,      // Radio suavizado a 7.0 (+1 punto de difuminado)
-      ground_opacity_fixed: 0.60,    // Opacidad fija del suelo (0.60)
-      light2_castShadow: false,
+      ground_opacity_fixed: 0.50,    // Opacidad fija del suelo (0.60)
+      light2_castShadow: true,
       light3_castShadow: false,
       light4_castShadow: false,
       
       // --- RESTRICCIONES ESPACIALES (LUCES A 30º DE ELEVACIÓN) ---
       light_distance: 2.2,           // Distancia de proyección espacial
       min_light_height: 0.25,        // Altura mínima obligatoria (25 cm sobre el plano SLAM)
-      elevation_angle_lights: (30.0 * Math.PI) / 180.0, // Ángulo subido de nuevo a 30º
+      elevation_angle_lights: (30.0 * Math.PI) / 180.0, // Ángulo rasante fijado a 30º
       min_separation_angle: (35.0 * Math.PI) / 180.0,     // Cono de exclusión de 35º respecto a luces 2 y 4
       upper_third_limit: 0.35,       // Tercio superior para posición inicial de Luz 3
       
@@ -84,11 +84,11 @@
       p90_weight: 0.70,              // Peso del Percentil P90
       avg_weight: 0.30,              // Peso del promedio global
       
-      // --- RENDIMIENTO PMREM 32x32 A 200 MS / ISO A 300 MS ---
-      pmrem_resolution: 32,          // PMREM optimizado a 32x32 para máximo rendimiento GPU
+      // --- RENDIMIENTO PMREM 64x64 A 200 MS / ISO A 300 MS ---
+      pmrem_resolution: 128,          // PMREM restaurado a 64x64 (mínimo técnico de Three.js)
       pmrem_interval_ms: 200,        // Actualización PMREM GPU rápida cada 200 ms
       scan_interval_ms: 300,         // Escaneo de ISO cada 300 ms
-      scan_pixel_step: 16            // Muestreo en CPU sobre 32x32 (256 píxeles evaluados)
+      scan_pixel_step: 8            // Muestreo en CPU sobre 64x64 (1.024 píxeles evaluados)
     };
     // =====================================================================================
 
@@ -322,7 +322,7 @@
                }, lightEstimationInterval);
             ===================================================================================== */
 
-            // === CONFIGURACIÓN DEL PMREM A 32x32 ===
+            // === CONFIGURACIÓN DEL PMREM A 64x64 ===
             const pmremSize = LIGHTING_CONFIG.pmrem_resolution;
             const pmremCanvas = document.createElement('canvas');
             pmremCanvas.width = pmremSize;
@@ -388,7 +388,7 @@
                 const now = performance.now();
 
                 // =========================================================================
-                // 1. ESCANEO ISO Y ESTIMACIÓN DE LUZ (Cada 300 ms - 256 px evaluados sobre 32x32)
+                // 1. ESCANEO ISO Y ESTIMACIÓN DE LUZ (Cada 300 ms - 1.024 px evaluados sobre 64x64)
                 // =========================================================================
                 if (now - lastScanTime >= LIGHTING_CONFIG.scan_interval_ms) {
                   lastScanTime = now;
@@ -579,7 +579,7 @@
                 }
 
                 // =========================================================================
-                // 2. ACTUALIZACIÓN PMREM GPU RÁPIDA A 32x32 (Cada 200 ms)
+                // 2. ACTUALIZACIÓN PMREM GPU RÁPIDA A 64x64 (Cada 200 ms)
                 // =========================================================================
                 if (now - lastPmremTime >= LIGHTING_CONFIG.pmrem_interval_ms) {
                   lastPmremTime = now;
