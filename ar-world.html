@@ -1,4 +1,4 @@
-<!-- 9th Wall v3.32 Apple Probe -->
+<!-- 9th Wall v3.33 Apple Probe -->
 <html>
 <head>
   <meta charset="UTF-8">
@@ -18,7 +18,7 @@
     style="position:fixed;top:10px;right:10px;z-index:1000000;background:rgba(0,0,0,0.9);color:#0f0;font-family:monospace;font-size:12px;padding:8px;border-radius:4px;cursor:pointer;line-height:1.2;border:1px solid #0f0;">
     <div id="debugTitle">FPS: --</div>
     <div id="debugContent">
-      ar-world: v3.32<br>
+      ar-world: v3.33<br>
       bundle: v3.10y<br>
       <span id="lightsCountSpan" style="color:#0f0;">Luces: 3</span><br>
       <span id="latencySpan" style="color:#0f0;">Latencia: -- ms</span>
@@ -41,13 +41,13 @@
 
   <script>
     // =====================================================================================
-    // === CONTROL DE ILUMINACIÓN (Consola Central de Calibración v3.32) ===
+    // === CONTROL DE ILUMINACIÓN (Consola Central de Calibración v3.33) ===
     // =====================================================================================
     const LIGHTING_CONFIG = {
       // --- INTENSIDADES BASE ---
       light1_intensity: 0.00,        // Luz 1 (ECS Ground / Cenital): 0.00 (apagada)
       light_maxIntensity: 3.40,      // Techo base de potencia para luces directas
-      light2_ratio: 3.88,            // Luz 2 (+25% de potencia: ~13.19 peak) a 30º
+      light2_ratio: 2.90,            // Luz 2 ajustada a 2.90 (~9.86 peak) a 30º
       light3_ratio: 0.27,            // Luz 3 (-50% de potencia: ~0.92) a 30º con cono de 35º
       light4_ratio: 0.59,            // Luz 4 (+15% de potencia: ~2.00, espejo a 30º)
       
@@ -55,11 +55,13 @@
       boost_lum_threshold: 235,      // Umbral de luminancia para sobreimpulso
       boost_multiplier: 1.25,        // Multiplicador contenido
       
-      // --- SOMBRAS DINÁMICAS FIJAS ---
-      light1_castShadow: true,       // Sombra base de contacto en el suelo (Ground)
-      shadow_radius_fixed: 7.0,      // Radio suavizado a 7.0 (+1 punto de difuminado)
-      ground_opacity_fixed: 0.50,    // Opacidad fija del suelo (0.60)
-      light2_castShadow: true,
+      // --- SOMBRAS DINÁMICAS (MAPA 1024x1024 Y FRUSTUM MILIMÉTRICO) ---
+      shadow_map_size: 1024,         // Resolución de ShadowMap subida a 1024x1024 para pruebas
+      light1_castShadow: true,       // Sombra base cenital de contacto en el suelo (Ground)
+      shadow_radius_fixed: 7.0,      // Radio difuso suave para Luz 1 (Ground AO)
+      shadow_radius_light2: 3.5,     // Radio para Luz 2 (la mitad de difuminado que Luz 1)
+      ground_opacity_fixed: 0.50,    // Opacidad fija del suelo (0.50)
+      light2_castShadow: true,       // Sombra direccional activa en Luz 2 con frustum ajustado
       light3_castShadow: false,
       light4_castShadow: false,
       
@@ -84,11 +86,11 @@
       p90_weight: 0.70,              // Peso del Percentil P90
       avg_weight: 0.30,              // Peso del promedio global
       
-      // --- RENDIMIENTO PMREM 64x64 A 200 MS / ISO A 300 MS ---
-      pmrem_resolution: 128,          // PMREM restaurado a 64x64 (mínimo técnico de Three.js)
+      // --- RENDIMIENTO PMREM 128x128 A 200 MS / ISO A 300 MS ---
+      pmrem_resolution: 128,         // PMREM a 128x128
       pmrem_interval_ms: 200,        // Actualización PMREM GPU rápida cada 200 ms
       scan_interval_ms: 300,         // Escaneo de ISO cada 300 ms
-      scan_pixel_step: 8            // Muestreo en CPU sobre 64x64 (1.024 píxeles evaluados)
+      scan_pixel_step: 8             // Muestreo en CPU sobre 128x128
     };
     // =====================================================================================
 
@@ -178,7 +180,7 @@
                   slot.anchoredDir = new nativeTHREE.Vector3(0, 1, 0);
                 });
 
-                // Captura del Ground y Luz 1 (Ajuste de ShadowCamera a 50cm, radio 7.0 y opacidad 0.60)
+                // Captura del Ground y Luz 1 (Ajuste de ShadowCamera a 50cm, radio 7.0 y opacidad 0.50)
                 _scene.traverse((node) => {
                   if (node.isMesh && node.material && (node.material.type === 'ShadowMaterial' || node.name === 'Ground')) {
                     _groundMesh = node;
@@ -190,8 +192,8 @@
                     _baseLight1 = node;
                     node.intensity = LIGHTING_CONFIG.light1_intensity; // Luz ECS a 0.00
                     if (node.shadow) {
-                      node.shadow.mapSize.width = 512;
-                      node.shadow.mapSize.height = 512;
+                      node.shadow.mapSize.width = LIGHTING_CONFIG.shadow_map_size;
+                      node.shadow.mapSize.height = LIGHTING_CONFIG.shadow_map_size;
                       node.shadow.radius = LIGHTING_CONFIG.shadow_radius_fixed;
                       if (node.shadow.camera) {
                         node.shadow.camera.left = -0.50;
@@ -210,10 +212,25 @@
                   }
                 });
 
-                // 1. Instanciamos Luz 2 (Modelado principal a 30º)
+                // 1. Instanciamos Luz 2 (Modelado principal a 30º con frustum milimétrico idéntico a Luz 1)
                 slotLight2.light = new nativeTHREE.DirectionalLight(0xffffff, 0.0);
                 slotLight2.light.position.set(0, 1.10, -1.91);
                 slotLight2.light.castShadow = LIGHTING_CONFIG.light2_castShadow;
+                if (slotLight2.light.shadow) {
+                  slotLight2.light.shadow.mapSize.width = LIGHTING_CONFIG.shadow_map_size;
+                  slotLight2.light.shadow.mapSize.height = LIGHTING_CONFIG.shadow_map_size;
+                  slotLight2.light.shadow.radius = LIGHTING_CONFIG.shadow_radius_light2;
+                  slotLight2.light.shadow.bias = -0.0005;
+                  if (slotLight2.light.shadow.camera) {
+                    slotLight2.light.shadow.camera.left = -0.50;
+                    slotLight2.light.shadow.camera.right = 0.50;
+                    slotLight2.light.shadow.camera.top = 0.50;
+                    slotLight2.light.shadow.camera.bottom = -0.50;
+                    slotLight2.light.shadow.camera.near = 0.1;
+                    slotLight2.light.shadow.camera.far = 10;
+                    slotLight2.light.shadow.camera.updateProjectionMatrix();
+                  }
+                }
                 _scene.add(slotLight2.light);
                 _scene.add(slotLight2.light.target);
 
@@ -322,7 +339,7 @@
                }, lightEstimationInterval);
             ===================================================================================== */
 
-            // === CONFIGURACIÓN DEL PMREM A 64x64 ===
+            // === CONFIGURACIÓN DEL PMREM A 128x128 ===
             const pmremSize = LIGHTING_CONFIG.pmrem_resolution;
             const pmremCanvas = document.createElement('canvas');
             pmremCanvas.width = pmremSize;
@@ -388,7 +405,7 @@
                 const now = performance.now();
 
                 // =========================================================================
-                // 1. ESCANEO ISO Y ESTIMACIÓN DE LUZ (Cada 300 ms - 1.024 px evaluados sobre 64x64)
+                // 1. ESCANEO ISO Y ESTIMACIÓN DE LUZ (Cada 300 ms)
                 // =========================================================================
                 if (now - lastScanTime >= LIGHTING_CONFIG.scan_interval_ms) {
                   lastScanTime = now;
@@ -479,7 +496,7 @@
                   }
 
                   const baseDirectIntensity = normalizedBrightness * LIGHTING_CONFIG.light_maxIntensity * boostFactor;
-                  slotLight2.targetIntensity = baseDirectIntensity * LIGHTING_CONFIG.light2_ratio; // Luz 2 (+25% potencia: ~13.19 peak)
+                  slotLight2.targetIntensity = baseDirectIntensity * LIGHTING_CONFIG.light2_ratio; // Luz 2 (2.90 ratio)
                   slotLight3.targetIntensity = baseDirectIntensity * LIGHTING_CONFIG.light3_ratio; // Luz 3 (-50% potencia: ~0.92)
                   slotLight4.targetIntensity = baseDirectIntensity * LIGHTING_CONFIG.light4_ratio; // Luz 4 (+15% potencia: ~2.00)
 
@@ -579,7 +596,7 @@
                 }
 
                 // =========================================================================
-                // 2. ACTUALIZACIÓN PMREM GPU RÁPIDA A 64x64 (Cada 200 ms)
+                // 2. ACTUALIZACIÓN PMREM GPU RÁPIDA A 128x128 (Cada 200 ms)
                 // =========================================================================
                 if (now - lastPmremTime >= LIGHTING_CONFIG.pmrem_interval_ms) {
                   lastPmremTime = now;
