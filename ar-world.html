@@ -1,4 +1,4 @@
-<!-- 9th Wall v3.37 Apple Probe -->
+<!-- 9th Wall v3.38 Apple Probe -->
 <html>
 <head>
   <meta charset="UTF-8">
@@ -18,9 +18,9 @@
     style="position:fixed;top:10px;right:10px;z-index:1000000;background:rgba(0,0,0,0.9);color:#0f0;font-family:monospace;font-size:12px;padding:8px;border-radius:4px;cursor:pointer;line-height:1.2;border:1px solid #0f0;">
     <div id="debugTitle">FPS: --</div>
     <div id="debugContent">
-      ar-world: v3.37<br>
-      bundle: v3.10y<br>
-      <span id="lightsCountSpan" style="color:#0f0;">Luces: 3</span><br>
+      ar-world: v3.38<br>
+      bundle: v3.38<br>
+      <span id="lightsCountSpan" style="color:#0f0;">Luces: ECS (4)</span><br>
       <span id="latencySpan" style="color:#0f0;">Latencia: -- ms</span>
     </div>
   </div>
@@ -41,11 +41,11 @@
 
   <script>
     // =====================================================================================
-    // === CONTROL DE ILUMINACIÓN (Consola Central de Calibración v3.37) ===
+    // === CONTROL DE ILUMINACIÓN (Consola Central de Calibración v3.38) ===
     // =====================================================================================
     const LIGHTING_CONFIG = {
-      // --- INTENSIDADES BASE ---
-      light1_intensity: 0.00,        // Luz 1 (ECS Ground / Cenital): 0.00 (apagada)
+      // --- INTENSIDADES BASE (DEFINIDAS EN BUNDLE ECS PARA ESTA PRUEBA) ---
+      light1_intensity: 0.00,        // Luz 1 (ECS Ground / Cenital): 0.00
       light_maxIntensity: 3.40,      // Techo base de potencia para luces directas
       light2_ratio: 2.18,            // Luz 2 (-25%: ~7.41 peak) a 40º
       light3_ratio: 0.20,            // Luz 3 (-25%: ~0.68) a 30º con cono de 35º
@@ -55,12 +55,13 @@
       boost_lum_threshold: 235,      // Umbral de luminancia para sobreimpulso
       boost_multiplier: 1.25,        // Multiplicador contenido
       
-      // --- SOMBRAS DINÁMICAS (MAPA 1024x1024 Y DUAL RADIUS) ---
+      // --- SOMBRAS DINÁMICAS (MAPA 1024x1024 Y DUAL RADIUS EN ECS) ---
       shadow_map_size: 1024,         // Resolución de ShadowMap fijada a 1024x1024
       light1_castShadow: true,       // Sombra base cenital de contacto en el suelo (Ground)
       shadow_radius_fixed: 12.0,     // Radio difuso suave para Luz 1 (Ground AO)
       shadow_radius_light2: 2.0,     // Radio nítido para Luz 2 (definida y sutil)
       ground_opacity_fixed: 0.40,    // Opacidad fija equilibrada del suelo (0.40)
+      light2_shadow_opacity: 0.0625, // Opacidad propia en bundle para Luz 2 (1/8 de Luz 1)
       light2_castShadow: true,       // Sombra direccional activa en Luz 2
       light3_castShadow: false,
       light4_castShadow: false,
@@ -120,28 +121,23 @@
     let envMode = 'cam';
     let _scene = null, _renderer = null, _activeCamera = null, _groundMesh = null, _baseLight1 = null;
 
-    // Estructura para ranuras de luz direccional fijas
-    const crearRanuraLuz = () => ({
-      light: null,
-      anchoredDir: null,
-      targetIntensity: 0.0
-    });
+    /* =====================================================================================
+       LUCES DINÁMICAS EN RUNTIME HTML (v3.37) - COMENTADAS PARA PRUEBA DE LUCES EN BUNDLE ECS
+       -------------------------------------------------------------------------------------
+       const crearRanuraLuz = () => ({
+         light: null,
+         anchoredDir: null,
+         targetIntensity: 0.0
+       });
 
-    const slotLight2 = crearRanuraLuz();
-    const slotLight3 = crearRanuraLuz();
-    const slotLight4 = crearRanuraLuz();
-    const carruselSlots = [slotLight2, slotLight3, slotLight4];
+       const slotLight2 = crearRanuraLuz();
+       const slotLight3 = crearRanuraLuz();
+       const slotLight4 = crearRanuraLuz();
+       const carruselSlots = [slotLight2, slotLight3, slotLight4];
+    ===================================================================================== */
 
     let previousAvgLum = 128;
-    let initialLightsPlaced = false; // Se posicionan en Frame 1 y se apaga el rastreo
-    let totalLightsDetected = 3; // Luces 2, 3 y 4 activas
-
-    const actualizarContadorLuces = () => {
-      const lightsSpan = document.getElementById('lightsCountSpan');
-      if (lightsSpan) {
-        lightsSpan.innerText = `Luces: ${totalLightsDetected}`;
-      }
-    };
+    let initialLightsPlaced = false;
 
     document.getElementById('envToggle').addEventListener('click', (e) => {
       toggleEnv();
@@ -177,11 +173,7 @@
                 _renderer.shadowMap.enabled = true;
                 _renderer.toneMapping = nativeTHREE.ACESFilmicToneMapping;
 
-                carruselSlots.forEach(slot => {
-                  slot.anchoredDir = new nativeTHREE.Vector3(0, 1, 0);
-                });
-
-                // Captura del Ground y Luz 1 (Ajuste de ShadowCamera a 50cm, radio 12.0 y opacidad equilibrada a 0.40)
+                // Captura del Ground y Luces ECS
                 _scene.traverse((node) => {
                   if (node.isMesh && node.material && (node.material.type === 'ShadowMaterial' || node.name === 'Ground')) {
                     _groundMesh = node;
@@ -190,12 +182,13 @@
                     }
                   }
                   if (node.isDirectionalLight) {
-                    _baseLight1 = node;
-                    node.intensity = LIGHTING_CONFIG.light1_intensity; // Luz ECS a 0.00
+                    if (node.name === 'Directional Light') {
+                      _baseLight1 = node;
+                      node.intensity = LIGHTING_CONFIG.light1_intensity;
+                    }
                     if (node.shadow) {
                       node.shadow.mapSize.width = LIGHTING_CONFIG.shadow_map_size;
                       node.shadow.mapSize.height = LIGHTING_CONFIG.shadow_map_size;
-                      node.shadow.radius = LIGHTING_CONFIG.shadow_radius_fixed;
                       if (node.shadow.camera) {
                         node.shadow.camera.left = -0.50;
                         node.shadow.camera.right = 0.50;
@@ -213,41 +206,23 @@
                   }
                 });
 
-                // 1. Instanciamos Luz 2 (Modelado principal a 40º con frustum milimétrico y radio 2.0)
-                slotLight2.light = new nativeTHREE.DirectionalLight(0xffffff, 0.0);
-                slotLight2.light.position.set(0, 1.41, -1.69);
-                slotLight2.light.castShadow = LIGHTING_CONFIG.light2_castShadow;
-                if (slotLight2.light.shadow) {
-                  slotLight2.light.shadow.mapSize.width = LIGHTING_CONFIG.shadow_map_size;
-                  slotLight2.light.shadow.mapSize.height = LIGHTING_CONFIG.shadow_map_size;
-                  slotLight2.light.shadow.radius = LIGHTING_CONFIG.shadow_radius_light2;
-                  slotLight2.light.shadow.bias = -0.0005;
-                  if (slotLight2.light.shadow.camera) {
-                    slotLight2.light.shadow.camera.left = -0.50;
-                    slotLight2.light.shadow.camera.right = 0.50;
-                    slotLight2.light.shadow.camera.top = 0.50;
-                    slotLight2.light.shadow.camera.bottom = -0.50;
-                    slotLight2.light.shadow.camera.near = 0.1;
-                    slotLight2.light.shadow.camera.far = 10;
-                    slotLight2.light.shadow.camera.updateProjectionMatrix();
-                  }
-                }
-                _scene.add(slotLight2.light);
-                _scene.add(slotLight2.light.target);
+                /* =====================================================================================
+                   INSTANCIACIÓN DE LUCES EN RUNTIME (COMENTADA: SE USAN LAS DECLARADAS EN EL BUNDLE ECS)
+                   -------------------------------------------------------------------------------------
+                   // 1. Instanciamos Luz 2
+                   slotLight2.light = new nativeTHREE.DirectionalLight(0xffffff, 0.0);
+                   slotLight2.light.position.set(0, 1.41, -1.69);
+                   slotLight2.light.castShadow = LIGHTING_CONFIG.light2_castShadow;
+                   ...
+                   _scene.add(slotLight2.light);
 
-                // 2. Instanciamos Luz 3 (A 30º de elevación y con cono de 35º)
-                slotLight3.light = new nativeTHREE.DirectionalLight(0xffffff, 0.0);
-                slotLight3.light.position.set(1.35, 1.10, -1.35);
-                slotLight3.light.castShadow = LIGHTING_CONFIG.light3_castShadow;
-                _scene.add(slotLight3.light);
-                _scene.add(slotLight3.light.target);
-
-                // 3. Instanciamos Luz 4 (Posición espejo opuesta a 40º)
-                slotLight4.light = new nativeTHREE.DirectionalLight(0xffffff, 0.0);
-                slotLight4.light.position.set(0, 1.41, 1.69);
-                slotLight4.light.castShadow = LIGHTING_CONFIG.light4_castShadow;
-                _scene.add(slotLight4.light);
-                _scene.add(slotLight4.light.target);
+                   // 2. Instanciamos Luz 3
+                   slotLight3.light = new nativeTHREE.DirectionalLight(0xffffff, 0.0);
+                   ...
+                   // 3. Instanciamos Luz 4
+                   slotLight4.light = new nativeTHREE.DirectionalLight(0xffffff, 0.0);
+                   ...
+                ===================================================================================== */
 
                 loadNativeRGBELoader(nativeTHREE).then((LoaderClass) => {
                   if (LoaderClass) {
@@ -358,11 +333,6 @@
             let lastScanTime = 0;
             let lastPmremTime = 0;
 
-            const probeNDC = new THREE_INSTANCE.Vector3();
-            const camWorldPos = new THREE_INSTANCE.Vector3();
-            const rayDir2 = new THREE_INSTANCE.Vector3();
-            const rayDir3 = new THREE_INSTANCE.Vector3();
-
             // Look Scene Viewer: Suelo de rugosidad, pedestal emisivo y desaturación
             const aplicarAjustesSceneViewer = () => {
               if (!_scene) return;
@@ -419,16 +389,6 @@
                   let maxLum = 0;
                   let count = 0;
 
-                  // Captura Frame 1
-                  const colorBins = new Int32Array(8);
-                  const colorBinLumSumX = new Float32Array(8);
-                  const colorBinLumSumY = new Float32Array(8);
-                  const colorBinWeight = new Float32Array(8);
-
-                  const scanUpperLimitY = Math.floor(pmremSize * LIGHTING_CONFIG.upper_third_limit);
-                  let upperSumX = 0, upperSumY = 0, upperCount = 0;
-                  let upperMaxLum = 0;
-
                   lumaBins.fill(0);
 
                   for (let idx = 0; idx < data.length; idx += LIGHTING_CONFIG.scan_pixel_step) {
@@ -436,10 +396,6 @@
                     const g = data[idx + 1];
                     const b = data[idx + 2];
                     const lum = (r * 0.299 + g * 0.587 + b * 0.114);
-
-                    const pixelIdx = idx / 4;
-                    const px = pixelIdx % pmremSize;
-                    const py = Math.floor(pixelIdx / pmremSize);
 
                     sumR += r;
                     sumG += g;
@@ -450,24 +406,6 @@
                     lumaBins[binIdx]++;
 
                     if (lum > maxLum) maxLum = lum;
-
-                    if (!initialLightsPlaced) {
-                      // Luz 2 (Gradiente mesa - mayoría)
-                      const cBin = ((r > 100 ? 1 : 0) << 2) | ((g > 100 ? 1 : 0) << 1) | (b > 100 ? 1 : 0);
-                      colorBins[cBin]++;
-                      colorBinLumSumX[cBin] += px * lum;
-                      colorBinLumSumY[cBin] += py * lum;
-                      colorBinWeight[cBin] += lum;
-
-                      // Luz 3 (Puntos más claros tercio superior)
-                      if (py < scanUpperLimitY) {
-                        const weight = lum * lum;
-                        upperSumX += px * weight;
-                        upperSumY += py * weight;
-                        upperCount += weight;
-                        if (lum > upperMaxLum) upperMaxLum = lum;
-                      }
-                    }
                   }
 
                   const avgR = count > 0 ? sumR / count : 0;
@@ -489,116 +427,6 @@
                   const effectiveIlluminance = (avgLum * LIGHTING_CONFIG.avg_weight) + (p90Lum * LIGHTING_CONFIG.p90_weight);
                   smoothedBrightness += (effectiveIlluminance - smoothedBrightness) * LIGHTING_CONFIG.reaction_speed;
                   const normalizedBrightness = Math.max(0.0, Math.min(1.0, smoothedBrightness / 255));
-
-                  let boostFactor = 1.0;
-                  if (maxLum > LIGHTING_CONFIG.boost_lum_threshold) {
-                    const boostRatio = (maxLum - LIGHTING_CONFIG.boost_lum_threshold) / (255 - LIGHTING_CONFIG.boost_lum_threshold);
-                    boostFactor = 1.0 + boostRatio * (LIGHTING_CONFIG.boost_multiplier - 1.0);
-                  }
-
-                  const baseDirectIntensity = normalizedBrightness * LIGHTING_CONFIG.light_maxIntensity * boostFactor;
-                  slotLight2.targetIntensity = baseDirectIntensity * LIGHTING_CONFIG.light2_ratio; // Luz 2 (2.18 ratio)
-                  slotLight3.targetIntensity = baseDirectIntensity * LIGHTING_CONFIG.light3_ratio; // Luz 3 (0.20 ratio)
-                  slotLight4.targetIntensity = baseDirectIntensity * LIGHTING_CONFIG.light4_ratio; // Luz 4 (0.44 ratio)
-
-                  // =========================================================================
-                  // FRAME 1: POSICIONAMIENTO GEOMÉTRICO (Luces 2/4 a 40º, Luz 3 a 30º)
-                  // =========================================================================
-                  if (!initialLightsPlaced && _activeCamera) {
-                    _activeCamera.getWorldPosition(camWorldPos);
-                    const r = LIGHTING_CONFIG.light_distance;
-
-                    // 1. Luces 2 y 4 a 40º de elevación
-                    const elevAngle2_4 = LIGHTING_CONFIG.elevation_angle_light2_4;
-                    const initY2_4 = Math.max(LIGHTING_CONFIG.min_light_height, Math.sin(elevAngle2_4) * r);
-                    const initXZ2_4 = Math.cos(elevAngle2_4) * r;
-
-                    // 2. Luz 3 a 30º de elevación
-                    const elevAngle3 = LIGHTING_CONFIG.elevation_angle_light3;
-                    const initY3 = Math.max(LIGHTING_CONFIG.min_light_height, Math.sin(elevAngle3) * r);
-                    const initXZ3 = Math.cos(elevAngle3) * r;
-
-                    // Posicionamiento de Luz 2
-                    let targetX2 = pmremSize * 0.5;
-                    let targetY2 = pmremSize * 0.4;
-                    let dominantBin = 0, maxBinCount = 0;
-                    for (let c = 0; c < 8; c++) {
-                      if (colorBins[c] > maxBinCount) {
-                        maxBinCount = colorBins[c];
-                        dominantBin = c;
-                      }
-                    }
-                    if (maxBinCount > (count * 0.20) && colorBinWeight[dominantBin] > 0) {
-                      targetX2 = colorBinLumSumX[dominantBin] / colorBinWeight[dominantBin];
-                      targetY2 = colorBinLumSumY[dominantBin] / colorBinWeight[dominantBin];
-                    }
-
-                    const ndcX2 = (targetX2 / pmremSize) * 2 - 1;
-                    const ndcY2 = 1 - (targetY2 / pmremSize) * 2;
-                    probeNDC.set(ndcX2, ndcY2, 0.5);
-                    probeNDC.unproject(_activeCamera);
-                    rayDir2.subVectors(probeNDC, camWorldPos).normalize();
-
-                    const azimLen2 = Math.hypot(rayDir2.x, rayDir2.z) || 1.0;
-                    const posX2 = (rayDir2.x / azimLen2) * initXZ2_4;
-                    const posZ2 = (rayDir2.z / azimLen2) * initXZ2_4;
-
-                    if (slotLight2.light) {
-                      slotLight2.light.position.set(posX2, initY2_4, posZ2);
-                      slotLight2.anchoredDir.copy(slotLight2.light.position).normalize();
-                      slotLight2.light.intensity = slotLight2.targetIntensity;
-                    }
-
-                    // Posicionamiento de Luz 4 (Posición espejo opuesta a 40º)
-                    if (slotLight4.light) {
-                      slotLight4.light.position.set(-posX2, initY2_4, -posZ2);
-                      slotLight4.anchoredDir.copy(slotLight4.light.position).normalize();
-                      slotLight4.light.intensity = slotLight4.targetIntensity;
-                    }
-
-                    // Posicionamiento de Luz 3 (a 30º con cono de exclusión de 35º)
-                    let targetX3 = pmremSize * 0.65;
-                    let targetY3 = pmremSize * 0.20;
-                    if (upperCount > 0) {
-                      targetX3 = upperSumX / upperCount;
-                      targetY3 = upperSumY / upperCount;
-                    }
-
-                    const ndcX3 = (targetX3 / pmremSize) * 2 - 1;
-                    const ndcY3 = 1 - (targetY3 / pmremSize) * 2;
-                    probeNDC.set(ndcX3, ndcY3, 0.5);
-                    probeNDC.unproject(_activeCamera);
-                    rayDir3.subVectors(probeNDC, camWorldPos).normalize();
-
-                    // Cono de exclusión de 35º respecto a Luz 2 y Luz 4 en el plano horizontal
-                    const v2Flat = new THREE_INSTANCE.Vector3(rayDir2.x, 0, rayDir2.z).normalize();
-                    const v3Flat = new THREE_INSTANCE.Vector3(rayDir3.x, 0, rayDir3.z).normalize();
-                    if (v3Flat.angleTo(v2Flat) < LIGHTING_CONFIG.min_separation_angle) {
-                      rayDir3.applyAxisAngle(new THREE_INSTANCE.Vector3(0, 1, 0), LIGHTING_CONFIG.min_separation_angle);
-                    } else {
-                      const v4Flat = v2Flat.clone().negate();
-                      if (v3Flat.angleTo(v4Flat) < LIGHTING_CONFIG.min_separation_angle) {
-                        rayDir3.applyAxisAngle(new THREE_INSTANCE.Vector3(0, 1, 0), LIGHTING_CONFIG.min_separation_angle);
-                      }
-                    }
-
-                    const azimLen3 = Math.hypot(rayDir3.x, rayDir3.z) || 1.0;
-                    const posX3 = (rayDir3.x / azimLen3) * initXZ3;
-                    const posZ3 = (rayDir3.z / azimLen3) * initXZ3;
-
-                    if (slotLight3.light) {
-                      slotLight3.light.position.set(posX3, initY3, posZ3);
-                      slotLight3.anchoredDir.copy(slotLight3.light.position).normalize();
-                      slotLight3.light.intensity = slotLight3.targetIntensity;
-                    }
-
-                    initialLightsPlaced = true; // Se apaga la colocación para siempre
-                    actualizarContadorLuces();
-                  } else if (initialLightsPlaced) {
-                    if (slotLight2.light) slotLight2.light.intensity = slotLight2.targetIntensity;
-                    if (slotLight3.light) slotLight3.light.intensity = slotLight3.targetIntensity;
-                    if (slotLight4.light) slotLight4.light.intensity = slotLight4.targetIntensity;
-                  }
 
                   targetExposure = normalizedBrightness * LIGHTING_CONFIG.exposure_mult * LIGHTING_CONFIG.master_exposure_scale;
                 }
