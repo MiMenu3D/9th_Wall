@@ -1,4 +1,4 @@
-﻿// 9th Wall v3.38 Apple Probe
+﻿// 9th Wall v3.10y Apple Probe
 (() => {
   var e = {
     574() {
@@ -340,7 +340,7 @@
           "prefab": true
         },
 
-        // Luz 1: Luz direccional base ECS (Contact AO cenital en el Ground)
+        // Luz direccional base (Contact AO y sombras del Ground)
         "492cfe2c-9334-4a9c-a48a-be80132af9fb": {
           "id": "492cfe2c-9334-4a9c-a48a-be80132af9fb",
           "position": [0, 1, 0],
@@ -352,76 +352,13 @@
           "components": {},
           "light": {
             "type": "directional",
-            "intensity": 0.0,
             "shadowBias": 0.0001,
-            "shadowRadius": 12.0,
+            "shadowRadius": 2.5,
             "followCamera": false,
-            "shadowCamera": [-0.5, 0.5, 0.5, -0.5, 0.1, 10]
+            "shadowCamera": [-10, 10, 10, -10, 3, 5]
           },
           "name": "Directional Light",
           "order": 0.6785011504707911
-        },
-
-        // Luz 2: Modelado principal a 40º con sombra direccional al 1/8 de opacidad (shadow_opacity: 0.0625)
-        "directional-light-2": {
-          "id": "directional-light-2",
-          "position": [0, 1.41, -1.69],
-          "rotation": [-0.3420201, 0, 0, 0.9396926],
-          "scale": [1, 1, 1],
-          "geometry": null,
-          "material": null,
-          "parentId": "84028e73-ee70-412d-b8d4-c09bf07c655c",
-          "components": {},
-          "light": {
-            "type": "directional",
-            "intensity": 2.18,
-            "shadowBias": -0.0005,
-            "shadowRadius": 2.0,
-            "shadowOpacity": 0.0625,
-            "shadow_opacity": 0.0625,
-            "followCamera": false,
-            "shadowCamera": [-0.5, 0.5, 0.5, -0.5, 0.1, 10]
-          },
-          "name": "Directional Light 2",
-          "order": 0.6785011504707912
-        },
-
-        // Luz 3: Acento superior a 30º
-        "directional-light-3": {
-          "id": "directional-light-3",
-          "position": [1.35, 1.10, -1.35],
-          "rotation": [-0.2241439, 0.3696438, 0.092296, 0.8976261],
-          "scale": [1, 1, 1],
-          "geometry": null,
-          "material": null,
-          "parentId": "84028e73-ee70-412d-b8d4-c09bf07c655c",
-          "components": {},
-          "light": {
-            "type": "directional",
-            "intensity": 0.20,
-            "followCamera": false
-          },
-          "name": "Directional Light 3",
-          "order": 0.6785011504707913
-        },
-
-        // Luz 4: Relleno espejo a 40º
-        "directional-light-4": {
-          "id": "directional-light-4",
-          "position": [0, 1.41, 1.69],
-          "rotation": [0.9396926, 0, 0, 0.3420201],
-          "scale": [1, 1, 1],
-          "geometry": null,
-          "material": null,
-          "parentId": "84028e73-ee70-412d-b8d4-c09bf07c655c",
-          "components": {},
-          "light": {
-            "type": "directional",
-            "intensity": 0.44,
-            "followCamera": false
-          },
-          "name": "Directional Light 4",
-          "order": 0.6785011504707914
         },
 
         // Camera de Realidad Aumentada
