@@ -1,4 +1,4 @@
-<!-- 9th Wall v3.50 Apple Probe -->
+<!-- 9th Wall v3.51 Apple Probe -->
 <html>
 <head>
   <meta charset="UTF-8">
@@ -22,7 +22,7 @@
     style="position:fixed;top:10px;right:10px;z-index:1000000;background:rgba(0,0,0,0.9);color:#0f0;font-family:monospace;font-size:12px;padding:8px;border-radius:4px;cursor:pointer;line-height:1.3;border:1px solid #0f0;">
     <div id="debugTitle">FPS: --</div>
     <div id="debugContent">
-      ar-world: v3.50<br>
+      ar-world: v3.51<br>
       bundle: v3.48<br>
       <span id="envVerdictSpan" style="color:#0f0;">Entorno: ESPERANDO MESA...</span><br>
       <span id="telemetrySpan" style="color:#0f0;">Grano: -- (/25) | P98: -- (/255) | Conf: --%</span><br>
@@ -58,15 +58,15 @@
 
   <script>
     // =====================================================================================
-    // === CONSOLA CENTRAL DE ILUMINACIÓN Y CALIBRACIÓN (v3.50) ===
+    // === CONSOLA CENTRAL DE ILUMINACIÓN Y CALIBRACIÓN (v3.51) ===
     // =====================================================================================
     const LIGHTING_CONFIG = {
       // --- 1. PARÁMETROS TÉCNICOS ESENCIALES ---
       pmrem_resolution: 64,          // PMREM a 64x64 para reflexiones
-      raw_patch_size: 128,           // Parche central nativo 1:1 de 128x128 sin reescalado
+      raw_patch_size: 128,           // Parche central nativo 1:1 de 128x128 píxeles consecutivos
       pmrem_interval_ms: 200,        // Refresco PMREM GPU cada 200 ms
       scan_interval_ms: 300,         // Escaneo Light Estimation periódico (en reposo) cada 300 ms
-      calibration_frames_target: 8,  // Ventana de 8 frames con filtrado de mediana (descarte de vibración)
+      calibration_frames_target: 8,  // Ventana estricta de 8 frames consecutivos con poda de extremos
       shadow_map_size: 512,          // Sombra contacto ECS Ground a 512x512
       shadow_radius_fixed: 5,        // Radio difuso suave
       ground_opacity_fixed: 0.40,    // Opacidad suelo equilibrada
@@ -368,7 +368,7 @@
             pmremCanvas.height = pmremSize;
             const pmremCtx = pmremCanvas.getContext('2d', { willReadFrequently: true });
             
-            // Canvas para Muestreo Nativo 1:1 (Centro del Frame sin Reescalado)
+            // Canvas para Muestreo Nativo 1:1 Central (128x128 píxeles consecutivos)
             const rawSize = LIGHTING_CONFIG.raw_patch_size;
             const rawGrainCanvas = document.createElement('canvas');
             rawGrainCanvas.width = rawSize;
@@ -480,7 +480,7 @@
                   setTimeout(() => { readyPrompt.style.display = 'none'; }, 300);
                 }
 
-                // 3. Inicia la ráfaga estricta de 8 frames con filtrado de mediana
+                // 3. Inicia la ráfaga estricta de 8 frames consecutivos con filtrado de mediana
                 isCalibrating = true;
                 calibrationFramesDone = 0;
                 accumulatedNoiseSamples.length = 0;
@@ -501,7 +501,7 @@
                 lastFrameTime = now;
 
                 // =========================================================================
-                // 1. ESCANEO ISO, RUIDO NATIVO 1:1 Y CALIBRACIÓN
+                // 1. ESCANEO ISO, RUIDO NATIVO 1:1 CONSECUTIVO Y CALIBRACIÓN
                 // =========================================================================
                 const shouldScan = isCalibrating || (now - lastScanTime >= LIGHTING_CONFIG.scan_interval_ms);
 
@@ -569,7 +569,7 @@
                   }
 
                   // =========================================================================
-                  // MUESTREO NATIVO 1:1 EN BRUTO (RECORTE CENTRAL BLINDADO DE 128x128)
+                  // MUESTREO NATIVO 1:1 EN BRUTO (PÍXELES CONSECUTIVOS 1:1 EN EL CENTRO)
                   // =========================================================================
                   const vWidth = video.videoWidth || 1280;
                   const vHeight = video.videoHeight || 720;
@@ -581,8 +581,8 @@
                   const rawData = rawGrainCtx.getImageData(0, 0, rSize, rSize).data;
 
                   let sumDiff = 0, diffCount = 0;
-                  for (let py = 1; py < rSize - 1; py += 2) {
-                    for (let px = 0; px < rSize - 1; px += 2) {
+                  for (let py = 0; py < rSize; py++) {
+                    for (let px = 0; px < rSize - 1; px++) {
                       const pIdx1 = (py * rSize + px) * 4;
                       const pIdx2 = (py * rSize + (px + 1)) * 4;
 
@@ -591,14 +591,17 @@
 
                       const y1 = r1 * 0.299 + g1 * 0.587 + b1 * 0.114;
                       const y2 = r2 * 0.299 + g2 * 0.587 + b2 * 0.114;
+                      const deltaY = Math.abs(y1 - y2);
 
-                      if (Math.abs(y1 - y2) < 22) {
+                      // Filtro de rechazo de bordes físicos (solo evaluamos superficies homogéneas)
+                      if (deltaY < 18) {
                         const cb1 = -0.168736 * r1 - 0.331264 * g1 + 0.5 * b1 + 128;
                         const cr1 = 0.5 * r1 - 0.418688 * g1 - 0.081312 * b1 + 128;
                         const cb2 = -0.168736 * r2 - 0.331264 * g2 + 0.5 * b2 + 128;
                         const cr2 = 0.5 * r2 - 0.418688 * g2 - 0.081312 * b2 + 128;
 
-                        sumDiff += Math.hypot(cb1 - cb2, cr1 - cr2);
+                        const deltaChroma = Math.hypot(cb1 - cb2, cr1 - cr2);
+                        sumDiff += deltaY + deltaChroma;
                         diffCount++;
                       }
                     }
@@ -606,7 +609,7 @@
                   const currentFrameGrain = diffCount > 0 ? (sumDiff / diffCount) : 0.0;
 
                   // =========================================================================
-                  // FASE DE CALIBRACIÓN POST-"LISTO" (8 FRAMES CON DESCARTE DE EXTREMOS)
+                  // FASE DE CALIBRACIÓN POST-"LISTO" (8 FRAMES CONSECUTIVOS CON PODA)
                   // =========================================================================
                   if (isCalibrating && !isCalibrated) {
                     accumulatedNoiseSamples.push(currentFrameGrain);
@@ -634,26 +637,26 @@
                       // 1. Factor de radiancia ambiental global (Luz real del PMREM)
                       const pmremFactor = Math.max(0.0, Math.min(1.0, 1.0 - (avgLumFinal - 60.0) / (130.0 - 60.0)));
 
-                      // 2. Factor de ruido ISO real 1:1 (escala calibrada de 2.0 a 6.5)
+                      // 2. Factor de ruido ISO real 1:1 (escala calibrada de 2.2 a 7.0)
                       let grainFactor = 0.0;
-                      if (avgGrain <= 2.0) {
+                      if (avgGrain <= 2.2) {
                         grainFactor = 0.0;
-                      } else if (avgGrain >= 6.5) {
+                      } else if (avgGrain >= 7.0) {
                         grainFactor = 1.0;
                       } else {
-                        grainFactor = (avgGrain - 2.0) / (6.5 - 2.0);
+                        grainFactor = (avgGrain - 2.2) / (7.0 - 2.2);
                       }
 
                       // 3. Fusión Coherente con guardarraíles lógicos
                       if (avgLumFinal > 120) {
-                        // En entornos luminosos, la radiancia manda y el grano modula si hay ganancia
-                        environmentFactor = pmremFactor * 0.70 + grainFactor * 0.30;
+                        // En entornos luminosos, la radiancia manda pero si hay grano alto (mesa blanca a oscuras), el grano levanta la penumbra
+                        environmentFactor = pmremFactor * 0.60 + grainFactor * 0.40;
                       } else if (avgLumFinal < 65) {
-                        // En entornos oscuros, la presencia de grano o baja luz confirma la penumbra
-                        environmentFactor = Math.max(pmremFactor * 0.85 + grainFactor * 0.15, grainFactor);
+                        // En entornos oscuros, la baja luz o el grano confirman la penumbra
+                        environmentFactor = Math.max(pmremFactor * 0.80 + grainFactor * 0.20, grainFactor);
                       } else {
-                        // Rango medio estándar
-                        environmentFactor = pmremFactor * 0.50 + grainFactor * 0.50;
+                        // Rango medio
+                        environmentFactor = pmremFactor * 0.45 + grainFactor * 0.55;
                       }
                       environmentFactor = Math.max(0.0, Math.min(1.0, environmentFactor));
 
