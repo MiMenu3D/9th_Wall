@@ -1,4 +1,4 @@
-<!-- 9th Wall v3.44 Apple Probe -->
+<!-- 9th Wall v3.45 Apple Probe -->
 <html>
 <head>
   <meta charset="UTF-8">
@@ -14,14 +14,17 @@
 </head>
 <body>
 
-  <!-- PANEL DE DEPURACIÓN HUD -->
+  <!-- 1. CAPA DE BLOQUEO TÁCTIL TOTAL PREVIO A 'LISTO' -->
+  <div id="touchBlocker" style="position:fixed;inset:0;width:100vw;height:100vh;z-index:999990;pointer-events:auto;background:transparent;"></div>
+
+  <!-- 2. PANEL DE DEPURACIÓN HUD CON FPS -->
   <div id="debugLog" onclick="this.classList.toggle('minimized')"
     style="position:fixed;top:10px;right:10px;z-index:1000000;background:rgba(0,0,0,0.9);color:#0f0;font-family:monospace;font-size:12px;padding:8px;border-radius:4px;cursor:pointer;line-height:1.3;border:1px solid #0f0;">
     <div id="debugTitle">FPS: --</div>
     <div id="debugContent">
-      ar-world: v3.44<br>
+      ar-world: v3.45<br>
       bundle: v3.10y<br>
-      <span id="envVerdictSpan" style="color:#0f0;">Entorno: CALIBRANDO...</span><br>
+      <span id="envVerdictSpan" style="color:#0f0;">Entorno: ESPERANDO MESA...</span><br>
       <span id="telemetrySpan" style="color:#0f0;">Grano: -- (/25) | P98: -- (/255) | Conf: --%</span><br>
       <span id="lightsCountSpan" style="color:#0f0;">Luces: 1</span><br>
       <span id="latencySpan" style="color:#0f0;">Latencia: -- ms</span>
@@ -32,14 +35,21 @@
     #debugLog.minimized #debugContent { display: none; }
   </style>
 
-  <!-- INTERFAZ ERGONÓMICA DE CALIBRACIÓN Y COLOCACIÓN -->
-  <div id="readyPromptContainer" style="position:fixed;bottom:90px;left:0;right:0;z-index:999999;display:flex;flex-direction:column;align-items:center;pointer-events:none;transition:opacity 0.3s ease;">
-    <div style="background:rgba(0,0,0,0.75);color:white;font-family:sans-serif;font-size:15px;font-weight:bold;padding:8px 18px;border-radius:20px;border:1px solid rgba(255,255,255,0.4);margin-bottom:10px;text-align:center;box-shadow:0 4px 12px rgba(0,0,0,0.5);">
+  <!-- 3. UI PASO 1: CENTRADA EXACTA EN PANTALLA -->
+  <div id="readyPromptContainer" style="position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);z-index:999999;display:flex;flex-direction:column;align-items:center;pointer-events:none;transition:opacity 0.3s ease;">
+    <div style="background:rgba(0,0,0,0.75);color:white;font-family:sans-serif;font-size:16px;font-weight:bold;padding:10px 22px;border-radius:22px;border:1px solid rgba(255,255,255,0.4);margin-bottom:14px;text-align:center;box-shadow:0 4px 14px rgba(0,0,0,0.6);white-space:nowrap;">
       Apunta hacia la mesa
     </div>
-    <button id="readyBtn" style="pointer-events:auto !important;background:#00e5ff;color:#000;border:none;font-family:sans-serif;font-size:15px;font-weight:bold;padding:12px 34px;border-radius:24px;box-shadow:0 4px 16px rgba(0,229,255,0.6);cursor:pointer;">
+    <button id="readyBtn" style="pointer-events:auto !important;background:#00e5ff;color:#000;border:none;font-family:sans-serif;font-size:16px;font-weight:bold;padding:14px 40px;border-radius:28px;box-shadow:0 4px 20px rgba(0,229,255,0.7);cursor:pointer;letter-spacing:0.5px;">
       Listo
     </button>
+  </div>
+
+  <!-- 4. UI PASO 2: MENSAJE TRAS PULSAR 'LISTO' -->
+  <div id="placePromptContainer" style="position:fixed;bottom:90px;left:0;right:0;z-index:999999;display:none;flex-direction:column;align-items:center;pointer-events:none;transition:opacity 0.3s ease;">
+    <div style="background:rgba(0,0,0,0.75);color:#00e5ff;font-family:sans-serif;font-size:15px;font-weight:bold;padding:9px 20px;border-radius:20px;border:1px solid #00e5ff;text-align:center;box-shadow:0 4px 12px rgba(0,0,0,0.5);">
+      Toca la mesa para colocar el plato
+    </div>
   </div>
 
   <!-- BOTONES DE CONTROL SECUNDARIOS -->
@@ -55,7 +65,7 @@
 
   <script>
     // =====================================================================================
-    // === CONSOLA CENTRAL DE ILUMINACIÓN Y CALIBRACIÓN (v3.44) ===
+    // === CONSOLA CENTRAL DE ILUMINACIÓN Y CALIBRACIÓN (v3.45) ===
     // =====================================================================================
     const LIGHTING_CONFIG = {
       // --- 1. PARÁMETROS TÉCNICOS ESENCIALES ---
@@ -81,7 +91,9 @@
       weights_2_lights: [0.70, 0.30],   // 2 Luces (Luz 2: 70%, Luz 3: 30%)
       weights_real_focus: [0.50, 0.50], // Focos reales cazados (Luz 3: 50%, Luz 4: 50%)
 
-      // --- 3. TIEMPOS Y SINCRONIZACIÓN DE TRANSICIONES ---
+      // --- 3. EXPOSICIÓN, TIEMPOS Y SINCRONIZACIÓN (BLINDADOS CONTRA NaN) ---
+      master_exposure_scale: 0.45,   // Escala maestra de exposición
+      exposure_mult: 1.80,           // Multiplicador base
       transition_duration_ms: 800,   // Duración exacta sincronizada (800 ms)
       out_of_frame_retention: 0.80,  // Retención física al girar la cámara
       smoothing_rate: 2.2,           // Tasa lambda para amortiguación dt continua
@@ -95,7 +107,7 @@
       light4_default_pos: [-1.3, 0.25, 0.0],
       min_separation_angle: 0.52,    // Separación mínima (~30º)
 
-      // --- 5. DETECCIÓN DE FOCOS REALES Y CALIBRACIÓN SCENE VIEWER ---
+      // --- 5. DETECCIÓN DE FOCOS REALES Y LOOK SCENE VIEWER ---
       emitter_lum_threshold: 197,    // Luminancia núcleo saturado
       min_core_pixels: 2,            // Píxeles contiguos
       contrast_delta_threshold: 72,  // Contraste foco vs fondo
@@ -106,7 +118,6 @@
       debounce_cycles: 1,            // Ciclos confirmación
       min_material_roughness: 0.35,  // Suelo rugosidad
       metalness_bypass_threshold: 0.50,
-      emissive_pedestal_base: 0.042,
       albedo_desaturation: 0.15,
       temporal_blend_alpha: 0.25
     };
@@ -136,7 +147,7 @@
     let pmremGenerator = null, cameraRT = null, originalEnv = null;
     let envMode = 'cam';
     let _scene = null, _renderer = null, _activeCamera = null, _groundMesh = null, _baseLight1 = null;
-    let _ecsWorld = null, _placementGroundEid = null;
+    let _reticleMesh = null;
 
     // Estado global de energía y balance
     let currentDirectBudget = LIGHTING_CONFIG.day_total_energy;
@@ -171,9 +182,10 @@
     let totalRealLightsAnchored = 0;
     let detectionPermanentlyStopped = false;
 
-    // Control de flujo UX "Listo" y Calibración
+    // Control de flujo UX "Listo", Retícula y Calibración
     let isCalibrating = false;
-    let isScenePlaced = false;
+    let isCalibrated = false;
+    let isObjectPlaced = false;
     let calibrationFramesDone = 0;
     const accumulatedNoiseSamples = [];
     const accumulatedP98Samples = [];
@@ -219,7 +231,6 @@
         add: (world, component) => {
           setTimeout(() => {
             try {
-              _ecsWorld = world;
               _scene = world.three.scene;
               _renderer = world.three.renderer;
               _activeCamera = world.three.activeCamera;
@@ -229,6 +240,7 @@
               if (nativeTHREE) {
                 _renderer.shadowMap.enabled = true;
                 _renderer.toneMapping = nativeTHREE.ACESFilmicToneMapping;
+                _renderer.toneMappingExposure = 1.0; // Valor seguro inicial anti-NaN
 
                 candidateDebounce.dir = new nativeTHREE.Vector3();
 
@@ -267,7 +279,7 @@
                   }
                 });
 
-                // Instanciación limpia de Luces 2, 3 y 4 (sin sombras en Three.js)
+                // Instanciación limpia de Luces 2, 3 y 4
                 slotLight2.light = new nativeTHREE.DirectionalLight(0xffffff, 0.0);
                 slotLight2.light.position.set(0, 1.41, -1.69);
                 _scene.add(slotLight2.light);
@@ -290,6 +302,21 @@
                 );
                 _scene.add(slotLight4.light);
                 _scene.add(slotLight4.light.target);
+
+                // Creación de la Retícula 3D para Opción B (Anillo cian luminoso en el suelo)
+                const ringGeo = new nativeTHREE.RingGeometry(0.09, 0.105, 32);
+                const ringMat = new nativeTHREE.MeshBasicMaterial({
+                  color: 0x00e5ff,
+                  transparent: true,
+                  opacity: 0.85,
+                  side: nativeTHREE.DoubleSide,
+                  depthWrite: false
+                });
+                _reticleMesh = new nativeTHREE.Mesh(ringGeo, ringMat);
+                _reticleMesh.rotation.x = -Math.PI / 2;
+                _reticleMesh.position.set(0, 0.002, -0.4);
+                _reticleMesh.visible = false;
+                _scene.add(_reticleMesh);
 
                 loadNativeRGBELoader(nativeTHREE).then((LoaderClass) => {
                   if (LoaderClass) {
@@ -344,15 +371,14 @@
             pmremCanvas.height = pmremSize;
             const pmremCtx = pmremCanvas.getContext('2d', { willReadFrequently: true });
             
-            // Inicialización limpia
             pmremCtx.drawImage(video, 0, 0, pmremSize, pmremSize);
 
             const envTexture = new THREE_INSTANCE.CanvasTexture(pmremCanvas);
             envTexture.mapping = THREE_INSTANCE.EquirectangularReflectionMapping;
             if (THREE_INSTANCE.sRGBEncoding) envTexture.encoding = THREE_INSTANCE.sRGBEncoding;
 
-            let smoothedBrightness = 0;
-            let targetExposure = 0.0;
+            let smoothedBrightness = 128;
+            let targetExposure = 0.45;
             let lastScanTime = 0;
             let lastPmremTime = 0;
 
@@ -360,6 +386,8 @@
             const camWorldPos = new THREE_INSTANCE.Vector3();
             const rayDir = new THREE_INSTANCE.Vector3();
             const candidatePos = new THREE_INSTANCE.Vector3();
+            const groundPlane = new THREE_INSTANCE.Plane(new THREE_INSTANCE.Vector3(0, 1, 0), 0);
+            const placementRay = new THREE_INSTANCE.Ray();
 
             const aplicarRestriccionesMesa = (outVec, origin, dir, dist) => {
               outVec.copy(origin).addScaledVector(dir, dist);
@@ -369,7 +397,6 @@
               outVec.y = Math.max(LIGHTING_CONFIG.min_light_height, outVec.y);
             };
 
-            // Inicia una transición lerp sincronizada sobre una ranura
             const iniciarTransicionRanura = (slot, destIntensity, duration = 800, newPos = null, newDir = null) => {
               slot.state = (destIntensity > 0) ? 'transitioning' : 'fading_out';
               slot.transition.startTime = performance.now();
@@ -421,22 +448,55 @@
 
             const lumaBins = new Int32Array(16);
 
-            // === MANEJADOR DEL BOTÓN "LISTO" (Arranque de Calibración Rápida) ===
+            // =========================================================================
+            // MANEJADOR DEL BOTÓN "LISTO" -> RECENTER + CALIBRACIÓN + RETÍCULA
+            // =========================================================================
             const readyBtn = document.getElementById('readyBtn');
             const readyPrompt = document.getElementById('readyPromptContainer');
-            
+            const placePrompt = document.getElementById('placePromptContainer');
+            const touchBlocker = document.getElementById('touchBlocker');
+
             if (readyBtn) {
-              readyBtn.addEventListener('click', () => {
-                if (isScenePlaced || isCalibrating) return;
+              readyBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                if (isCalibrating || isCalibrated) return;
+
+                // 1. Reinicio oficial del SLAM sobre la mesa actual
+                if (window.XR8 && window.XR8.XrController) {
+                  try { window.XR8.XrController.recenter(); } catch (err) {}
+                }
+
+                // 2. Oculta el mensaje central "Apunta hacia la mesa"
+                if (readyPrompt) {
+                  readyPrompt.style.opacity = '0';
+                  setTimeout(() => { readyPrompt.style.display = 'none'; }, 300);
+                }
+
+                // 3. Inicia la ráfaga de estudio de ruido
                 isCalibrating = true;
                 calibrationFramesDone = 0;
                 accumulatedNoiseSamples.length = 0;
                 accumulatedP98Samples.length = 0;
-
-                if (readyPrompt) readyPrompt.style.opacity = '0';
-                setTimeout(() => { if (readyPrompt) readyPrompt.style.display = 'none'; }, 300);
               });
             }
+
+            // Detección de colocación del plato para apagar la retícula y el mensaje
+            window.addEventListener('touchstart', (e) => {
+              if (isCalibrated && !isObjectPlaced) {
+                // Si el usuario toca la pantalla fuera de botones tras calibrar
+                const target = e.target;
+                if (target.tagName !== 'BUTTON') {
+                  setTimeout(() => {
+                    isObjectPlaced = true;
+                    if (_reticleMesh) _reticleMesh.visible = false;
+                    if (placePrompt) {
+                      placePrompt.style.opacity = '0';
+                      setTimeout(() => { placePrompt.style.display = 'none'; }, 300);
+                    }
+                  }, 200);
+                }
+              }
+            }, { passive: true });
 
             // =========================================================================
             // BUCLE MAESTRO TEMPORIZADO (ISO a 300 ms / PMREM GPU a 200 ms)
@@ -450,7 +510,7 @@
                 lastFrameTime = now;
 
                 // =========================================================================
-                // 1. ESCANEO ISO, RUIDO Cb/Cr Y DETECCIÓN INTELIGENTE
+                // 1. ESCANEO ISO, RUIDO Cb/Cr Y CALIBRACIÓN
                 // =========================================================================
                 if (now - lastScanTime >= LIGHTING_CONFIG.scan_interval_ms) {
                   lastScanTime = now;
@@ -509,15 +569,13 @@
                     if (acc >= p98Target) { p98Lum = ((b + 0.5) / 16) * 255; break; }
                   }
 
-                  // Identificación del cluster dominante de la mesa
+                  // Cluster dominante de la mesa
                   let dominantBin = 0, maxBinCount = 0;
                   for (let c = 0; c < 8; c++) {
                     if (colorBins[c] > maxBinCount) { maxBinCount = colorBins[c]; dominantBin = c; }
                   }
 
-                  // =========================================================================
-                  // MEDICIÓN DE RUIDO Cb/Cr EXCLUSIVO EN EL CLUSTER DE LA MESA
-                  // =========================================================================
+                  // Medición de grano cromático Cb/Cr en la mesa
                   let diffCbCrSum = 0, diffCount = 0;
                   for (let py = 1; py < pmremSize - 1; py += 2) {
                     for (let px = 0; px < pmremSize - 1; px += 2) {
@@ -534,7 +592,7 @@
                         const y1 = r1 * 0.299 + g1 * 0.587 + b1 * 0.114;
                         const y2 = r2 * 0.299 + g2 * 0.587 + b2 * 0.114;
 
-                        if (Math.abs(y1 - y2) < 25) { // Ignora saltos bruscos de borde
+                        if (Math.abs(y1 - y2) < 25) {
                           const cb1 = -0.168736 * r1 - 0.331264 * g1 + 0.5 * b1 + 128;
                           const cr1 = 0.5 * r1 - 0.418688 * g1 - 0.081312 * b1 + 128;
                           const cb2 = -0.168736 * r2 - 0.331264 * g2 + 0.5 * b2 + 128;
@@ -550,21 +608,21 @@
                   const currentFrameGrain = diffCount > 0 ? (diffCbCrSum / diffCount) : 4.0;
 
                   // =========================================================================
-                  // FASE DE CALIBRACIÓN POST-"LISTO" (Ventana de 10 frames)
+                  // FASE DE CALIBRACIÓN POST-"LISTO"
                   // =========================================================================
-                  if (isCalibrating && !isScenePlaced) {
+                  if (isCalibrating && !isCalibrated) {
                     accumulatedNoiseSamples.push(currentFrameGrain);
                     accumulatedP98Samples.push(p98Lum);
                     calibrationFramesDone++;
 
                     if (calibrationFramesDone >= LIGHTING_CONFIG.calibration_frames_target) {
                       isCalibrating = false;
-                      isScenePlaced = true;
+                      isCalibrated = true;
 
                       const avgGrain = accumulatedNoiseSamples.reduce((a, b) => a + b, 0) / accumulatedNoiseSamples.length;
                       const avgP98 = accumulatedP98Samples.reduce((a, b) => a + b, 0) / accumulatedP98Samples.length;
 
-                      // Clasificación continua α_env (0.0: Día -> 1.0: Penumbra)
+                      // Factor de entorno continuo
                       if (avgP98 >= 225 && avgGrain <= 4.0) {
                         environmentFactor = 0.0;
                       } else if (avgGrain >= 12.0 || (avgP98 < 130 && avgGrain >= 7.5)) {
@@ -573,12 +631,11 @@
                         environmentFactor = Math.max(0.0, Math.min(1.0, (avgGrain - 4.0) / 8.0));
                       }
 
-                      // Asignación de Presupuestos de Energía Lumínica
+                      // Presupuestos de Energía Lumínica
                       currentDirectBudget = THREE_INSTANCE.MathUtils.lerp(LIGHTING_CONFIG.day_total_energy, LIGHTING_CONFIG.night_total_energy, environmentFactor);
                       currentPmremMult = THREE_INSTANCE.MathUtils.lerp(LIGHTING_CONFIG.day_pmrem_mult, LIGHTING_CONFIG.night_pmrem_mult, environmentFactor);
                       currentPedestal = THREE_INSTANCE.MathUtils.lerp(LIGHTING_CONFIG.day_pedestal, LIGHTING_CONFIG.night_pedestal, environmentFactor);
 
-                      // Veredicto para Telemetría HUD
                       let verdict = "DIA_NORMAL";
                       if (environmentFactor < 0.15 && avgP98 > 225) verdict = "DIRECCIONAL_FUERTE";
                       else if (environmentFactor < 0.45) verdict = "DIA_NORMAL";
@@ -588,7 +645,7 @@
                       const confidence = Math.min(99, Math.max(70, 75 + Math.abs(environmentFactor - 0.5) * 48));
                       actualizarHUDTelemetria(verdict, avgGrain, avgP98, confidence);
 
-                      // --- POSICIONAMIENTO INICIAL LUZ 2 (100% de la energía) ---
+                      // Posicionamiento de Luz 2 a 40º
                       if (_activeCamera) {
                         let targetX2 = pmremSize * 0.5, targetY2 = pmremSize * 0.4;
                         if (maxBinCount > (count * 0.20) && colorBinWeight[dominantBin] > 0) {
@@ -621,35 +678,22 @@
                         actualizarContadorLuces();
                       }
 
-                      // Disparo de Colocación ECS en Mesa Cercana (NDC y = -0.35)
-                      if (_activeCamera) {
-                        const targetPlacementPos = new THREE_INSTANCE.Vector3();
-                        probeNDC.set(0, -0.35, 0.5);
-                        probeNDC.unproject(_activeCamera);
-                        rayDir.subVectors(probeNDC, camWorldPos).normalize();
-
-                        const groundPlane = new THREE_INSTANCE.Plane(new THREE_INSTANCE.Vector3(0, 1, 0), 0);
-                        const ray = new THREE_INSTANCE.Ray(camWorldPos, rayDir);
-                        if (!ray.intersectPlane(groundPlane, targetPlacementPos)) {
-                          targetPlacementPos.set(camWorldPos.x + rayDir.x * 0.7, 0, camWorldPos.z + rayDir.z * 0.7);
-                        }
-
-                        if (_groundMesh && _ecsWorld) {
-                          _scene.traverse((child) => {
-                            if (child.name === 'Model') {
-                              child.position.copy(targetPlacementPos);
-                              child.visible = true;
-                            }
-                          });
-                        }
+                      // Desbloquea la pantalla táctil y activa la Retícula de colocación (Paso 2)
+                      if (touchBlocker) touchBlocker.style.display = 'none';
+                      if (_reticleMesh) _reticleMesh.visible = true;
+                      if (placePrompt) {
+                        placePrompt.style.display = 'flex';
+                        placePrompt.style.opacity = '1';
                       }
                     }
                   }
 
-                  // Suavizado continuo de luminancia
-                  const effectiveIlluminance = (avgLum * LIGHTING_CONFIG.avg_weight) + (p90Lum * LIGHTING_CONFIG.p90_weight);
+                  // Suavizado continuo de luminancia y exposición (Blindado)
+                  const effectiveIlluminance = (avgLum * 0.30) + (p90Lum * 0.70);
                   smoothedBrightness = effectiveIlluminance;
-                  const normalizedBrightness = Math.max(0.0, Math.min(1.0, smoothedBrightness / 255));
+                  const normalizedBrightness = Math.max(0.001, Math.min(1.0, smoothedBrightness / 255));
+                  targetExposure = normalizedBrightness * currentPmremMult * LIGHTING_CONFIG.master_exposure_scale;
+                  if (isNaN(targetExposure)) targetExposure = 0.45;
 
                   // --- DETECCIÓN DE FOCOS REALES (MÁQUINA DE ESTADOS CARRUSEL) ---
                   if (initialLightPlaced && !detectionPermanentlyStopped && _activeCamera) {
@@ -745,8 +789,6 @@
                       }
                     }
                   }
-
-                  targetExposure = normalizedBrightness * currentPmremMult * LIGHTING_CONFIG.master_exposure_scale;
                 }
 
                 // =========================================================================
@@ -767,9 +809,27 @@
                 }
 
                 // =========================================================================
-                // 3. CINEMÁTICA Y LERP SINCRONIZADO DE LUCES DIRECTAS
+                // 3. CINEMÁTICA, RETÍCULA Y LERP SINCRONIZADO DE LUCES
                 // =========================================================================
-                if (_activeCamera) _activeCamera.getWorldDirection(rayDir);
+                if (_activeCamera) {
+                  _activeCamera.getWorldDirection(rayDir);
+                  _activeCamera.getWorldPosition(camWorldPos);
+
+                  // Actualiza la posición de la Retícula en la mesa si está activa
+                  if (_reticleMesh && _reticleMesh.visible) {
+                    probeNDC.set(0, -0.25, 0.5); // Apunta ligeramente por debajo del centro
+                    probeNDC.unproject(_activeCamera);
+                    const rDir = probeNDC.sub(camWorldPos).normalize();
+                    placementRay.set(camWorldPos, rDir);
+
+                    const hitTarget = new THREE_INSTANCE.Vector3();
+                    if (placementRay.intersectPlane(groundPlane, hitTarget)) {
+                      _reticleMesh.position.x = hitTarget.x;
+                      _reticleMesh.position.z = hitTarget.z;
+                      _reticleMesh.position.y = 0.002;
+                    }
+                  }
+                }
 
                 carruselSlots.forEach(slot => {
                   if (!slot.light) return;
@@ -804,8 +864,9 @@
                   }
                 });
 
-                // Amortiguación continua de exposición dt
+                // Amortiguación continua dt de exposición (Blindada contra NaN)
                 const expLerpStep = 1.0 - Math.exp(-LIGHTING_CONFIG.smoothing_rate * deltaSec);
+                if (isNaN(renderer.toneMappingExposure)) renderer.toneMappingExposure = 1.0;
                 renderer.toneMappingExposure += (targetExposure - renderer.toneMappingExposure) * expLerpStep;
 
                 aplicarAjustesSceneViewer();
