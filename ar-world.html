@@ -1,4 +1,4 @@
-<!-- 9th Wall v3.51 Apple Probe -->
+<!-- 9th Wall v3.52 Apple Probe -->
 <html>
 <head>
   <meta charset="UTF-8">
@@ -22,7 +22,7 @@
     style="position:fixed;top:10px;right:10px;z-index:1000000;background:rgba(0,0,0,0.9);color:#0f0;font-family:monospace;font-size:12px;padding:8px;border-radius:4px;cursor:pointer;line-height:1.3;border:1px solid #0f0;">
     <div id="debugTitle">FPS: --</div>
     <div id="debugContent">
-      ar-world: v3.51<br>
+      ar-world: v3.52<br>
       bundle: v3.48<br>
       <span id="envVerdictSpan" style="color:#0f0;">Entorno: ESPERANDO MESA...</span><br>
       <span id="telemetrySpan" style="color:#0f0;">Grano: -- (/25) | P98: -- (/255) | Conf: --%</span><br>
@@ -58,7 +58,7 @@
 
   <script>
     // =====================================================================================
-    // === CONSOLA CENTRAL DE ILUMINACIÓN Y CALIBRACIÓN (v3.51) ===
+    // === CONSOLA CENTRAL DE ILUMINACIÓN Y CALIBRACIÓN (v3.52) ===
     // =====================================================================================
     const LIGHTING_CONFIG = {
       // --- 1. PARÁMETROS TÉCNICOS ESENCIALES ---
@@ -501,7 +501,7 @@
                 lastFrameTime = now;
 
                 // =========================================================================
-                // 1. ESCANEO ISO, RUIDO NATIVO 1:1 CONSECUTIVO Y CALIBRACIÓN
+                // 1. ESCANEO ISO, RUIDO UNIVERSAL 1:1 Y CALIBRACIÓN
                 // =========================================================================
                 const shouldScan = isCalibrating || (now - lastScanTime >= LIGHTING_CONFIG.scan_interval_ms);
 
@@ -569,7 +569,7 @@
                   }
 
                   // =========================================================================
-                  // MUESTREO NATIVO 1:1 EN BRUTO (PÍXELES CONSECUTIVOS 1:1 EN EL CENTRO)
+                  // MUESTREO NATIVO 1:1 UNIVERSAL (CROMATICIDAD NORMALIZADA + RUIDO POISSON)
                   // =========================================================================
                   const vWidth = video.videoWidth || 1280;
                   const vHeight = video.videoHeight || 720;
@@ -580,7 +580,9 @@
                   rawGrainCtx.drawImage(video, sx, sy, rSize, rSize, 0, 0, rSize, rSize);
                   const rawData = rawGrainCtx.getImageData(0, 0, rSize, rSize).data;
 
-                  let sumDiff = 0, diffCount = 0;
+                  let sumNoise = 0, validPixelPairs = 0, blackPixelCount = 0;
+                  const totalPixels = rSize * rSize;
+
                   for (let py = 0; py < rSize; py++) {
                     for (let px = 0; px < rSize - 1; px++) {
                       const pIdx1 = (py * rSize + px) * 4;
@@ -591,22 +593,35 @@
 
                       const y1 = r1 * 0.299 + g1 * 0.587 + b1 * 0.114;
                       const y2 = r2 * 0.299 + g2 * 0.587 + b2 * 0.114;
-                      const deltaY = Math.abs(y1 - y2);
+                      const avgY = (y1 + y2) * 0.5;
 
-                      // Filtro de rechazo de bordes físicos (solo evaluamos superficies homogéneas)
-                      if (deltaY < 18) {
-                        const cb1 = -0.168736 * r1 - 0.331264 * g1 + 0.5 * b1 + 128;
-                        const cr1 = 0.5 * r1 - 0.418688 * g1 - 0.081312 * b1 + 128;
-                        const cb2 = -0.168736 * r2 - 0.331264 * g2 + 0.5 * b2 + 128;
-                        const cr2 = 0.5 * r2 - 0.418688 * g2 - 0.081312 * b2 + 128;
+                      if (y1 < 12) blackPixelCount++;
 
-                        const deltaChroma = Math.hypot(cb1 - cb2, cr1 - cr2);
-                        sumDiff += deltaY + deltaChroma;
-                        diffCount++;
+                      // Descarte de píxeles colapsados a negro (<12), quemados (>245) o bordes físicos (|ΔY| >= 25)
+                      if (y1 >= 12 && y2 >= 12 && y1 <= 245 && y2 <= 245) {
+                        const deltaY = Math.abs(y1 - y2);
+                        if (deltaY < 25) {
+                          // 1. Ruido relativo de Poisson en luminancia
+                          const relLumaNoise = deltaY / Math.sqrt(Math.max(1.0, avgY));
+
+                          // 2. Inestabilidad de Cromaticidad Normalizada (r, g, b)
+                          const sumRGB1 = Math.max(1.0, r1 + g1 + b1);
+                          const sumRGB2 = Math.max(1.0, r2 + g2 + b2);
+                          const nr1 = r1 / sumRGB1, ng1 = g1 / sumRGB1, nb1 = b1 / sumRGB1;
+                          const nr2 = r2 / sumRGB2, ng2 = g2 / sumRGB2, nb2 = b2 / sumRGB2;
+
+                          const deltaChromaNorm = Math.hypot(nr1 - nr2, ng1 - ng2, nb1 - nb2) * 100.0;
+
+                          sumNoise += (relLumaNoise * 0.8) + (deltaChromaNorm * 0.2);
+                          validPixelPairs++;
+                        }
                       }
                     }
                   }
-                  const currentFrameGrain = diffCount > 0 ? (sumDiff / diffCount) : 0.0;
+
+                  // Guardarraíl de Oscuridad Absoluta (Blackout): si más del 70% de los píxeles son negro digital puro
+                  const isBlackout = (blackPixelCount / totalPixels) > 0.70;
+                  const currentFrameGrain = isBlackout ? 18.0 : (validPixelPairs > 50 ? (sumNoise / validPixelPairs) : (isBlackout ? 18.0 : 2.0));
 
                   // =========================================================================
                   // FASE DE CALIBRACIÓN POST-"LISTO" (8 FRAMES CONSECUTIVOS CON PODA)
@@ -633,30 +648,30 @@
                       const avgP98 = mediaPoblacionalPodada(accumulatedP98Samples);
                       const avgLumFinal = mediaPoblacionalPodada(accumulatedAvgLumSamples);
 
-                      // --- FUSIÓN COHERENTE PONDERADA: RADIANCIA PMREM + GRANO NATIVO 1:1 ---
+                      // --- FUSIÓN COHERENTE PONDERADA: RADIANCIA PMREM + GRANO UNIVERSAL ---
                       // 1. Factor de radiancia ambiental global (Luz real del PMREM)
                       const pmremFactor = Math.max(0.0, Math.min(1.0, 1.0 - (avgLumFinal - 60.0) / (130.0 - 60.0)));
 
-                      // 2. Factor de ruido ISO real 1:1 (escala calibrada de 2.2 a 7.0)
+                      // 2. Factor de ruido universal (escala calibrada de 1.8 a 7.5)
                       let grainFactor = 0.0;
-                      if (avgGrain <= 2.2) {
+                      if (avgGrain <= 1.8) {
                         grainFactor = 0.0;
-                      } else if (avgGrain >= 7.0) {
+                      } else if (avgGrain >= 7.5) {
                         grainFactor = 1.0;
                       } else {
-                        grainFactor = (avgGrain - 2.2) / (7.0 - 2.2);
+                        grainFactor = (avgGrain - 1.8) / (7.5 - 1.8);
                       }
 
                       // 3. Fusión Coherente con guardarraíles lógicos
-                      if (avgLumFinal > 120) {
-                        // En entornos luminosos, la radiancia manda pero si hay grano alto (mesa blanca a oscuras), el grano levanta la penumbra
-                        environmentFactor = pmremFactor * 0.60 + grainFactor * 0.40;
-                      } else if (avgLumFinal < 65) {
-                        // En entornos oscuros, la baja luz o el grano confirman la penumbra
-                        environmentFactor = Math.max(pmremFactor * 0.80 + grainFactor * 0.20, grainFactor);
+                      if (avgGrain >= 6.5 || avgLumFinal < 45) {
+                        // Ruido alto o imagen en negro profundo confirman penumbra sin importar el color de la mesa
+                        environmentFactor = Math.max(0.70, grainFactor);
+                      } else if (avgLumFinal > 120) {
+                        // Superficie luminosa: la radiancia modula con el grano
+                        environmentFactor = pmremFactor * 0.50 + grainFactor * 0.50;
                       } else {
                         // Rango medio
-                        environmentFactor = pmremFactor * 0.45 + grainFactor * 0.55;
+                        environmentFactor = pmremFactor * 0.40 + grainFactor * 0.60;
                       }
                       environmentFactor = Math.max(0.0, Math.min(1.0, environmentFactor));
 
