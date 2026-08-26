@@ -1,4 +1,4 @@
-<!-- 9th Wall v3.46 Apple Probe -->
+<!-- 9th Wall v3.47 Apple Probe -->
 <html>
 <head>
   <meta charset="UTF-8">
@@ -22,8 +22,8 @@
     style="position:fixed;top:10px;right:10px;z-index:1000000;background:rgba(0,0,0,0.9);color:#0f0;font-family:monospace;font-size:12px;padding:8px;border-radius:4px;cursor:pointer;line-height:1.3;border:1px solid #0f0;">
     <div id="debugTitle">FPS: --</div>
     <div id="debugContent">
-      ar-world: v3.46<br>
-      bundle: v3.10y<br>
+      ar-world: v3.47<br>
+      bundle: v3.47<br>
       <span id="envVerdictSpan" style="color:#0f0;">Entorno: ESPERANDO MESA...</span><br>
       <span id="telemetrySpan" style="color:#0f0;">Grano: -- (/25) | P98: -- (/255) | Conf: --%</span><br>
       <span id="lightsCountSpan" style="color:#0f0;">Luces: 1</span><br>
@@ -35,9 +35,9 @@
     #debugLog.minimized #debugContent { display: none; }
   </style>
 
-  <!-- 3. UI PASO 1: CENTRADA EXACTA EN PANTALLA -->
-  <div id="readyPromptContainer" style="position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);z-index:999999;display:flex;flex-direction:column;align-items:center;pointer-events:none;transition:opacity 0.3s ease;">
-    <div style="background:rgba(0,0,0,0.75);color:white;font-family:sans-serif;font-size:16px;font-weight:bold;padding:10px 22px;border-radius:22px;border:1px solid rgba(255,255,255,0.4);margin-bottom:14px;text-align:center;box-shadow:0 4px 14px rgba(0,0,0,0.6);white-space:nowrap;">
+  <!-- 3. UI PASO 1: CENTRADA EXACTA CON ANIMACIÓN SUAVE AL INICIAR CÁMARA -->
+  <div id="readyPromptContainer" style="position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);z-index:999999;display:flex;flex-direction:column;align-items:center;pointer-events:none;opacity:0;transition:opacity 0.5s ease;">
+    <div style="background:rgba(0,0,0,0.75);color:white;font-family:sans-serif;font-size:16px;font-weight:bold;padding:10px 22px;border-radius:22px;border:1px solid rgba(255,255,255,0.4);margin-bottom:14px;text-align:center;white-space:nowrap;">
       Apunta hacia la mesa
     </div>
     <button id="readyBtn" style="pointer-events:auto !important;background:#00e5ff;color:#000;border:none;font-family:sans-serif;font-size:16px;font-weight:bold;padding:14px 40px;border-radius:28px;box-shadow:0 4px 20px rgba(0,229,255,0.7);cursor:pointer;letter-spacing:0.5px;">
@@ -58,7 +58,7 @@
 
   <script>
     // =====================================================================================
-    // === CONSOLA CENTRAL DE ILUMINACIÓN Y CALIBRACIÓN (v3.46) ===
+    // === CONSOLA CENTRAL DE ILUMINACIÓN Y CALIBRACIÓN (v3.47) ===
     // =====================================================================================
     const LIGHTING_CONFIG = {
       // --- 1. PARÁMETROS TÉCNICOS ESENCIALES ---
@@ -67,8 +67,8 @@
       scan_interval_ms: 300,         // Escaneo Light Estimation cada 300 ms
       calibration_frames_target: 5,  // Ventana reducida a 5 frames para estudio ultra-rápido de grano
       shadow_map_size: 512,          // Sombra contacto ECS Ground a 512x512
-      shadow_radius_fixed: 4,        // Radio difuso suave reducido a la mitad (4)
-      ground_opacity_fixed: 0.35,    // Opacidad suelo equilibrada
+      shadow_radius_fixed: 5,        // Radio difuso subido 1 punto (5)
+      ground_opacity_fixed: 0.40,    // Opacidad suelo subida medio punto (0.40)
 
       // --- 2. BALANCE MAESTRO DE ENERGÍA (Día vs Penumbra) ---
       day_total_energy: 5.20,        // Potencia directa total en Día (nivel 3 luces v3.43)
@@ -182,6 +182,7 @@
     let calibrationFramesDone = 0;
     const accumulatedNoiseSamples = [];
     const accumulatedP98Samples = [];
+    const accumulatedAvgLumSamples = [];
 
     const candidateDebounce = {
       active: false,
@@ -351,6 +352,15 @@
           if (video && video.readyState >= 2) {
             clearInterval(waitForVideo);
 
+            // =========================================================================
+            // ANIMACIÓN SUAVE (500 ms) DE LA FRASE Y BOTÓN AL APARECER LA CÁMARA
+            // =========================================================================
+            const readyPrompt = document.getElementById('readyPromptContainer');
+            if (readyPrompt) {
+              readyPrompt.style.opacity = '1';
+              readyPrompt.style.pointerEvents = 'auto';
+            }
+
             const pmremSize = LIGHTING_CONFIG.pmrem_resolution;
             const pmremCanvas = document.createElement('canvas');
             pmremCanvas.width = pmremSize;
@@ -442,7 +452,6 @@
             // MANEJADOR DEL BOTÓN "LISTO" -> RECENTER + INICIO ESTUDIO DE GRANO
             // =========================================================================
             const readyBtn = document.getElementById('readyBtn');
-            const readyPrompt = document.getElementById('readyPromptContainer');
             const touchBlocker = document.getElementById('touchBlocker');
 
             if (readyBtn) {
@@ -466,6 +475,7 @@
                 calibrationFramesDone = 0;
                 accumulatedNoiseSamples.length = 0;
                 accumulatedP98Samples.length = 0;
+                accumulatedAvgLumSamples.length = 0;
               });
             }
 
@@ -576,17 +586,18 @@
                     }
                   }
 
-                  // Grano calibrado con fallback contextual según la iluminación base
+                  // Grano calibrado con fallback suave contextual
                   const currentFrameGrain = diffCount > 0 
                     ? (diffCbCrSum / diffCount) 
-                    : (avgLum < 50 ? 8.0 : 2.5);
+                    : (avgLum < 50 ? 5.5 : 1.8);
 
                   // =========================================================================
-                  // FASE DE CALIBRACIÓN POST-"LISTO" (5 FRAMES ULTRA-RÁPIDOS)
+                  // FASE DE CALIBRACIÓN POST-"LISTO" (5 FRAMES HÍBRIDOS PMREM + GRANO)
                   // =========================================================================
                   if (isCalibrating && !isCalibrated) {
                     accumulatedNoiseSamples.push(currentFrameGrain);
                     accumulatedP98Samples.push(p98Lum);
+                    accumulatedAvgLumSamples.push(avgLum);
                     calibrationFramesDone++;
 
                     if (calibrationFramesDone >= LIGHTING_CONFIG.calibration_frames_target) {
@@ -595,15 +606,24 @@
 
                       const avgGrain = accumulatedNoiseSamples.reduce((a, b) => a + b, 0) / accumulatedNoiseSamples.length;
                       const avgP98 = accumulatedP98Samples.reduce((a, b) => a + b, 0) / accumulatedP98Samples.length;
+                      const avgLumFinal = accumulatedAvgLumSamples.reduce((a, b) => a + b, 0) / accumulatedAvgLumSamples.length;
 
-                      // Factor de entorno continuo gobernado prioritariamente por el GRANO (Ruido ISO)
-                      if (avgGrain <= 2.8) {
-                        environmentFactor = 0.0; // Día exterior / Luz limpia sin ruido
-                      } else if (avgGrain >= 5.8) {
-                        environmentFactor = 1.0; // Penumbra / Restaurante / Interior oscuro con ruido ISO
+                      // --- FUSIÓN HÍBRIDA MAESTRA: RADIANCIA PMREM + RUIDO ISO SUAVIZADO ---
+                      // 1. Factor de radiancia ambiental global (Luz real del PMREM)
+                      const pmremFactor = Math.max(0.0, Math.min(1.0, 1.0 - (avgLumFinal - 70.0) / (135.0 - 70.0)));
+
+                      // 2. Factor de ruido ISO / Grano adaptado a la realidad móvil (2.2 a 4.2)
+                      let grainFactor = 0.0;
+                      if (avgGrain <= 2.2) {
+                        grainFactor = 0.0; // Exterior / Día limpio
+                      } else if (avgGrain >= 4.2) {
+                        grainFactor = 1.0; // Penumbra / Restaurante con ganancia de sensor
                       } else {
-                        environmentFactor = (avgGrain - 2.8) / (5.8 - 2.8);
+                        grainFactor = (avgGrain - 2.2) / (4.2 - 2.2);
                       }
+
+                      // Decisión fusionada: el ambiente oscuro se confirma si la radiancia es baja o el grano es alto
+                      environmentFactor = Math.max(pmremFactor, grainFactor);
 
                       // Presupuestos de Energía Lumínica
                       currentDirectBudget = THREE_INSTANCE.MathUtils.lerp(LIGHTING_CONFIG.day_total_energy, LIGHTING_CONFIG.night_total_energy, environmentFactor);
@@ -612,8 +632,8 @@
 
                       let verdict = "DIA_NORMAL";
                       if (environmentFactor < 0.15 && avgP98 > 220) verdict = "DIRECCIONAL_FUERTE";
-                      else if (environmentFactor < 0.35) verdict = "DIA_NORMAL";
-                      else if (environmentFactor < 0.70) verdict = "AMBIENTE_SUAVE";
+                      else if (environmentFactor < 0.30) verdict = "DIA_NORMAL";
+                      else if (environmentFactor < 0.65) verdict = "AMBIENTE_SUAVE";
                       else verdict = "PENUMBRA";
 
                       const confidence = Math.min(99, Math.max(70, 75 + Math.abs(environmentFactor - 0.5) * 48));
@@ -652,7 +672,7 @@
                         actualizarContadorLuces();
 
                         // =========================================================================
-                        // COLOCACIÓN DIRECTA DEL PLATO (+5 CM DEL USUARIO)
+                        // COLOCACIÓN AUTOMÁTICA DEL PLATO (+5 CM DEL USUARIO) VÍA ECS EVENT
                         // =========================================================================
                         if (!isObjectPlaced && _ecsWorld) {
                           isObjectPlaced = true;
@@ -674,16 +694,9 @@
                           }
 
                           try {
-                            const prefabId = "b534657a-38e6-4275-a37d-77b655561d5b";
-                            const createdEid = _ecsWorld.createEntity(prefabId);
-                            const createdEntity = _ecsWorld.getEntity(createdEid);
-                            if (createdEntity) {
-                              createdEntity.setLocalPosition({ x: spawnTarget.x, y: spawnTarget.y, z: spawnTarget.z });
-                              if (window.ecs && window.ecs.Quaternion && window.ecs.math) {
-                                createdEntity.set(window.ecs.Quaternion, window.ecs.math.quat.yRadians(Math.random() * Math.PI));
-                              }
-                            }
-                            _ecsWorld.events.dispatch(_ecsWorld.events.globalId, "object-placed");
+                            _ecsWorld.events.dispatch(_ecsWorld.events.globalId, "auto-place-dish", {
+                              worldPosition: { x: spawnTarget.x, y: spawnTarget.y, z: spawnTarget.z }
+                            });
                           } catch (err) {
                             log("Error colocación directa: " + err.message);
                           }

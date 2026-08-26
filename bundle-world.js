@@ -1,4 +1,4 @@
-﻿// 9th Wall v3.10y Apple Probe
+﻿// 9th Wall v3.47 Apple Probe
 (() => {
   var e = {
     574() {
@@ -84,7 +84,18 @@
           d = t.getEntity(r);
           d.setLocalPosition(i.data.worldPosition),
           d.set(e.Quaternion, e.math.quat.yRadians(Math.random() * Math.PI)),
-          t.events.dispatch(a, o)
+          t.events.dispatch(a, o),
+          t.events.dispatch(t.events.globalId, o)
+        }).listen(t.events.globalId, "auto-place-dish", i => {
+          if (isPlaced) return;
+          if (!i.data || !i.data.worldPosition) return;
+          isPlaced = true;
+          const r = t.createEntity(schemaAttr.get(a).prefab),
+          d = t.getEntity(r);
+          d.setLocalPosition(i.data.worldPosition),
+          d.set(e.Quaternion, e.math.quat.yRadians(Math.random() * Math.PI)),
+          t.events.dispatch(a, o),
+          t.events.dispatch(t.events.globalId, o)
         }).onEvent(o, "placed", { target: a }),
         i("placed").onEvent(n, "initial", { target: a }).onEnter(() => {
           isPlaced = true;
