@@ -1,4 +1,4 @@
-<!-- 9th Wall v3.47 Apple Probe -->
+<!-- 9th Wall v3.48 Apple Probe -->
 <html>
 <head>
   <meta charset="UTF-8">
@@ -22,8 +22,8 @@
     style="position:fixed;top:10px;right:10px;z-index:1000000;background:rgba(0,0,0,0.9);color:#0f0;font-family:monospace;font-size:12px;padding:8px;border-radius:4px;cursor:pointer;line-height:1.3;border:1px solid #0f0;">
     <div id="debugTitle">FPS: --</div>
     <div id="debugContent">
-      ar-world: v3.47<br>
-      bundle: v3.47<br>
+      ar-world: v3.48<br>
+      bundle: v3.48<br>
       <span id="envVerdictSpan" style="color:#0f0;">Entorno: ESPERANDO MESA...</span><br>
       <span id="telemetrySpan" style="color:#0f0;">Grano: -- (/25) | P98: -- (/255) | Conf: --%</span><br>
       <span id="lightsCountSpan" style="color:#0f0;">Luces: 1</span><br>
@@ -58,17 +58,18 @@
 
   <script>
     // =====================================================================================
-    // === CONSOLA CENTRAL DE ILUMINACIÓN Y CALIBRACIÓN (v3.47) ===
+    // === CONSOLA CENTRAL DE ILUMINACIÓN Y CALIBRACIÓN (v3.48) ===
     // =====================================================================================
     const LIGHTING_CONFIG = {
       // --- 1. PARÁMETROS TÉCNICOS ESENCIALES ---
-      pmrem_resolution: 64,          // PMREM a 64x64
+      pmrem_resolution: 64,          // PMREM a 64x64 para reflexiones
+      raw_crop_size: 128,            // Ventana 1:1 nativa para lectura de grano sin comprimir
       pmrem_interval_ms: 200,        // Refresco PMREM GPU cada 200 ms
-      scan_interval_ms: 300,         // Escaneo Light Estimation cada 300 ms
-      calibration_frames_target: 5,  // Ventana reducida a 5 frames para estudio ultra-rápido de grano
+      scan_interval_ms: 300,         // Escaneo Light Estimation periódico (en reposo) cada 300 ms
+      calibration_frames_target: 3,  // Calibración ultra-rápida en 3 frames (150 ms)
       shadow_map_size: 512,          // Sombra contacto ECS Ground a 512x512
-      shadow_radius_fixed: 5,        // Radio difuso subido 1 punto (5)
-      ground_opacity_fixed: 0.40,    // Opacidad suelo subida medio punto (0.40)
+      shadow_radius_fixed: 5,        // Radio difuso suave
+      ground_opacity_fixed: 0.40,    // Opacidad suelo equilibrada
 
       // --- 2. BALANCE MAESTRO DE ENERGÍA (Día vs Penumbra) ---
       day_total_energy: 5.20,        // Potencia directa total en Día (nivel 3 luces v3.43)
@@ -367,10 +368,19 @@
             pmremCanvas.height = pmremSize;
             const pmremCtx = pmremCanvas.getContext('2d', { willReadFrequently: true });
             
+            // Canvas dedicado para muestreo 1:1 nativo en bruto (sin reescalado destructivo)
+            const rawCropSize = LIGHTING_CONFIG.raw_crop_size;
+            const rawGrainCanvas = document.createElement('canvas');
+            rawGrainCanvas.width = rawCropSize;
+            rawGrainCanvas.height = rawCropSize;
+            const rawGrainCtx = rawGrainCanvas.getContext('2d', { willReadFrequently: true });
+
             // Pre-calentamiento del buffer GPU -> CPU
             try {
               pmremCtx.drawImage(video, 0, 0, pmremSize, pmremSize);
               pmremCtx.getImageData(0, 0, pmremSize, pmremSize);
+              rawGrainCtx.drawImage(video, 0, 0, rawCropSize, rawCropSize, 0, 0, rawCropSize, rawCropSize);
+              rawGrainCtx.getImageData(0, 0, rawCropSize, rawCropSize);
             } catch (e) {}
 
             const envTexture = new THREE_INSTANCE.CanvasTexture(pmremCanvas);
@@ -470,7 +480,7 @@
                   setTimeout(() => { readyPrompt.style.display = 'none'; }, 300);
                 }
 
-                // 3. Inicia la ráfaga estricta de 5 frames para estudio de grano sobre la mesa
+                // 3. Inicia la ráfaga estricta de 3 frames ultra-rápidos para estudio de grano sobre la mesa
                 isCalibrating = true;
                 calibrationFramesDone = 0;
                 accumulatedNoiseSamples.length = 0;
@@ -480,7 +490,7 @@
             }
 
             // =========================================================================
-            // BUCLE MAESTRO TEMPORIZADO (ISO a 300 ms / PMREM GPU a 200 ms)
+            // BUCLE MAESTRO TEMPORIZADO (ISO continuo / PMREM GPU a 200 ms)
             // =========================================================================
             setInterval(() => {
               try {
@@ -491,9 +501,12 @@
                 lastFrameTime = now;
 
                 // =========================================================================
-                // 1. ESCANEO ISO, RUIDO Cb/Cr Y CALIBRACIÓN
+                // 1. ESCANEO ISO, RUIDO BRUTO 1:1 Cb/Cr Y CALIBRACIÓN
                 // =========================================================================
-                if (now - lastScanTime >= LIGHTING_CONFIG.scan_interval_ms) {
+                // Durante la calibración post-"Listo", se ejecutan los 3 frames de forma inmediata (sin esperar los 300 ms)
+                const shouldScan = isCalibrating || (now - lastScanTime >= LIGHTING_CONFIG.scan_interval_ms);
+
+                if (shouldScan) {
                   lastScanTime = now;
 
                   const imgData = pmremCtx.getImageData(0, 0, pmremSize, pmremSize);
@@ -556,43 +569,49 @@
                     if (colorBins[c] > maxBinCount) { maxBinCount = colorBins[c]; dominantBin = c; }
                   }
 
-                  // Medición de grano cromático Cb/Cr en la mesa (ISO Noise)
-                  let diffCbCrSum = 0, diffCount = 0;
-                  for (let py = 1; py < pmremSize - 1; py += 2) {
-                    for (let px = 0; px < pmremSize - 1; px += 2) {
-                      const pIdx1 = (py * pmremSize + px) * 4;
-                      const pIdx2 = (py * pmremSize + (px + 1)) * 4;
+                  // =========================================================================
+                  // MUESTREO 1:1 EN BRUTO DE RUIDO CROMÁTICO (Cb/Cr) DIRECTO DE LA CÁMARA
+                  // =========================================================================
+                  const vWidth = video.videoWidth || 1280;
+                  const vHeight = video.videoHeight || 720;
+                  const cropSize = LIGHTING_CONFIG.raw_crop_size;
+                  const startCropX = Math.max(0, Math.floor((vWidth - cropSize) / 2));
+                  const startCropY = Math.max(0, Math.floor((vHeight - cropSize) / 2));
 
-                      const r1 = data[pIdx1], g1 = data[pIdx1 + 1], b1 = data[pIdx1 + 2];
-                      const r2 = data[pIdx2], g2 = data[pIdx2 + 1], b2 = data[pIdx2 + 2];
+                  rawGrainCtx.drawImage(video, startCropX, startCropY, cropSize, cropSize, 0, 0, cropSize, cropSize);
+                  const rawData = rawGrainCtx.getImageData(0, 0, cropSize, cropSize).data;
 
-                      const cBin1 = ((r1 > 100 ? 1 : 0) << 2) | ((g1 > 100 ? 1 : 0) << 1) | (b1 > 100 ? 1 : 0);
-                      const cBin2 = ((r2 > 100 ? 1 : 0) << 2) | ((g2 > 100 ? 1 : 0) << 1) | (b1 > 100 ? 1 : 0);
+                  let rawCbCrSum = 0;
+                  let rawDiffCount = 0;
 
-                      if (cBin1 === dominantBin && cBin2 === dominantBin) {
-                        const y1 = r1 * 0.299 + g1 * 0.587 + b1 * 0.114;
-                        const y2 = r2 * 0.299 + g2 * 0.587 + b2 * 0.114;
+                  for (let py = 1; py < cropSize - 1; py += 2) {
+                    for (let px = 0; px < cropSize - 1; px += 2) {
+                      const pIdx1 = (py * cropSize + px) * 4;
+                      const pIdx2 = (py * cropSize + (px + 1)) * 4;
 
-                        if (Math.abs(y1 - y2) < 25) {
-                          const cb1 = -0.168736 * r1 - 0.331264 * g1 + 0.5 * b1 + 128;
-                          const cr1 = 0.5 * r1 - 0.418688 * g1 - 0.081312 * b1 + 128;
-                          const cb2 = -0.168736 * r2 - 0.331264 * g2 + 0.5 * b2 + 128;
-                          const cr2 = 0.5 * r2 - 0.418688 * g2 - 0.081312 * b2 + 128;
+                      const r1 = rawData[pIdx1], g1 = rawData[pIdx1 + 1], b1 = rawData[pIdx1 + 2];
+                      const r2 = rawData[pIdx2], g2 = rawData[pIdx2 + 1], b2 = rawData[pIdx2 + 2];
 
-                          diffCbCrSum += Math.hypot(cb1 - cb2, cr1 - cr2);
-                          diffCount++;
-                        }
+                      const y1 = r1 * 0.299 + g1 * 0.587 + b1 * 0.114;
+                      const y2 = r2 * 0.299 + g2 * 0.587 + b2 * 0.114;
+
+                      // Medición de ruido puro entre píxeles adyacentes de luminosidad cercana
+                      if (Math.abs(y1 - y2) < 22) {
+                        const cb1 = -0.168736 * r1 - 0.331264 * g1 + 0.5 * b1 + 128;
+                        const cr1 = 0.5 * r1 - 0.418688 * g1 - 0.081312 * b1 + 128;
+                        const cb2 = -0.168736 * r2 - 0.331264 * g2 + 0.5 * b2 + 128;
+                        const cr2 = 0.5 * r2 - 0.418688 * g2 - 0.081312 * b2 + 128;
+
+                        rawCbCrSum += Math.hypot(cb1 - cb2, cr1 - cr2);
+                        rawDiffCount++;
                       }
                     }
                   }
 
-                  // Grano calibrado con fallback suave contextual
-                  const currentFrameGrain = diffCount > 0 
-                    ? (diffCbCrSum / diffCount) 
-                    : (avgLum < 50 ? 5.5 : 1.8);
+                  const currentFrameGrain = rawDiffCount > 0 ? (rawCbCrSum / rawDiffCount) : 4.0;
 
                   // =========================================================================
-                  // FASE DE CALIBRACIÓN POST-"LISTO" (5 FRAMES HÍBRIDOS PMREM + GRANO)
+                  // FASE DE CALIBRACIÓN POST-"LISTO" (3 FRAMES RÁPIDOS 1:1)
                   // =========================================================================
                   if (isCalibrating && !isCalibrated) {
                     accumulatedNoiseSamples.push(currentFrameGrain);
@@ -608,21 +627,23 @@
                       const avgP98 = accumulatedP98Samples.reduce((a, b) => a + b, 0) / accumulatedP98Samples.length;
                       const avgLumFinal = accumulatedAvgLumSamples.reduce((a, b) => a + b, 0) / accumulatedAvgLumSamples.length;
 
-                      // --- FUSIÓN HÍBRIDA MAESTRA: RADIANCIA PMREM + RUIDO ISO SUAVIZADO ---
+                      // --- FUSIÓN HÍBRIDA MAESTRA: RADIANCIA PMREM + RUIDO ISO BRUTO 1:1 ---
                       // 1. Factor de radiancia ambiental global (Luz real del PMREM)
-                      const pmremFactor = Math.max(0.0, Math.min(1.0, 1.0 - (avgLumFinal - 70.0) / (135.0 - 70.0)));
+                      const pmremFactor = Math.max(0.0, Math.min(1.0, 1.0 - (avgLumFinal - 65.0) / (135.0 - 65.0)));
 
-                      // 2. Factor de ruido ISO / Grano adaptado a la realidad móvil (2.2 a 4.2)
+                      // 2. Factor de ruido ISO real 1:1 (Grano nativo sin comprimir)
+                      // Grano <= 3.2 -> Día limpio / Exterior
+                      // Grano >= 7.5 -> Penumbra con ganancia ISO alta / Armario
                       let grainFactor = 0.0;
-                      if (avgGrain <= 2.2) {
-                        grainFactor = 0.0; // Exterior / Día limpio
-                      } else if (avgGrain >= 4.2) {
-                        grainFactor = 1.0; // Penumbra / Restaurante con ganancia de sensor
+                      if (avgGrain <= 3.2) {
+                        grainFactor = 0.0;
+                      } else if (avgGrain >= 7.5) {
+                        grainFactor = 1.0;
                       } else {
-                        grainFactor = (avgGrain - 2.2) / (4.2 - 2.2);
+                        grainFactor = (avgGrain - 3.2) / (7.5 - 3.2);
                       }
 
-                      // Decisión fusionada: el ambiente oscuro se confirma si la radiancia es baja o el grano es alto
+                      // Decisión fusionada: el ambiente oscuro se confirma si la radiancia es baja o el grano bruto es alto
                       environmentFactor = Math.max(pmremFactor, grainFactor);
 
                       // Presupuestos de Energía Lumínica
