@@ -1,4 +1,4 @@
-<!-- 9th Wall v3.45 Apple Probe -->
+<!-- 9th Wall v3.46 Apple Probe -->
 <html>
 <head>
   <meta charset="UTF-8">
@@ -22,7 +22,7 @@
     style="position:fixed;top:10px;right:10px;z-index:1000000;background:rgba(0,0,0,0.9);color:#0f0;font-family:monospace;font-size:12px;padding:8px;border-radius:4px;cursor:pointer;line-height:1.3;border:1px solid #0f0;">
     <div id="debugTitle">FPS: --</div>
     <div id="debugContent">
-      ar-world: v3.45<br>
+      ar-world: v3.46<br>
       bundle: v3.10y<br>
       <span id="envVerdictSpan" style="color:#0f0;">Entorno: ESPERANDO MESA...</span><br>
       <span id="telemetrySpan" style="color:#0f0;">Grano: -- (/25) | P98: -- (/255) | Conf: --%</span><br>
@@ -45,13 +45,6 @@
     </button>
   </div>
 
-  <!-- 4. UI PASO 2: MENSAJE TRAS PULSAR 'LISTO' -->
-  <div id="placePromptContainer" style="position:fixed;bottom:90px;left:0;right:0;z-index:999999;display:none;flex-direction:column;align-items:center;pointer-events:none;transition:opacity 0.3s ease;">
-    <div style="background:rgba(0,0,0,0.75);color:#00e5ff;font-family:sans-serif;font-size:15px;font-weight:bold;padding:9px 20px;border-radius:20px;border:1px solid #00e5ff;text-align:center;box-shadow:0 4px 12px rgba(0,0,0,0.5);">
-      Toca la mesa para colocar el plato
-    </div>
-  </div>
-
   <!-- BOTONES DE CONTROL SECUNDARIOS -->
   <button id="envToggle"
     style="position:fixed;bottom:20px;left:20px;z-index:1000000;padding:10px 14px;border-radius:10px;border:1px solid white;background:rgba(0,0,0,0.7);color:white;font-size:13px;pointer-events:auto !important;">
@@ -65,16 +58,16 @@
 
   <script>
     // =====================================================================================
-    // === CONSOLA CENTRAL DE ILUMINACIÓN Y CALIBRACIÓN (v3.45) ===
+    // === CONSOLA CENTRAL DE ILUMINACIÓN Y CALIBRACIÓN (v3.46) ===
     // =====================================================================================
     const LIGHTING_CONFIG = {
       // --- 1. PARÁMETROS TÉCNICOS ESENCIALES ---
       pmrem_resolution: 64,          // PMREM a 64x64
       pmrem_interval_ms: 200,        // Refresco PMREM GPU cada 200 ms
       scan_interval_ms: 300,         // Escaneo Light Estimation cada 300 ms
-      calibration_frames_target: 10, // Ventana de 10 frames para estudio de ruido
+      calibration_frames_target: 5,  // Ventana reducida a 5 frames para estudio ultra-rápido de grano
       shadow_map_size: 512,          // Sombra contacto ECS Ground a 512x512
-      shadow_radius_fixed: 8,        // Radio difuso suave
+      shadow_radius_fixed: 4,        // Radio difuso suave reducido a la mitad (4)
       ground_opacity_fixed: 0.35,    // Opacidad suelo equilibrada
 
       // --- 2. BALANCE MAESTRO DE ENERGÍA (Día vs Penumbra) ---
@@ -147,7 +140,7 @@
     let pmremGenerator = null, cameraRT = null, originalEnv = null;
     let envMode = 'cam';
     let _scene = null, _renderer = null, _activeCamera = null, _groundMesh = null, _baseLight1 = null;
-    let _reticleMesh = null;
+    let _ecsWorld = null;
 
     // Estado global de energía y balance
     let currentDirectBudget = LIGHTING_CONFIG.day_total_energy;
@@ -182,7 +175,7 @@
     let totalRealLightsAnchored = 0;
     let detectionPermanentlyStopped = false;
 
-    // Control de flujo UX "Listo", Retícula y Calibración
+    // Control de flujo UX "Listo", Colocación Directa y Calibración
     let isCalibrating = false;
     let isCalibrated = false;
     let isObjectPlaced = false;
@@ -231,6 +224,7 @@
         add: (world, component) => {
           setTimeout(() => {
             try {
+              _ecsWorld = world;
               _scene = world.three.scene;
               _renderer = world.three.renderer;
               _activeCamera = world.three.activeCamera;
@@ -303,20 +297,12 @@
                 _scene.add(slotLight4.light);
                 _scene.add(slotLight4.light.target);
 
-                // Creación de la Retícula 3D para Opción B (Anillo cian luminoso en el suelo)
-                const ringGeo = new nativeTHREE.RingGeometry(0.09, 0.105, 32);
-                const ringMat = new nativeTHREE.MeshBasicMaterial({
-                  color: 0x00e5ff,
-                  transparent: true,
-                  opacity: 0.85,
-                  side: nativeTHREE.DoubleSide,
-                  depthWrite: false
-                });
-                _reticleMesh = new nativeTHREE.Mesh(ringGeo, ringMat);
-                _reticleMesh.rotation.x = -Math.PI / 2;
-                _reticleMesh.position.set(0, 0.002, -0.4);
-                _reticleMesh.visible = false;
-                _scene.add(_reticleMesh);
+                // Pre-compilación segura de Shaders en Three.js sin interferir con el tracking
+                try {
+                  if (_renderer && _activeCamera && _scene) {
+                    _renderer.compile(_scene, _activeCamera);
+                  }
+                } catch (e) {}
 
                 loadNativeRGBELoader(nativeTHREE).then((LoaderClass) => {
                   if (LoaderClass) {
@@ -371,7 +357,11 @@
             pmremCanvas.height = pmremSize;
             const pmremCtx = pmremCanvas.getContext('2d', { willReadFrequently: true });
             
-            pmremCtx.drawImage(video, 0, 0, pmremSize, pmremSize);
+            // Pre-calentamiento del buffer GPU -> CPU
+            try {
+              pmremCtx.drawImage(video, 0, 0, pmremSize, pmremSize);
+              pmremCtx.getImageData(0, 0, pmremSize, pmremSize);
+            } catch (e) {}
 
             const envTexture = new THREE_INSTANCE.CanvasTexture(pmremCanvas);
             envTexture.mapping = THREE_INSTANCE.EquirectangularReflectionMapping;
@@ -449,11 +439,10 @@
             const lumaBins = new Int32Array(16);
 
             // =========================================================================
-            // MANEJADOR DEL BOTÓN "LISTO" -> RECENTER + CALIBRACIÓN + RETÍCULA
+            // MANEJADOR DEL BOTÓN "LISTO" -> RECENTER + INICIO ESTUDIO DE GRANO
             // =========================================================================
             const readyBtn = document.getElementById('readyBtn');
             const readyPrompt = document.getElementById('readyPromptContainer');
-            const placePrompt = document.getElementById('placePromptContainer');
             const touchBlocker = document.getElementById('touchBlocker');
 
             if (readyBtn) {
@@ -472,31 +461,13 @@
                   setTimeout(() => { readyPrompt.style.display = 'none'; }, 300);
                 }
 
-                // 3. Inicia la ráfaga de estudio de ruido
+                // 3. Inicia la ráfaga estricta de 5 frames para estudio de grano sobre la mesa
                 isCalibrating = true;
                 calibrationFramesDone = 0;
                 accumulatedNoiseSamples.length = 0;
                 accumulatedP98Samples.length = 0;
               });
             }
-
-            // Detección de colocación del plato para apagar la retícula y el mensaje
-            window.addEventListener('touchstart', (e) => {
-              if (isCalibrated && !isObjectPlaced) {
-                // Si el usuario toca la pantalla fuera de botones tras calibrar
-                const target = e.target;
-                if (target.tagName !== 'BUTTON') {
-                  setTimeout(() => {
-                    isObjectPlaced = true;
-                    if (_reticleMesh) _reticleMesh.visible = false;
-                    if (placePrompt) {
-                      placePrompt.style.opacity = '0';
-                      setTimeout(() => { placePrompt.style.display = 'none'; }, 300);
-                    }
-                  }, 200);
-                }
-              }
-            }, { passive: true });
 
             // =========================================================================
             // BUCLE MAESTRO TEMPORIZADO (ISO a 300 ms / PMREM GPU a 200 ms)
@@ -575,7 +546,7 @@
                     if (colorBins[c] > maxBinCount) { maxBinCount = colorBins[c]; dominantBin = c; }
                   }
 
-                  // Medición de grano cromático Cb/Cr en la mesa
+                  // Medición de grano cromático Cb/Cr en la mesa (ISO Noise)
                   let diffCbCrSum = 0, diffCount = 0;
                   for (let py = 1; py < pmremSize - 1; py += 2) {
                     for (let px = 0; px < pmremSize - 1; px += 2) {
@@ -586,7 +557,7 @@
                       const r2 = data[pIdx2], g2 = data[pIdx2 + 1], b2 = data[pIdx2 + 2];
 
                       const cBin1 = ((r1 > 100 ? 1 : 0) << 2) | ((g1 > 100 ? 1 : 0) << 1) | (b1 > 100 ? 1 : 0);
-                      const cBin2 = ((r2 > 100 ? 1 : 0) << 2) | ((g2 > 100 ? 1 : 0) << 1) | (b2 > 100 ? 1 : 0);
+                      const cBin2 = ((r2 > 100 ? 1 : 0) << 2) | ((g2 > 100 ? 1 : 0) << 1) | (b1 > 100 ? 1 : 0);
 
                       if (cBin1 === dominantBin && cBin2 === dominantBin) {
                         const y1 = r1 * 0.299 + g1 * 0.587 + b1 * 0.114;
@@ -605,10 +576,13 @@
                     }
                   }
 
-                  const currentFrameGrain = diffCount > 0 ? (diffCbCrSum / diffCount) : 4.0;
+                  // Grano calibrado con fallback contextual según la iluminación base
+                  const currentFrameGrain = diffCount > 0 
+                    ? (diffCbCrSum / diffCount) 
+                    : (avgLum < 50 ? 8.0 : 2.5);
 
                   // =========================================================================
-                  // FASE DE CALIBRACIÓN POST-"LISTO"
+                  // FASE DE CALIBRACIÓN POST-"LISTO" (5 FRAMES ULTRA-RÁPIDOS)
                   // =========================================================================
                   if (isCalibrating && !isCalibrated) {
                     accumulatedNoiseSamples.push(currentFrameGrain);
@@ -622,13 +596,13 @@
                       const avgGrain = accumulatedNoiseSamples.reduce((a, b) => a + b, 0) / accumulatedNoiseSamples.length;
                       const avgP98 = accumulatedP98Samples.reduce((a, b) => a + b, 0) / accumulatedP98Samples.length;
 
-                      // Factor de entorno continuo
-                      if (avgP98 >= 225 && avgGrain <= 4.0) {
-                        environmentFactor = 0.0;
-                      } else if (avgGrain >= 12.0 || (avgP98 < 130 && avgGrain >= 7.5)) {
-                        environmentFactor = 1.0;
+                      // Factor de entorno continuo gobernado prioritariamente por el GRANO (Ruido ISO)
+                      if (avgGrain <= 2.8) {
+                        environmentFactor = 0.0; // Día exterior / Luz limpia sin ruido
+                      } else if (avgGrain >= 5.8) {
+                        environmentFactor = 1.0; // Penumbra / Restaurante / Interior oscuro con ruido ISO
                       } else {
-                        environmentFactor = Math.max(0.0, Math.min(1.0, (avgGrain - 4.0) / 8.0));
+                        environmentFactor = (avgGrain - 2.8) / (5.8 - 2.8);
                       }
 
                       // Presupuestos de Energía Lumínica
@@ -637,9 +611,9 @@
                       currentPedestal = THREE_INSTANCE.MathUtils.lerp(LIGHTING_CONFIG.day_pedestal, LIGHTING_CONFIG.night_pedestal, environmentFactor);
 
                       let verdict = "DIA_NORMAL";
-                      if (environmentFactor < 0.15 && avgP98 > 225) verdict = "DIRECCIONAL_FUERTE";
-                      else if (environmentFactor < 0.45) verdict = "DIA_NORMAL";
-                      else if (environmentFactor < 0.75) verdict = "AMBIENTE_SUAVE";
+                      if (environmentFactor < 0.15 && avgP98 > 220) verdict = "DIRECCIONAL_FUERTE";
+                      else if (environmentFactor < 0.35) verdict = "DIA_NORMAL";
+                      else if (environmentFactor < 0.70) verdict = "AMBIENTE_SUAVE";
                       else verdict = "PENUMBRA";
 
                       const confidence = Math.min(99, Math.max(70, 75 + Math.abs(environmentFactor - 0.5) * 48));
@@ -676,15 +650,48 @@
                         iniciarTransicionRanura(slotLight2, currentDirectBudget * LIGHTING_CONFIG.weights_1_light[0], LIGHTING_CONFIG.transition_duration_ms, light2Pos, light2Pos.clone().normalize());
                         initialLightPlaced = true;
                         actualizarContadorLuces();
+
+                        // =========================================================================
+                        // COLOCACIÓN DIRECTA DEL PLATO (+5 CM DEL USUARIO)
+                        // =========================================================================
+                        if (!isObjectPlaced && _ecsWorld) {
+                          isObjectPlaced = true;
+                          
+                          probeNDC.set(0, -0.25, 0.5);
+                          probeNDC.unproject(_activeCamera);
+                          const rDirPlacement = probeNDC.sub(camWorldPos).normalize();
+                          placementRay.set(camWorldPos, rDirPlacement);
+
+                          const spawnTarget = new THREE_INSTANCE.Vector3();
+                          if (placementRay.intersectPlane(groundPlane, spawnTarget)) {
+                            const forwardDir = new THREE_INSTANCE.Vector3(spawnTarget.x - camWorldPos.x, 0, spawnTarget.z - camWorldPos.z).normalize();
+                            spawnTarget.addScaledVector(forwardDir, 0.05); // +5 cm más alejado del usuario
+                            spawnTarget.y = 0.0;
+                          } else {
+                            const camDir = new THREE_INSTANCE.Vector3();
+                            _activeCamera.getWorldDirection(camDir);
+                            spawnTarget.set(camWorldPos.x + camDir.x * 0.45, 0.0, camWorldPos.z + camDir.z * 0.45);
+                          }
+
+                          try {
+                            const prefabId = "b534657a-38e6-4275-a37d-77b655561d5b";
+                            const createdEid = _ecsWorld.createEntity(prefabId);
+                            const createdEntity = _ecsWorld.getEntity(createdEid);
+                            if (createdEntity) {
+                              createdEntity.setLocalPosition({ x: spawnTarget.x, y: spawnTarget.y, z: spawnTarget.z });
+                              if (window.ecs && window.ecs.Quaternion && window.ecs.math) {
+                                createdEntity.set(window.ecs.Quaternion, window.ecs.math.quat.yRadians(Math.random() * Math.PI));
+                              }
+                            }
+                            _ecsWorld.events.dispatch(_ecsWorld.events.globalId, "object-placed");
+                          } catch (err) {
+                            log("Error colocación directa: " + err.message);
+                          }
+                        }
                       }
 
-                      // Desbloquea la pantalla táctil y activa la Retícula de colocación (Paso 2)
+                      // Desbloquea la interacción táctil
                       if (touchBlocker) touchBlocker.style.display = 'none';
-                      if (_reticleMesh) _reticleMesh.visible = true;
-                      if (placePrompt) {
-                        placePrompt.style.display = 'flex';
-                        placePrompt.style.opacity = '1';
-                      }
                     }
                   }
 
@@ -809,26 +816,11 @@
                 }
 
                 // =========================================================================
-                // 3. CINEMÁTICA, RETÍCULA Y LERP SINCRONIZADO DE LUCES
+                // 3. CINEMÁTICA Y LERP SINCRONIZADO DE LUCES
                 // =========================================================================
                 if (_activeCamera) {
                   _activeCamera.getWorldDirection(rayDir);
                   _activeCamera.getWorldPosition(camWorldPos);
-
-                  // Actualiza la posición de la Retícula en la mesa si está activa
-                  if (_reticleMesh && _reticleMesh.visible) {
-                    probeNDC.set(0, -0.25, 0.5); // Apunta ligeramente por debajo del centro
-                    probeNDC.unproject(_activeCamera);
-                    const rDir = probeNDC.sub(camWorldPos).normalize();
-                    placementRay.set(camWorldPos, rDir);
-
-                    const hitTarget = new THREE_INSTANCE.Vector3();
-                    if (placementRay.intersectPlane(groundPlane, hitTarget)) {
-                      _reticleMesh.position.x = hitTarget.x;
-                      _reticleMesh.position.z = hitTarget.z;
-                      _reticleMesh.position.y = 0.002;
-                    }
-                  }
                 }
 
                 carruselSlots.forEach(slot => {
