@@ -1,4 +1,4 @@
-<!-- 9th Wall v3.37 Apple Probe -->
+<!-- 9th Wall v3.34 Apple Probe -->
 <html>
 <head>
   <meta charset="UTF-8">
@@ -18,7 +18,7 @@
     style="position:fixed;top:10px;right:10px;z-index:1000000;background:rgba(0,0,0,0.9);color:#0f0;font-family:monospace;font-size:12px;padding:8px;border-radius:4px;cursor:pointer;line-height:1.2;border:1px solid #0f0;">
     <div id="debugTitle">FPS: --</div>
     <div id="debugContent">
-      ar-world: v3.37<br>
+      ar-world: v3.34<br>
       bundle: v3.10y<br>
       <span id="lightsCountSpan" style="color:#0f0;">Luces: 3</span><br>
       <span id="latencySpan" style="color:#0f0;">Latencia: -- ms</span>
@@ -41,10 +41,10 @@
 
   <script>
     // =====================================================================================
-    // === CONTROL DE ILUMINACIÓN (Consola Central de Calibración v3.37) ===
+    // === CONTROL DE ILUMINACIÓN (Consola Central de Calibración v3.34) ===
     // =====================================================================================
     const LIGHTING_CONFIG = {
-      // --- INTENSIDADES BASE ---
+      // --- INTENSIDADES BASE (-25% EN LUCES 2, 3 Y 4) ---
       light1_intensity: 0.00,        // Luz 1 (ECS Ground / Cenital): 0.00 (apagada)
       light_maxIntensity: 3.40,      // Techo base de potencia para luces directas
       light2_ratio: 2.18,            // Luz 2 (-25%: ~7.41 peak) a 40º
@@ -55,12 +55,13 @@
       boost_lum_threshold: 235,      // Umbral de luminancia para sobreimpulso
       boost_multiplier: 1.25,        // Multiplicador contenido
       
-      // --- SOMBRAS DINÁMICAS (MAPA 1024x1024 Y DUAL RADIUS) ---
+      // --- SOMBRAS DINÁMICAS (MAPA 1024x1024 Y OPACIDAD DIFERENCIADA) ---
       shadow_map_size: 1024,         // Resolución de ShadowMap fijada a 1024x1024
       light1_castShadow: true,       // Sombra base cenital de contacto en el suelo (Ground)
-      shadow_radius_fixed: 12.0,     // Radio difuso suave para Luz 1 (Ground AO)
+      shadow_radius_fixed: 12.0,     // Radio difuso suave para Luz 1 (Ground AO) en mapa 1024
       shadow_radius_light2: 2.0,     // Radio nítido para Luz 2 (definida y sutil)
-      ground_opacity_fixed: 0.40,    // Opacidad fija equilibrada del suelo (0.40)
+      ground_opacity_fixed: 0.50,    // Opacidad base de sombra en suelo (Luz 1 al 100%)
+      light2_shadow_weight: 0.125,   // Opacidad propia de Luz 2 (1/8 de la sombra de Luz 1)
       light2_castShadow: true,       // Sombra direccional activa en Luz 2
       light3_castShadow: false,
       light4_castShadow: false,
@@ -68,7 +69,7 @@
       // --- RESTRICCIONES ESPACIALES (LUCES 2/4 A 40º, LUZ 3 A 30º) ---
       light_distance: 2.2,           // Distancia de proyección espacial
       min_light_height: 0.25,        // Altura mínima obligatoria (25 cm sobre el plano SLAM)
-      elevation_angle_light2_4: (40.0 * Math.PI) / 180.0, // Ángulo a 40º para Luces 2 y 4
+      elevation_angle_light2_4: (40.0 * Math.PI) / 180.0, // Ángulo subido 10º para Luces 2 y 4 (40º)
       elevation_angle_light3: (30.0 * Math.PI) / 180.0,   // Ángulo a 30º para Luz 3
       min_separation_angle: (35.0 * Math.PI) / 180.0,     // Cono de exclusión de 35º respecto a luces 2 y 4
       upper_third_limit: 0.35,       // Tercio superior para posición inicial de Luz 3
@@ -181,12 +182,25 @@
                   slot.anchoredDir = new nativeTHREE.Vector3(0, 1, 0);
                 });
 
-                // Captura del Ground y Luz 1 (Ajuste de ShadowCamera a 50cm, radio 12.0 y opacidad equilibrada a 0.40)
+                // Captura del Ground y Luz 1 (Ajuste de ShadowCamera a 50cm, radio 12.0 y opacidad 0.50 con shader ponderado)
                 _scene.traverse((node) => {
                   if (node.isMesh && node.material && (node.material.type === 'ShadowMaterial' || node.name === 'Ground')) {
                     _groundMesh = node;
                     if (_groundMesh.material) {
                       _groundMesh.material.opacity = LIGHTING_CONFIG.ground_opacity_fixed;
+                      
+                      // Inyección en el shader para dar a Luz 2 exactamente 1/8 de la opacidad de Luz 1
+                      _groundMesh.material.onBeforeCompile = (shader) => {
+                        shader.fragmentShader = shader.fragmentShader.replace(
+                          'shadow *= receiveShadow ? getShadow( directionalShadowMap[ i ], directionalLightShadow.shadowMapSize, directionalLightShadow.shadowBias, directionalLightShadow.shadowRadius, vDirectionalShadowCoord[ i ] ) : 1.0;',
+                          `
+                          float currentShadow = receiveShadow ? getShadow( directionalShadowMap[ i ], directionalLightShadow.shadowMapSize, directionalLightShadow.shadowBias, directionalLightShadow.shadowRadius, vDirectionalShadowCoord[ i ] ) : 1.0;
+                          float shadowWeight = (i == 0) ? 1.0 : ${LIGHTING_CONFIG.light2_shadow_weight.toFixed(4)};
+                          shadow *= (1.0 - (1.0 - currentShadow) * shadowWeight);
+                          `
+                        );
+                      };
+                      _groundMesh.material.needsUpdate = true;
                     }
                   }
                   if (node.isDirectionalLight) {
