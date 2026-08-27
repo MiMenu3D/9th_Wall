@@ -1,4 +1,4 @@
-﻿// 9th Wall v4.03 Apple Probe
+﻿// 9th Wall v4.05 Apple Probe
 (() => {
   var e = {
     574() {
@@ -46,15 +46,6 @@
     rotationSensitivity: 7,
     pinchActivationThreshold: 0.09,
     rotationActivationThreshold: 0.008
-  });
-
-  // v4.00: Asentamiento de escala métrica real tras la colocación (ventana VIO + transición)
-  // v4.02: +1s de margen de observación VIO antes de aplicar la corrección
-  const METRIC_SCALE_CONFIG = Object.freeze({
-    apparentScale: 1.01,
-    targetScale: 1.0,
-    vioWindowMs: 3500,
-    transitionMs: 800
   });
 
   // v4.02: retícula estilo Scene Viewer (marco grueso de esquinas redondeadas) y rebote al soltar tras arrastrar
@@ -356,103 +347,6 @@
             if (o.data.nextTouchCount < 2) isTwoFingerGesture = !1;
             if (reticleMesh && !isDragActive) reticleMesh.visible = false;
           })
-          .listen(t.events.globalId, "scale-stabilization-complete", () => {
-            // v4.02: una vez asentada la escala métrica real, se bloquea el pellizco manual de escala
-            pinchScaleLocked = !0;
-          })
-      }
-    });
-
-    // v4.00: corrige la escala aparente inicial hacia la escala métrica real (1:1) tras una ventana de observación VIO
-    e.registerComponent({
-      name: "metric-scale-stabilizer",
-      add: (world, component) => {
-        const eid = component.eid;
-        let groundOffsetY = 0;
-
-        // Bounding box real del modelo, usada únicamente para compensar el pivote y mantenerlo anclado al suelo (Y=0)
-        try {
-          const obj3D = world.three.entityIdToObject && world.three.entityIdToObject.get(eid);
-          if (obj3D && window.THREE) {
-            const box = new window.THREE.Box3().setFromObject(obj3D);
-            if (isFinite(box.min.y)) groundOffsetY = box.min.y;
-          }
-        } catch (err) {}
-
-        // La entidad se instancia justo en el momento de la colocación: "add" ya marca t=0 de la ventana VIO
-        let placedAt = 0;
-        let lastFrameTime = 0;
-        let phase = "waiting-placement";
-        let transStart = 0;
-        let currentScale = METRIC_SCALE_CONFIG.apparentScale;
-
-        // v4.02: bucle propio por rAF (el mismo patrón ya probado del HUD de depuración) en vez del lifecycle "tick",
-        // que no llegaba a ejecutarse en este runtime y dejaba la escala congelada en su valor aparente
-        const actualizarEscala = () => {
-          if (phase === "done") return;
-
-          const now = performance.now();
-
-          if (phase === "waiting-placement") {
-            if (window.metricScalePlacementTime) {
-              placedAt = window.metricScalePlacementTime;
-              lastFrameTime = placedAt;
-              phase = "waiting-vio";
-            }
-            requestAnimationFrame(actualizarEscala);
-            return;
-          }
-
-          if (phase === "waiting-vio") {
-            if (now - placedAt >= METRIC_SCALE_CONFIG.vioWindowMs) {
-              phase = "transitioning";
-              transStart = now;
-              lastFrameTime = now;
-            }
-            requestAnimationFrame(actualizarEscala);
-            return;
-          }
-
-          // Interpolación exponencial basada en deltaTime real para máxima fluidez incluso a 14 FPS
-          const deltaSec = Math.max(0.001, (now - lastFrameTime) / 1000);
-          lastFrameTime = now;
-
-          const elapsed = now - transStart;
-          const finished = elapsed >= METRIC_SCALE_CONFIG.transitionMs;
-          const prevScale = currentScale;
-
-          if (finished) {
-            currentScale = METRIC_SCALE_CONFIG.targetScale;
-          } else {
-            const speed = Math.log(200) / (METRIC_SCALE_CONFIG.transitionMs / 1000);
-            const lerpFactor = 1.0 - Math.exp(-speed * deltaSec);
-            currentScale += (METRIC_SCALE_CONFIG.targetScale - currentScale) * lerpFactor;
-          }
-
-          e.Scale.set(world, eid, { x: currentScale, y: currentScale, z: currentScale });
-
-          // Mantenimiento estricto del pivote de suelo: compensa el desplazamiento vertical que introduce el cambio de escala
-          if (groundOffsetY) {
-            try {
-              const pos = world.transform.getWorldPosition(eid);
-              const deltaY = -groundOffsetY * (currentScale - prevScale);
-              world.transform.setWorldPosition(eid, { x: pos.x, y: pos.y + deltaY, z: pos.z });
-            } catch (err) {}
-          }
-
-          if (finished) {
-            phase = "done";
-            world.events.dispatch(world.events.globalId, "scale-stabilization-complete");
-            if (typeof window.onScaleStabilizationComplete === "function") {
-              window.onScaleStabilizationComplete();
-            }
-            return;
-          }
-
-          requestAnimationFrame(actualizarEscala);
-        };
-
-        requestAnimationFrame(actualizarEscala);
       }
     });
 
