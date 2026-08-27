@@ -1,4 +1,4 @@
-<!-- 9th Wall v4.07 Apple Probe -->
+<!-- 9th Wall v4.04 Apple Probe -->
 <html>
 <head>
   <meta charset="UTF-8">
@@ -15,8 +15,8 @@
     style="position:fixed;top:10px;right:10px;z-index:1000000;background:rgba(0,0,0,0.9);color:#0f0;font-family:monospace;font-size:12px;padding:8px;border-radius:4px;cursor:pointer;line-height:1.3;border:1px solid #0f0;">
     <div id="debugTitle">FPS: --</div>
     <div id="debugContent">
-      ar-world: v4.07<br>
-      bundle: v4.06<br>
+      ar-world: v4.04<br>
+      bundle: v4.03<br>
       <span id="envVerdictSpan" style="color:#0f0;">Entorno: ESPERANDO MESA...</span><br>
       <span id="telemetrySpan" style="color:#0f0;">P98: -- (/255) | Lum: -- (/255) | Cálido: --%</span><br>
       <span id="lightsCountSpan" style="color:#0f0;">Luces: 1</span><br>
@@ -35,6 +35,10 @@
     <button id="readyBtn" style="pointer-events:auto !important;background:#00e5ff;color:#000;border:none;font-family:sans-serif;font-size:16px;font-weight:bold;padding:14px 40px;border-radius:28px;box-shadow:0 4px 20px rgba(0,229,255,0.7);cursor:pointer;letter-spacing:0.5px;">
       Listo
     </button>
+  </div>
+
+  <div id="scaleStatusText" style="position:fixed;bottom:70px;left:50%;transform:translateX(-50%);z-index:999995;font-family:sans-serif;font-style:italic;font-size:18px;color:rgba(255,255,255,0.85);text-shadow:0 1px 4px rgba(0,0,0,0.9);pointer-events:none;opacity:0;transition:opacity 0.8s ease;white-space:nowrap;">
+    Calculando escala real...
   </div>
 
   <button id="envToggle"
@@ -155,6 +159,7 @@
     let totalLightsDetected = 1;
     let totalRealLightsAnchored = 0;
     let detectionPermanentlyStopped = false;
+    let lightScanPaused = false;
 
     let isCalibrating = false;
     let isCalibrated = false;
@@ -182,6 +187,13 @@
       const telSpan = document.getElementById('telemetrySpan');
       if (envSpan) envSpan.innerText = `Entorno: ${verdict}`;
       if (telSpan) telSpan.innerText = `P98: ${Math.round(p98)} (/255) | Lum: ${Math.round(lum)} (/255) | Cálido: ${Math.round(warmPct)}%`;
+    };
+
+    // v4.00: al completarse el asentamiento de escala métrica en bundle-world.js, se oculta el aviso y se reanuda el escaneo de luces
+    window.onScaleStabilizationComplete = () => {
+      const scaleStatusEl = document.getElementById('scaleStatusText');
+      if (scaleStatusEl) scaleStatusEl.style.opacity = '0';
+      lightScanPaused = false;
     };
 
     document.getElementById('envToggle').addEventListener('click', () => toggleEnv());
@@ -454,7 +466,7 @@
                 const deltaSec = Math.max(0.001, (now - lastFrameTime) / 1000.0);
                 lastFrameTime = now;
 
-                const shouldScan = isCalibrating || (now - lastScanTime >= LIGHTING_CONFIG.scan_interval_ms);
+                const shouldScan = !lightScanPaused && (isCalibrating || (now - lastScanTime >= LIGHTING_CONFIG.scan_interval_ms));
 
                 if (shouldScan) {
                   lastScanTime = now;
@@ -638,6 +650,12 @@
 
                         if (!isObjectPlaced && _ecsWorld) {
                           isObjectPlaced = true;
+
+                          // v4.00: colocado el plato, pausamos el escaneo intensivo de luces y avisamos del asentamiento de escala
+                          lightScanPaused = true;
+                          window.metricScalePlacementTime = performance.now();
+                          const scaleStatusEl = document.getElementById('scaleStatusText');
+                          if (scaleStatusEl) scaleStatusEl.style.opacity = '1';
 
                           probeNDC.set(0, -0.25, 0.5);
                           probeNDC.unproject(_activeCamera);
@@ -848,6 +866,10 @@
             if (obj.light) obj.light.intensity = 0.0;
           }
 
+          if (obj.name === 'Hider') {
+            obj.scale = [0, 0, 0];
+          }
+
           if (obj.name === 'Model') {
             obj.scale = [1.01, 1.01, 1.01];
             const anim = obj.components['a2c75775-5a0f-44d7-910c-c111bc850bf6'];
@@ -861,7 +883,6 @@
             };
           }
         }
-        delete c.objects['17af117a-efce-48dd-857e-e383a3649c7b'];
         return _i.call(ecs.application, c);
       };
     }
