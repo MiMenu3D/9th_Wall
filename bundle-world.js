@@ -1,4 +1,4 @@
-﻿// 9th Wall v4.01 Apple Probe
+﻿// 9th Wall v4.02 Apple Probe
 (() => {
   var e = {
     574() {
@@ -49,21 +49,49 @@
   });
 
   // v4.00: Asentamiento de escala métrica real tras la colocación (ventana VIO + transición)
+  // v4.02: +1s de margen de observación VIO antes de aplicar la corrección
   const METRIC_SCALE_CONFIG = Object.freeze({
     apparentScale: 1.01,
     targetScale: 1.0,
-    vioWindowMs: 2500,
+    vioWindowMs: 3500,
     transitionMs: 800
   });
 
-  // v4.00: retícula estilo Scene Viewer y rebote al soltar tras arrastrar con un dedo
+  // v4.02: retícula estilo Scene Viewer (marco grueso de esquinas redondeadas) y rebote al soltar tras arrastrar
   const DRAG_RETICLE_CONFIG = Object.freeze({
     liftHeight: 0.05,
-    size: 0.16,
+    liftSmoothingRate: 8.0,
+    size: 0.34,
+    thickness: 0.02,
+    cornerRadius: 0.05,
     color: 0x66ffff,
     bounceDuration: 2000,
     bounceEasing: "Elastic"
   });
+
+  // v4.02: rectángulo con esquinas redondeadas (recurso estándar de three.js: Shape + hole interior)
+  function crearFormaRectRedondeada(THREE_INSTANCE, size, radius) {
+    const s = size / 2;
+    const shape = new THREE_INSTANCE.Shape();
+    shape.moveTo(-s, -s + radius);
+    shape.lineTo(-s, s - radius);
+    shape.quadraticCurveTo(-s, s, -s + radius, s);
+    shape.lineTo(s - radius, s);
+    shape.quadraticCurveTo(s, s, s, s - radius);
+    shape.lineTo(s, -s + radius);
+    shape.quadraticCurveTo(s, -s, s - radius, -s);
+    shape.lineTo(-s + radius, -s);
+    shape.quadraticCurveTo(-s, -s, -s, -s + radius);
+    return shape;
+  }
+
+  function crearGeometriaMarcoReticula(THREE_INSTANCE, outerSize, thickness, radius) {
+    const outer = crearFormaRectRedondeada(THREE_INSTANCE, outerSize, radius);
+    const innerSize = Math.max(0.02, outerSize - thickness * 2);
+    const innerRadius = Math.max(0.001, radius - thickness);
+    outer.holes.push(crearFormaRectRedondeada(THREE_INSTANCE, innerSize, innerRadius));
+    return new THREE_INSTANCE.ShapeGeometry(outer);
+  }
   function a(o) {
     var n = t[o];
     if (void 0 !== n) return n.exports;
@@ -136,34 +164,58 @@
         scaleAtGestureStart = 1,
         isDragActive = !1,
         pinchScaleLocked = !1,
-        reticleMesh = null;
+        reticleMesh = null,
+        currentLift = 0,
+        planarX = 0,
+        planarZ = 0,
+        lastLiftFrameTime = performance.now();
 
-        // v4.00: retícula plana (LineLoop) que sigue al modelo mientras se arrastra sobre el plano SLAM
+        // v4.02: retícula plana con esquinas redondeadas (mesh, no línea: el grosor de línea de WebGL no es fiable)
         const obtenerReticula = (THREE_INSTANCE, scene) => {
           if (reticleMesh) return reticleMesh;
-          const s = DRAG_RETICLE_CONFIG.size / 2;
-          const geometry = new THREE_INSTANCE.BufferGeometry().setFromPoints([
-            new THREE_INSTANCE.Vector3(-s, 0, -s),
-            new THREE_INSTANCE.Vector3(s, 0, -s),
-            new THREE_INSTANCE.Vector3(s, 0, s),
-            new THREE_INSTANCE.Vector3(-s, 0, s)
-          ]);
-          const material = new THREE_INSTANCE.LineBasicMaterial({
+          const geometry = crearGeometriaMarcoReticula(THREE_INSTANCE, DRAG_RETICLE_CONFIG.size, DRAG_RETICLE_CONFIG.thickness, DRAG_RETICLE_CONFIG.cornerRadius);
+          const material = new THREE_INSTANCE.MeshBasicMaterial({
             color: DRAG_RETICLE_CONFIG.color,
             transparent: true,
-            opacity: 0.9,
-            depthTest: false
+            opacity: 0.85,
+            depthTest: false,
+            side: THREE_INSTANCE.DoubleSide
           });
-          reticleMesh = new THREE_INSTANCE.LineLoop(geometry, material);
+          reticleMesh = new THREE_INSTANCE.Mesh(geometry, material);
+          reticleMesh.rotation.x = -Math.PI / 2;
           reticleMesh.visible = false;
           reticleMesh.renderOrder = 999;
           scene.add(reticleMesh);
           return reticleMesh;
         };
 
-        // El bloque de lógica multitáctil original
+        // v4.02: elevación suave e independiente del evento (patrón rAF ya usado en este proyecto para el HUD)
+        const actualizarElevacion = () => {
+          const now = performance.now();
+          const deltaSec = Math.max(0.001, (now - lastLiftFrameTime) / 1000);
+          lastLiftFrameTime = now;
+
+          const targetLift = isDragActive ? DRAG_RETICLE_CONFIG.liftHeight : 0;
+          const lerpStep = 1.0 - Math.exp(-DRAG_RETICLE_CONFIG.liftSmoothingRate * deltaSec);
+          currentLift += (targetLift - currentLift) * lerpStep;
+
+          if (isModelTouchActive && !isTwoFingerGesture) {
+            t.transform.setWorldPosition(a, { x: planarX, y: dragPlaneY + currentLift, z: planarZ });
+          }
+
+          requestAnimationFrame(actualizarElevacion);
+        };
+        requestAnimationFrame(actualizarElevacion);
+
+        // El bloque de lógica multitáctil original (eventos nativos de 8th Wall: no se sustituyen, solo se afinan)
         o("enabled").initial()
           .listen(a, e.input.SCREEN_TOUCH_START, o => {
+            // v4.02: un segundo dedo que también toca el modelo no debe reiniciar el arrastre del primero
+            if (isModelTouchActive) {
+              activePointerIds.add(o.data.pointerId);
+              return;
+            }
+
             const n = t.transform.getWorldPosition(a),
             i = t.three.activeCamera,
             r = window.THREE;
@@ -172,7 +224,9 @@
             activePointerIds.add(o.data.pointerId),
             dragPlaneY = n.y,
             dragOffsetX = 0,
-            dragOffsetZ = 0;
+            dragOffsetZ = 0,
+            planarX = n.x,
+            planarZ = n.z;
             if (!i || !r) return;
             const d = new r.Raycaster(),
             s = new r.Vector2(o.data.position.x * 2 - 1, 1 - o.data.position.y * 2),
@@ -184,14 +238,14 @@
               dragOffsetZ = n.z - c.z
             }
 
-            // v4.00: al iniciar el arrastre, el modelo se eleva y aparece la retícula bajo él
+            // v4.02: la retícula aparece de inmediato; la elevación del modelo sube sola y suavemente en el bucle
             isDragActive = !0;
             if (t.three.scene) {
               const ret = obtenerReticula(r, t.three.scene);
-              ret.position.set(n.x, dragPlaneY + 0.002, n.z);
+              ret.rotation.z = 0;
+              ret.position.set(planarX, dragPlaneY + 0.002, planarZ);
               ret.visible = true;
             }
-            t.transform.setWorldPosition(a, { x: n.x, y: dragPlaneY + DRAG_RETICLE_CONFIG.liftHeight, z: n.z });
           })
           .listen(t.events.globalId, e.input.SCREEN_TOUCH_START, o => {
             if (isModelTouchActive) activePointerIds.add(o.data.pointerId)
@@ -207,20 +261,15 @@
             l = new i.Vector3();
             r.setFromCamera(d, n);
             if (r.ray.intersectPlane(s, l)) {
-              const targetX = l.x + dragOffsetX,
-              targetZ = l.z + dragOffsetZ;
-              t.transform.setWorldPosition(a, {
-                x: targetX,
-                y: dragPlaneY + DRAG_RETICLE_CONFIG.liftHeight,
-                z: targetZ
-              });
-              if (reticleMesh) reticleMesh.position.set(targetX, dragPlaneY + 0.002, targetZ);
+              planarX = l.x + dragOffsetX;
+              planarZ = l.z + dragOffsetZ;
+              if (reticleMesh) reticleMesh.position.set(planarX, dragPlaneY + 0.002, planarZ);
             }
           })
           .listen(t.events.globalId, e.input.SCREEN_TOUCH_END, o => {
             activePointerIds.delete(o.data.pointerId);
             if (0 === activePointerIds.size) {
-              // v4.00: al soltar tras arrastrar, la retícula desaparece y el modelo rebota igual que en su aparición
+              // v4.02: al soltar tras arrastrar, la retícula desaparece y el modelo rebota igual que en su aparición
               if (isDragActive) {
                 isDragActive = !1;
                 if (reticleMesh) reticleMesh.visible = false;
@@ -249,9 +298,10 @@
             gestureMode = "none",
             scaleAtGestureStart = currentScale;
 
-            // v4.00: al pasar a gesto de dos dedos se cancela el arrastre sin rebote (el gesto ya no controla la posición)
+            // v4.02: al pasar a gesto de dos dedos se cancela el arrastre y el modelo vuelve a su altura de reposo
             if (isDragActive) {
               isDragActive = !1;
+              currentLift = 0;
               if (reticleMesh) reticleMesh.visible = false;
               const n = t.transform.getWorldPosition(a);
               t.transform.setWorldPosition(a, { x: n.x, y: dragPlaneY, z: n.z });
@@ -271,14 +321,25 @@
               currentScale = Math.max(MODEL_GESTURES.minimumScale, Math.min(MODEL_GESTURES.maximumScale, scaleAtGestureStart * n)),
               e.Scale.set(t, a, { x: currentScale, y: currentScale, z: currentScale })
             } else if ("rotate" === gestureMode) {
-              t.transform.rotateSelf(a, e.math.quat.yRadians(o.data.positionChange.x * MODEL_GESTURES.rotationSensitivity))
+              const angleDelta = o.data.positionChange.x * MODEL_GESTURES.rotationSensitivity;
+              t.transform.rotateSelf(a, e.math.quat.yRadians(angleDelta));
+
+              // v4.02: la retícula acompaña al modelo también durante el gesto de rotación de dos dedos
+              if (t.three.scene && window.THREE) {
+                const ret = obtenerReticula(window.THREE, t.three.scene);
+                const pos = t.transform.getWorldPosition(a);
+                ret.position.set(pos.x, dragPlaneY + 0.002, pos.z);
+                ret.visible = true;
+                ret.rotateZ(angleDelta);
+              }
             }
           })
           .listen(t.events.globalId, e.input.GESTURE_END, o => {
-            if (o.data.nextTouchCount < 2) isTwoFingerGesture = !1
+            if (o.data.nextTouchCount < 2) isTwoFingerGesture = !1;
+            if (reticleMesh && !isDragActive) reticleMesh.visible = false;
           })
           .listen(t.events.globalId, "scale-stabilization-complete", () => {
-            // v4.00: una vez asentada la escala métrica real, se bloquea el pellizco manual de escala
+            // v4.02: una vez asentada la escala métrica real, se bloquea el pellizco manual de escala
             pinchScaleLocked = !0;
           })
       }
@@ -301,65 +362,69 @@
         } catch (err) {}
 
         // La entidad se instancia justo en el momento de la colocación: "add" ya marca t=0 de la ventana VIO
-        component._scaleState = {
-          phase: "waiting-vio",
-          placedAt: performance.now(),
-          lastTickTime: performance.now(),
-          transStart: 0,
-          currentScale: METRIC_SCALE_CONFIG.apparentScale,
-          groundOffsetY
+        const placedAt = performance.now();
+        let lastFrameTime = placedAt;
+        let phase = "waiting-vio";
+        let transStart = 0;
+        let currentScale = METRIC_SCALE_CONFIG.apparentScale;
+
+        // v4.02: bucle propio por rAF (el mismo patrón ya probado del HUD de depuración) en vez del lifecycle "tick",
+        // que no llegaba a ejecutarse en este runtime y dejaba la escala congelada en su valor aparente
+        const actualizarEscala = () => {
+          if (phase === "done") return;
+
+          const now = performance.now();
+
+          if (phase === "waiting-vio") {
+            if (now - placedAt >= METRIC_SCALE_CONFIG.vioWindowMs) {
+              phase = "transitioning";
+              transStart = now;
+              lastFrameTime = now;
+            }
+            requestAnimationFrame(actualizarEscala);
+            return;
+          }
+
+          // Interpolación exponencial basada en deltaTime real para máxima fluidez incluso a 14 FPS
+          const deltaSec = Math.max(0.001, (now - lastFrameTime) / 1000);
+          lastFrameTime = now;
+
+          const elapsed = now - transStart;
+          const finished = elapsed >= METRIC_SCALE_CONFIG.transitionMs;
+          const prevScale = currentScale;
+
+          if (finished) {
+            currentScale = METRIC_SCALE_CONFIG.targetScale;
+          } else {
+            const speed = 1000 / METRIC_SCALE_CONFIG.transitionMs;
+            const lerpFactor = 1.0 - Math.exp(-speed * deltaSec);
+            currentScale += (METRIC_SCALE_CONFIG.targetScale - currentScale) * lerpFactor;
+          }
+
+          e.Scale.set(world, eid, { x: currentScale, y: currentScale, z: currentScale });
+
+          // Mantenimiento estricto del pivote de suelo: compensa el desplazamiento vertical que introduce el cambio de escala
+          if (groundOffsetY) {
+            try {
+              const pos = world.transform.getWorldPosition(eid);
+              const deltaY = -groundOffsetY * (currentScale - prevScale);
+              world.transform.setWorldPosition(eid, { x: pos.x, y: pos.y + deltaY, z: pos.z });
+            } catch (err) {}
+          }
+
+          if (finished) {
+            phase = "done";
+            world.events.dispatch(world.events.globalId, "scale-stabilization-complete");
+            if (typeof window.onScaleStabilizationComplete === "function") {
+              window.onScaleStabilizationComplete();
+            }
+            return;
+          }
+
+          requestAnimationFrame(actualizarEscala);
         };
-      },
-      tick: (world, component, time) => {
-        const st = component._scaleState;
-        if (!st || st.phase === "done") return;
 
-        const eid = component.eid;
-        const now = performance.now();
-
-        if (st.phase === "waiting-vio") {
-          if (now - st.placedAt >= METRIC_SCALE_CONFIG.vioWindowMs) {
-            st.phase = "transitioning";
-            st.transStart = now;
-            st.lastTickTime = now;
-          }
-          return;
-        }
-
-        // Interpolación exponencial basada en deltaTime real para máxima fluidez incluso a 14 FPS
-        const deltaSec = Math.max(0.001, (now - st.lastTickTime) / 1000);
-        st.lastTickTime = now;
-
-        const elapsed = now - st.transStart;
-        const finished = elapsed >= METRIC_SCALE_CONFIG.transitionMs;
-        const prevScale = st.currentScale;
-
-        if (finished) {
-          st.currentScale = METRIC_SCALE_CONFIG.targetScale;
-        } else {
-          const speed = 1000 / METRIC_SCALE_CONFIG.transitionMs;
-          const lerpFactor = 1.0 - Math.exp(-speed * deltaSec);
-          st.currentScale += (METRIC_SCALE_CONFIG.targetScale - st.currentScale) * lerpFactor;
-        }
-
-        e.Scale.set(world, eid, { x: st.currentScale, y: st.currentScale, z: st.currentScale });
-
-        // Mantenimiento estricto del pivote de suelo: compensa el desplazamiento vertical que introduce el cambio de escala
-        if (st.groundOffsetY) {
-          try {
-            const pos = world.transform.getWorldPosition(eid);
-            const deltaY = -st.groundOffsetY * (st.currentScale - prevScale);
-            world.transform.setWorldPosition(eid, { x: pos.x, y: pos.y + deltaY, z: pos.z });
-          } catch (err) {}
-        }
-
-        if (finished) {
-          st.phase = "done";
-          world.events.dispatch(world.events.globalId, "scale-stabilization-complete");
-          if (typeof window.onScaleStabilizationComplete === "function") {
-            window.onScaleStabilizationComplete();
-          }
-        }
+        requestAnimationFrame(actualizarEscala);
       }
     });
 
