@@ -62,7 +62,7 @@
     liftHeight: 0.05,
     liftSmoothingRate: 8.0,
     dragActivationThreshold: 0.012,
-    size: 0.34,
+    size: 0.272,
     thickness: 0.02,
     cornerRadius: 0.05,
     color: 0x66ffff,
