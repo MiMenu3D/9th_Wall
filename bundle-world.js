@@ -43,9 +43,9 @@
   const MODEL_GESTURES = Object.freeze({
     minimumScale: 0.75,
     maximumScale: 1.45,
-    rotationSensitivity: 4,
+    rotationSensitivity: 7,
     pinchActivationThreshold: 0.09,
-    rotationActivationThreshold: 0.020
+    rotationActivationThreshold: 0.008
   });
 
   // v4.00: Asentamiento de escala métrica real tras la colocación (ventana VIO + transición)
@@ -54,6 +54,15 @@
     targetScale: 1.0,
     vioWindowMs: 2500,
     transitionMs: 800
+  });
+
+  // v4.00: retícula estilo Scene Viewer y rebote al soltar tras arrastrar con un dedo
+  const DRAG_RETICLE_CONFIG = Object.freeze({
+    liftHeight: 0.05,
+    size: 0.16,
+    color: 0x66ffff,
+    bounceDuration: 2000,
+    bounceEasing: "Elastic"
   });
   function a(o) {
     var n = t[o];
@@ -124,7 +133,33 @@
         waitForAllTouchesToEnd = !1,
         gestureMode = "none",
         currentScale = 1,
-        scaleAtGestureStart = 1;
+        scaleAtGestureStart = 1,
+        isDragActive = !1,
+        pinchScaleLocked = !1,
+        reticleMesh = null;
+
+        // v4.00: retícula plana (LineLoop) que sigue al modelo mientras se arrastra sobre el plano SLAM
+        const obtenerReticula = (THREE_INSTANCE, scene) => {
+          if (reticleMesh) return reticleMesh;
+          const s = DRAG_RETICLE_CONFIG.size / 2;
+          const geometry = new THREE_INSTANCE.BufferGeometry().setFromPoints([
+            new THREE_INSTANCE.Vector3(-s, 0, -s),
+            new THREE_INSTANCE.Vector3(s, 0, -s),
+            new THREE_INSTANCE.Vector3(s, 0, s),
+            new THREE_INSTANCE.Vector3(-s, 0, s)
+          ]);
+          const material = new THREE_INSTANCE.LineBasicMaterial({
+            color: DRAG_RETICLE_CONFIG.color,
+            transparent: true,
+            opacity: 0.9,
+            depthTest: false
+          });
+          reticleMesh = new THREE_INSTANCE.LineLoop(geometry, material);
+          reticleMesh.visible = false;
+          reticleMesh.renderOrder = 999;
+          scene.add(reticleMesh);
+          return reticleMesh;
+        };
 
         // El bloque de lógica multitáctil original
         o("enabled").initial()
@@ -148,6 +183,15 @@
               dragOffsetX = n.x - c.x,
               dragOffsetZ = n.z - c.z
             }
+
+            // v4.00: al iniciar el arrastre, el modelo se eleva y aparece la retícula bajo él
+            isDragActive = !0;
+            if (t.three.scene) {
+              const ret = obtenerReticula(r, t.three.scene);
+              ret.position.set(n.x, dragPlaneY + 0.002, n.z);
+              ret.visible = true;
+            }
+            t.transform.setWorldPosition(a, { x: n.x, y: dragPlaneY + DRAG_RETICLE_CONFIG.liftHeight, z: n.z });
           })
           .listen(t.events.globalId, e.input.SCREEN_TOUCH_START, o => {
             if (isModelTouchActive) activePointerIds.add(o.data.pointerId)
@@ -162,15 +206,36 @@
             s = new i.Plane(new i.Vector3(0, 1, 0), -dragPlaneY),
             l = new i.Vector3();
             r.setFromCamera(d, n);
-            if (r.ray.intersectPlane(s, l)) t.transform.setWorldPosition(a, {
-              x: l.x + dragOffsetX,
-              y: dragPlaneY,
-              z: l.z + dragOffsetZ
-            })
+            if (r.ray.intersectPlane(s, l)) {
+              const targetX = l.x + dragOffsetX,
+              targetZ = l.z + dragOffsetZ;
+              t.transform.setWorldPosition(a, {
+                x: targetX,
+                y: dragPlaneY + DRAG_RETICLE_CONFIG.liftHeight,
+                z: targetZ
+              });
+              if (reticleMesh) reticleMesh.position.set(targetX, dragPlaneY + 0.002, targetZ);
+            }
           })
           .listen(t.events.globalId, e.input.SCREEN_TOUCH_END, o => {
             activePointerIds.delete(o.data.pointerId);
             if (0 === activePointerIds.size) {
+              // v4.00: al soltar tras arrastrar, la retícula desaparece y el modelo rebota igual que en su aparición
+              if (isDragActive) {
+                isDragActive = !1;
+                if (reticleMesh) reticleMesh.visible = false;
+                const n = t.transform.getWorldPosition(a);
+                e.PositionAnimation.set(t, a, {
+                  duration: DRAG_RETICLE_CONFIG.bounceDuration,
+                  loop: !1,
+                  easeOut: !0,
+                  easingFunction: DRAG_RETICLE_CONFIG.bounceEasing,
+                  fromX: n.x, toX: n.x,
+                  fromY: n.y, toY: dragPlaneY,
+                  fromZ: n.z, toZ: n.z
+                });
+              }
+
               isModelTouchActive = !1,
               dragPointerId = null,
               waitForAllTouchesToEnd = !1,
@@ -182,18 +247,26 @@
             isTwoFingerGesture = !0,
             waitForAllTouchesToEnd = !0,
             gestureMode = "none",
-            scaleAtGestureStart = currentScale
+            scaleAtGestureStart = currentScale;
+
+            // v4.00: al pasar a gesto de dos dedos se cancela el arrastre sin rebote (el gesto ya no controla la posición)
+            if (isDragActive) {
+              isDragActive = !1;
+              if (reticleMesh) reticleMesh.visible = false;
+              const n = t.transform.getWorldPosition(a);
+              t.transform.setWorldPosition(a, { x: n.x, y: dragPlaneY, z: n.z });
+            }
           })
           .listen(t.events.globalId, e.input.GESTURE_MOVE, o => {
             if (!isModelTouchActive || !isTwoFingerGesture || 2 !== o.data.touchCount) return;
             const n = o.data.startSpread > 0 ? Math.abs(o.data.spread - o.data.startSpread) / o.data.startSpread : 0,
             i = Math.abs(o.data.position.x - o.data.startPosition.x);
             if ("none" === gestureMode) {
-              if (n >= MODEL_GESTURES.pinchActivationThreshold && n / MODEL_GESTURES.pinchActivationThreshold >= i / MODEL_GESTURES.rotationActivationThreshold) gestureMode = "scale";
+              if (!pinchScaleLocked && n >= MODEL_GESTURES.pinchActivationThreshold && n / MODEL_GESTURES.pinchActivationThreshold >= i / MODEL_GESTURES.rotationActivationThreshold) gestureMode = "scale";
               else if (i >= MODEL_GESTURES.rotationActivationThreshold) gestureMode = "rotate";
               else return
             }
-            if ("scale" === gestureMode) {
+            if ("scale" === gestureMode && !pinchScaleLocked) {
               const n = o.data.startSpread > 0 ? o.data.spread / o.data.startSpread : 1;
               currentScale = Math.max(MODEL_GESTURES.minimumScale, Math.min(MODEL_GESTURES.maximumScale, scaleAtGestureStart * n)),
               e.Scale.set(t, a, { x: currentScale, y: currentScale, z: currentScale })
@@ -203,6 +276,10 @@
           })
           .listen(t.events.globalId, e.input.GESTURE_END, o => {
             if (o.data.nextTouchCount < 2) isTwoFingerGesture = !1
+          })
+          .listen(t.events.globalId, "scale-stabilization-complete", () => {
+            // v4.00: una vez asentada la escala métrica real, se bloquea el pellizco manual de escala
+            pinchScaleLocked = !0;
           })
       }
     });
