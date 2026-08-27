@@ -1,4 +1,4 @@
-<!-- 9th Wall v3.55 Apple Probe -->
+<!-- 9th Wall v3.56 Apple Probe -->
 <html>
 <head>
   <meta charset="UTF-8">
@@ -15,7 +15,7 @@
     style="position:fixed;top:10px;right:10px;z-index:1000000;background:rgba(0,0,0,0.9);color:#0f0;font-family:monospace;font-size:12px;padding:8px;border-radius:4px;cursor:pointer;line-height:1.3;border:1px solid #0f0;">
     <div id="debugTitle">FPS: --</div>
     <div id="debugContent">
-      ar-world: v3.55<br>
+      ar-world: v3.56<br>
       bundle: v3.48<br>
       <span id="envVerdictSpan" style="color:#0f0;">Entorno: ESPERANDO MESA...</span><br>
       <span id="telemetrySpan" style="color:#0f0;">P98: -- (/255) | Lum: -- (/255) | Cálido: --%</span><br>
@@ -54,16 +54,17 @@
       scan_interval_ms: 300,
       calibration_frames_target: 8,
       shadow_map_size: 512,
-      shadow_radius_fixed: 5,
+      day_shadow_radius: 3.0,
+      night_shadow_radius: 5.0,
       ground_opacity_fixed: 0.40,
 
       day_total_energy: 5.20,
-      day_pmrem_mult: 1.60,
-      day_pedestal: 0.040,
+      day_pmrem_mult: 1.50,
+      day_pedestal: 0.038,
 
-      night_total_energy: 3.20,
-      night_pmrem_mult: 2.10,
-      night_pedestal: 0.048,
+      night_total_energy: 1.00,
+      night_pmrem_mult: 3.00,
+      night_pedestal: 0.070,
 
       weights_1_light: [1.00],
       weights_2_lights: [0.70, 0.30],
@@ -233,8 +234,7 @@
                     node.intensity = 0.0;
                     if (node.shadow) {
                       node.shadow.mapSize.width = LIGHTING_CONFIG.shadow_map_size;
-                      node.shadow.mapSize.height = LIGHTING_CONFIG.shadow_map_size;
-                      node.shadow.radius = LIGHTING_CONFIG.shadow_radius_fixed;
+                      node.shadow.radius = LIGHTING_CONFIG.day_shadow_radius;
                       if (node.shadow.camera) {
                         node.shadow.camera.left = -0.50;
                         node.shadow.camera.right = 0.50;
@@ -547,54 +547,61 @@
                       const avgLumFinal = mediaPoblacionalPodada(accumulatedAvgLumSamples);
                       const avgWarmRatio = mediaPoblacionalPodada(accumulatedWarmRatioSamples);
 
-                      // Factores normalizados de entrada (0.0 = Día, 1.0 = Penumbra)
+                      // Factores normalizados (0.0 = Día Máximo, 1.0 = Penumbra)
                       const p98Factor = Math.max(0.0, Math.min(1.0, 1.0 - (avgP98 - 100.0) / (220.0 - 100.0)));
                       const lumFactor = Math.max(0.0, Math.min(1.0, 1.0 - (avgLumFinal - 50.0) / (135.0 - 50.0)));
 
-                      // Matriz de decisión: P98 (65%) + avgLum (35%), modulada por cobertura cálida global
+                      // Matriz de decisión: Lum (60%) + P98 (40%), modulada por cobertura cálida global
                       const isFullSceneWarm = (avgWarmRatio >= 0.70);
 
                       if (isFullSceneWarm) {
                         // Cobertura cálida >= 70%: La sala entera tiene iluminación cálida de restaurante/velas
-                        const warmWeight = 0.40;
-                        const remainingWeight = 0.60;
-                        const warmInfluence = 0.75; // Tendencia natural hacia ambiente suave / penumbra cálida
+                        const warmWeight = 0.50;
+                        const remainingWeight = 0.50;
+                        const warmInfluence = 0.75; // Arrastre natural hacia ambiente suave / penumbra cálida
 
-                        environmentFactor = (p98Factor * 0.65 * remainingWeight) +
-                                            (lumFactor * 0.35 * remainingWeight) +
+                        environmentFactor = (lumFactor * 0.60 * remainingWeight) +
+                                            (p98Factor * 0.40 * remainingWeight) +
                                             (warmInfluence * warmWeight);
                       } else {
                         // Cobertura cálida < 70%: Mesa o superficie cálida local; se ignora como luz ambiental
                         const warmWeight = 0.15;
                         const remainingWeight = 0.85;
 
-                        environmentFactor = (p98Factor * 0.65 * remainingWeight) +
-                                            (lumFactor * 0.35 * remainingWeight) +
-                                            (p98Factor * warmWeight);
+                        environmentFactor = (lumFactor * 0.60 * remainingWeight) +
+                                            (p98Factor * 0.40 * remainingWeight) +
+                                            (lumFactor * warmWeight);
                       }
 
-                      // Guardarraíles Infranqueables de P98
+                      // Guardarraíles Cruzados y Clasificación Anti-Engaño
                       let verdict = "DIA_NORMAL";
-                      if (avgP98 > 220) {
-                        environmentFactor = Math.min(environmentFactor, 0.10);
+                      if (avgP98 > 225 && avgLumFinal > 130) {
+                        // Sol directo / exterior real: altas luces extremas Y escena completa inundada de luz
+                        environmentFactor = Math.min(environmentFactor, 0.05);
                         verdict = "DIRECCIONAL_FUERTE";
-                      } else if (avgP98 > 200) {
-                        environmentFactor = Math.min(environmentFactor, 0.25);
+                      } else if (avgLumFinal > 140 || (environmentFactor < 0.30 && avgLumFinal >= 70)) {
+                        environmentFactor = Math.min(environmentFactor, 0.33);
                         verdict = "DIA_NORMAL";
-                      } else if (avgP98 > 170) {
-                        environmentFactor = Math.min(environmentFactor, 0.58);
-                        verdict = (environmentFactor < 0.30) ? "DIA_NORMAL" : "AMBIENTE_SUAVE";
+                      } else if (environmentFactor < 0.65 || (avgP98 > 170 && avgLumFinal >= 70)) {
+                        environmentFactor = Math.max(0.33, Math.min(environmentFactor, 0.67));
+                        verdict = "AMBIENTE_SUAVE";
                       } else {
-                        if (environmentFactor < 0.30) verdict = "DIA_NORMAL";
-                        else if (environmentFactor < 0.65) verdict = "AMBIENTE_SUAVE";
-                        else verdict = "PENUMBRA";
+                        environmentFactor = Math.max(0.67, environmentFactor);
+                        verdict = "PENUMBRA";
                       }
 
                       environmentFactor = Math.max(0.0, Math.min(1.0, environmentFactor));
 
+                      // Interpolación Lineal Estricta de Parámetros
                       currentDirectBudget = THREE_INSTANCE.MathUtils.lerp(LIGHTING_CONFIG.day_total_energy, LIGHTING_CONFIG.night_total_energy, environmentFactor);
                       currentPmremMult = THREE_INSTANCE.MathUtils.lerp(LIGHTING_CONFIG.day_pmrem_mult, LIGHTING_CONFIG.night_pmrem_mult, environmentFactor);
                       currentPedestal = THREE_INSTANCE.MathUtils.lerp(LIGHTING_CONFIG.day_pedestal, LIGHTING_CONFIG.night_pedestal, environmentFactor);
+
+                      // Sombra dinámica: 3.0 en día máximo (definida) a 5.0 en penumbra (suave)
+                      const currentShadowRadius = THREE_INSTANCE.MathUtils.lerp(LIGHTING_CONFIG.day_shadow_radius, LIGHTING_CONFIG.night_shadow_radius, environmentFactor);
+                      if (_baseLight1 && _baseLight1.shadow) {
+                        _baseLight1.shadow.radius = currentShadowRadius;
+                      }
 
                       actualizarHUDTelemetria(verdict, avgP98, avgLumFinal, avgWarmRatio * 100);
 
