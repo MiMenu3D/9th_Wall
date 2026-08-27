@@ -1,4 +1,4 @@
-<!-- 9th Wall v3.54 Apple Probe -->
+<!-- 9th Wall v3.55 Apple Probe -->
 <html>
 <head>
   <meta charset="UTF-8">
@@ -15,10 +15,10 @@
     style="position:fixed;top:10px;right:10px;z-index:1000000;background:rgba(0,0,0,0.9);color:#0f0;font-family:monospace;font-size:12px;padding:8px;border-radius:4px;cursor:pointer;line-height:1.3;border:1px solid #0f0;">
     <div id="debugTitle">FPS: --</div>
     <div id="debugContent">
-      ar-world: v3.54<br>
+      ar-world: v3.55<br>
       bundle: v3.48<br>
       <span id="envVerdictSpan" style="color:#0f0;">Entorno: ESPERANDO MESA...</span><br>
-      <span id="telemetrySpan" style="color:#0f0;">Grano: -- (/25) | P98: -- (/255) | Conf: --%</span><br>
+      <span id="telemetrySpan" style="color:#0f0;">P98: -- (/255) | Lum: -- (/255) | Cálido: --%</span><br>
       <span id="lightsCountSpan" style="color:#0f0;">Luces: 1</span><br>
       <span id="latencySpan" style="color:#0f0;">Latencia: -- ms</span>
     </div>
@@ -50,7 +50,6 @@
   <script>
     const LIGHTING_CONFIG = {
       pmrem_resolution: 64,
-      raw_patch_size: 128,
       pmrem_interval_ms: 200,
       scan_interval_ms: 300,
       calibration_frames_target: 8,
@@ -160,11 +159,9 @@
     let isCalibrated = false;
     let isObjectPlaced = false;
     let calibrationFramesDone = 0;
-    const accumulatedNoiseSamples = [];
     const accumulatedP98Samples = [];
     const accumulatedAvgLumSamples = [];
-    const accumulatedFlatDarkSamples = [];
-    const accumulatedWarmSamples = [];
+    const accumulatedWarmRatioSamples = [];
 
     const candidateDebounce = {
       active: false,
@@ -179,11 +176,11 @@
       if (lightsSpan) lightsSpan.innerText = `Luces: ${totalLightsDetected}`;
     };
 
-    const actualizarHUDTelemetria = (verdict, grano, p98, conf) => {
+    const actualizarHUDTelemetria = (verdict, p98, lum, warmPct) => {
       const envSpan = document.getElementById('envVerdictSpan');
       const telSpan = document.getElementById('telemetrySpan');
       if (envSpan) envSpan.innerText = `Entorno: ${verdict}`;
-      if (telSpan) telSpan.innerText = `Grano: ${grano.toFixed(1)} (/25) | P98: ${Math.round(p98)} (/255) | Conf: ${Math.round(conf)}%`;
+      if (telSpan) telSpan.innerText = `P98: ${Math.round(p98)} (/255) | Lum: ${Math.round(lum)} (/255) | Cálido: ${Math.round(warmPct)}%`;
     };
 
     document.getElementById('envToggle').addEventListener('click', () => toggleEnv());
@@ -343,17 +340,9 @@
             pmremCanvas.height = pmremSize;
             const pmremCtx = pmremCanvas.getContext('2d', { willReadFrequently: true });
 
-            const rawSize = LIGHTING_CONFIG.raw_patch_size;
-            const rawGrainCanvas = document.createElement('canvas');
-            rawGrainCanvas.width = rawSize;
-            rawGrainCanvas.height = rawSize;
-            const rawGrainCtx = rawGrainCanvas.getContext('2d', { willReadFrequently: true });
-
             try {
               pmremCtx.drawImage(video, 0, 0, pmremSize, pmremSize);
               pmremCtx.getImageData(0, 0, pmremSize, pmremSize);
-              rawGrainCtx.drawImage(video, 0, 0, rawSize, rawSize);
-              rawGrainCtx.getImageData(0, 0, rawSize, rawSize);
             } catch (e) {}
 
             const envTexture = new THREE_INSTANCE.CanvasTexture(pmremCanvas);
@@ -450,11 +439,9 @@
 
                 isCalibrating = true;
                 calibrationFramesDone = 0;
-                accumulatedNoiseSamples.length = 0;
                 accumulatedP98Samples.length = 0;
                 accumulatedAvgLumSamples.length = 0;
-                accumulatedFlatDarkSamples.length = 0;
-                accumulatedWarmSamples.length = 0;
+                accumulatedWarmRatioSamples.length = 0;
               });
             }
 
@@ -479,6 +466,7 @@
                   let maxLum = 0, maxLumX = pmremSize * 0.5, maxLumY = pmremSize * 0.3;
                   let count = 0, corePixelCount = 0, coreSumX = 0, coreSumY = 0;
                   let minCoreX = pmremSize, maxCoreX = 0, minCoreY = scanEmitterHeight, maxCoreY = 0;
+                  let warmPixelsCount = 0;
 
                   const colorBins = new Int32Array(8);
                   const colorBinLumSumX = new Float32Array(8);
@@ -505,6 +493,13 @@
                       if (py < minCoreY) minCoreY = py; if (py > maxCoreY) maxCoreY = py;
                     }
 
+                    // Evaluación de Calidez Global del píxel (Cr > Cb + 4 en espacio YCbCr)
+                    const cb = -0.168736 * r - 0.331264 * g + 0.5 * b + 128;
+                    const cr = 0.5 * r - 0.418688 * g - 0.081312 * b + 128;
+                    if (lum >= 15 && cr > (cb + 4)) {
+                      warmPixelsCount++;
+                    }
+
                     const cBin = ((r > 100 ? 1 : 0) << 2) | ((g > 100 ? 1 : 0) << 1) | (b > 100 ? 1 : 0);
                     colorBins[cBin]++;
                     colorBinLumSumX[cBin] += px * lum;
@@ -524,81 +519,17 @@
                     if (acc >= p98Target) { p98Lum = ((b + 0.5) / 16) * 255; break; }
                   }
 
+                  const currentWarmRatio = count > 0 ? (warmPixelsCount / count) : 0.0;
+
                   let dominantBin = 0, maxBinCount = 0;
                   for (let c = 0; c < 8; c++) {
                     if (colorBins[c] > maxBinCount) { maxBinCount = colorBins[c]; dominantBin = c; }
                   }
 
-                  const vWidth = video.videoWidth || 1280;
-                  const vHeight = video.videoHeight || 720;
-                  const rSize = LIGHTING_CONFIG.raw_patch_size;
-                  const sx = Math.max(0, Math.min(vWidth - rSize, Math.floor((vWidth - rSize) / 2)));
-                  const sy = Math.max(0, Math.min(vHeight - rSize, Math.floor((vHeight - rSize) / 2)));
-
-                  rawGrainCtx.drawImage(video, sx, sy, rSize, rSize, 0, 0, rSize, rSize);
-                  const rawData = rawGrainCtx.getImageData(0, 0, rSize, rSize).data;
-
-                  let sumDiff = 0, diffCount = 0;
-                  let flatDarkPixelCount = 0;
-                  let totalWarmBiasSum = 0;
-                  let warmEvalCount = 0;
-
-                  for (let py = 0; py < rSize; py++) {
-                    let streakLen = 0;
-
-                    for (let px = 0; px < rSize - 1; px++) {
-                      const pIdx1 = (py * rSize + px) * 4;
-                      const pIdx2 = (py * rSize + (px + 1)) * 4;
-
-                      const r1 = rawData[pIdx1], g1 = rawData[pIdx1 + 1], b1 = rawData[pIdx1 + 2];
-                      const r2 = rawData[pIdx2], g2 = rawData[pIdx2 + 1], b2 = rawData[pIdx2 + 2];
-
-                      const y1 = r1 * 0.299 + g1 * 0.587 + b1 * 0.114;
-                      const y2 = r2 * 0.299 + g2 * 0.587 + b2 * 0.114;
-                      const deltaY = Math.abs(y1 - y2);
-
-                      const cb1 = -0.168736 * r1 - 0.331264 * g1 + 0.5 * b1 + 128;
-                      const cr1 = 0.5 * r1 - 0.418688 * g1 - 0.081312 * b1 + 128;
-                      const cb2 = -0.168736 * r2 - 0.331264 * g2 + 0.5 * b2 + 128;
-                      const cr2 = 0.5 * r2 - 0.418688 * g2 - 0.081312 * b2 + 128;
-
-                      // Detección de rachas planas oscuras (empastado de negros por denoiser / AE)
-                      if (y1 < 35 && deltaY <= 1) {
-                        streakLen++;
-                        if (streakLen >= 16) {
-                          flatDarkPixelCount++;
-                        }
-                      } else {
-                        streakLen = 0;
-                      }
-
-                      // Muestreo de firma cálida (Cr > Cb -> tintes ámbar/tungsteno de restaurante)
-                      if (y1 >= 15) {
-                        const warmBias = Math.max(0, cr1 - cb1);
-                        totalWarmBiasSum += warmBias;
-                        warmEvalCount++;
-                      }
-
-                      // Exclusión de rachas empastadas del cómputo de grano
-                      if (streakLen < 16 && deltaY < 18) {
-                        const deltaChroma = Math.hypot(cb1 - cb2, cr1 - cr2);
-                        sumDiff += deltaY + deltaChroma;
-                        diffCount++;
-                      }
-                    }
-                  }
-
-                  const currentFrameGrain = diffCount > 0 ? (sumDiff / diffCount) : 0.0;
-                  const totalEvaluatedPx = rSize * (rSize - 1);
-                  const currentFlatDarkRatio = flatDarkPixelCount / totalEvaluatedPx;
-                  const currentWarmBias = warmEvalCount > 0 ? (totalWarmBiasSum / warmEvalCount) : 0.0;
-
                   if (isCalibrating && !isCalibrated) {
-                    accumulatedNoiseSamples.push(currentFrameGrain);
                     accumulatedP98Samples.push(p98Lum);
                     accumulatedAvgLumSamples.push(avgLum);
-                    accumulatedFlatDarkSamples.push(currentFlatDarkRatio);
-                    accumulatedWarmSamples.push(currentWarmBias);
+                    accumulatedWarmRatioSamples.push(currentWarmRatio);
                     calibrationFramesDone++;
 
                     if (calibrationFramesDone >= LIGHTING_CONFIG.calibration_frames_target) {
@@ -612,55 +543,60 @@
                         return podados.reduce((a, b) => a + b, 0) / podados.length;
                       };
 
-                      const avgGrain = mediaPoblacionalPodada(accumulatedNoiseSamples);
                       const avgP98 = mediaPoblacionalPodada(accumulatedP98Samples);
                       const avgLumFinal = mediaPoblacionalPodada(accumulatedAvgLumSamples);
-                      const avgFlatDark = mediaPoblacionalPodada(accumulatedFlatDarkSamples);
-                      const avgWarm = mediaPoblacionalPodada(accumulatedWarmSamples);
+                      const avgWarmRatio = mediaPoblacionalPodada(accumulatedWarmRatioSamples);
 
-                      const pmremFactor = Math.max(0.0, Math.min(1.0, 1.0 - (avgLumFinal - 60.0) / (130.0 - 60.0)));
+                      // Factores normalizados de entrada (0.0 = Día, 1.0 = Penumbra)
+                      const p98Factor = Math.max(0.0, Math.min(1.0, 1.0 - (avgP98 - 100.0) / (220.0 - 100.0)));
+                      const lumFactor = Math.max(0.0, Math.min(1.0, 1.0 - (avgLumFinal - 50.0) / (135.0 - 50.0)));
 
-                      let grainFactor = 0.0;
-                      if (avgGrain <= 2.2) {
-                        grainFactor = 0.0;
-                      } else if (avgGrain >= 7.0) {
-                        grainFactor = 1.0;
+                      // Matriz de decisión: P98 (65%) + avgLum (35%), modulada por cobertura cálida global
+                      const isFullSceneWarm = (avgWarmRatio >= 0.70);
+
+                      if (isFullSceneWarm) {
+                        // Cobertura cálida >= 70%: La sala entera tiene iluminación cálida de restaurante/velas
+                        const warmWeight = 0.40;
+                        const remainingWeight = 0.60;
+                        const warmInfluence = 0.75; // Tendencia natural hacia ambiente suave / penumbra cálida
+
+                        environmentFactor = (p98Factor * 0.65 * remainingWeight) +
+                                            (lumFactor * 0.35 * remainingWeight) +
+                                            (warmInfluence * warmWeight);
                       } else {
-                        grainFactor = (avgGrain - 2.2) / (7.0 - 2.2);
+                        // Cobertura cálida < 70%: Mesa o superficie cálida local; se ignora como luz ambiental
+                        const warmWeight = 0.15;
+                        const remainingWeight = 0.85;
+
+                        environmentFactor = (p98Factor * 0.65 * remainingWeight) +
+                                            (lumFactor * 0.35 * remainingWeight) +
+                                            (p98Factor * warmWeight);
                       }
 
-                      // Guardarraíl Armario: Más del 40% del parche son rachas planas oscuras
-                      const isArmario = (avgFlatDark > 0.40);
-
-                      if (isArmario) {
-                        environmentFactor = 1.0;
+                      // Guardarraíles Infranqueables de P98
+                      let verdict = "DIA_NORMAL";
+                      if (avgP98 > 220) {
+                        environmentFactor = Math.min(environmentFactor, 0.10);
+                        verdict = "DIRECCIONAL_FUERTE";
+                      } else if (avgP98 > 200) {
+                        environmentFactor = Math.min(environmentFactor, 0.25);
+                        verdict = "DIA_NORMAL";
+                      } else if (avgP98 > 170) {
+                        environmentFactor = Math.min(environmentFactor, 0.58);
+                        verdict = (environmentFactor < 0.30) ? "DIA_NORMAL" : "AMBIENTE_SUAVE";
                       } else {
-                        // Si hay dominancia cálida (típica de restaurante/penumbra), añade peso ambiental
-                        const warmBonus = Math.max(0.0, Math.min(0.25, (avgWarm - 6.0) / 20.0));
-
-                        if (avgLumFinal > 120) {
-                          environmentFactor = pmremFactor * 0.60 + grainFactor * 0.40 + warmBonus;
-                        } else if (avgLumFinal < 65) {
-                          environmentFactor = Math.max(pmremFactor * 0.80 + grainFactor * 0.20, grainFactor) + warmBonus;
-                        } else {
-                          environmentFactor = pmremFactor * 0.45 + grainFactor * 0.55 + warmBonus;
-                        }
+                        if (environmentFactor < 0.30) verdict = "DIA_NORMAL";
+                        else if (environmentFactor < 0.65) verdict = "AMBIENTE_SUAVE";
+                        else verdict = "PENUMBRA";
                       }
+
                       environmentFactor = Math.max(0.0, Math.min(1.0, environmentFactor));
 
                       currentDirectBudget = THREE_INSTANCE.MathUtils.lerp(LIGHTING_CONFIG.day_total_energy, LIGHTING_CONFIG.night_total_energy, environmentFactor);
                       currentPmremMult = THREE_INSTANCE.MathUtils.lerp(LIGHTING_CONFIG.day_pmrem_mult, LIGHTING_CONFIG.night_pmrem_mult, environmentFactor);
                       currentPedestal = THREE_INSTANCE.MathUtils.lerp(LIGHTING_CONFIG.day_pedestal, LIGHTING_CONFIG.night_pedestal, environmentFactor);
 
-                      let verdict = "DIA_NORMAL";
-                      if (isArmario) verdict = "PENUMBRA";
-                      else if (environmentFactor < 0.15 && avgP98 > 220) verdict = "DIRECCIONAL_FUERTE";
-                      else if (environmentFactor < 0.30) verdict = "DIA_NORMAL";
-                      else if (environmentFactor < 0.65) verdict = "AMBIENTE_SUAVE";
-                      else verdict = "PENUMBRA";
-
-                      const confidence = Math.min(99, Math.max(70, 75 + Math.abs(environmentFactor - 0.5) * 48));
-                      actualizarHUDTelemetria(verdict, avgGrain, avgP98, confidence);
+                      actualizarHUDTelemetria(verdict, avgP98, avgLumFinal, avgWarmRatio * 100);
 
                       if (_activeCamera) {
                         let targetX2 = pmremSize * 0.5, targetY2 = pmremSize * 0.4;
