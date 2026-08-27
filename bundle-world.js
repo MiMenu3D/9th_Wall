@@ -1,4 +1,4 @@
-﻿// 9th Wall v4.05 Apple Probe
+﻿// 9th Wall v4.06 Apple Probe
 (() => {
   var e = {
     574() {
@@ -727,11 +727,6 @@
                 "duration": 2000,
                 "toY": 0.001
               }
-            },
-            "metric-scale-stabilizer-comp": {
-              "id": "metric-scale-stabilizer-comp",
-              "name": "metric-scale-stabilizer",
-              "parameters": {}
             }
           },
           "name": "Model",
