@@ -1,4 +1,4 @@
-﻿// 9th Wall v3.48 Apple Probe
+﻿// 9th Wall v4.00 Apple Probe
 (() => {
   var e = {
     574() {
@@ -46,6 +46,14 @@
     rotationSensitivity: 4,
     pinchActivationThreshold: 0.09,
     rotationActivationThreshold: 0.020
+  });
+
+  // v4.00: Asentamiento de escala métrica real tras la colocación (ventana VIO + transición)
+  const METRIC_SCALE_CONFIG = Object.freeze({
+    apparentScale: 1.01,
+    targetScale: 1.0,
+    vioWindowMs: 2500,
+    transitionMs: 800
   });
   function a(o) {
     var n = t[o];
@@ -198,6 +206,86 @@
           })
       }
     });
+
+    // v4.00: corrige la escala aparente inicial hacia la escala métrica real (1:1) tras una ventana de observación VIO
+    e.registerComponent({
+      name: "metric-scale-stabilizer",
+      add: (world, component) => {
+        const eid = component.eid;
+        let groundOffsetY = 0;
+
+        // Bounding box real del modelo, usada únicamente para compensar el pivote y mantenerlo anclado al suelo (Y=0)
+        try {
+          const obj3D = world.three.entityIdToObject && world.three.entityIdToObject.get(eid);
+          if (obj3D && window.THREE) {
+            const box = new window.THREE.Box3().setFromObject(obj3D);
+            if (isFinite(box.min.y)) groundOffsetY = box.min.y;
+          }
+        } catch (err) {}
+
+        // La entidad se instancia justo en el momento de la colocación: "add" ya marca t=0 de la ventana VIO
+        component._scaleState = {
+          phase: "waiting-vio",
+          placedAt: performance.now(),
+          lastTickTime: performance.now(),
+          transStart: 0,
+          currentScale: METRIC_SCALE_CONFIG.apparentScale,
+          groundOffsetY
+        };
+      },
+      tick: (world, component, time) => {
+        const st = component._scaleState;
+        if (!st || st.phase === "done") return;
+
+        const eid = component.eid;
+        const now = performance.now();
+
+        if (st.phase === "waiting-vio") {
+          if (now - st.placedAt >= METRIC_SCALE_CONFIG.vioWindowMs) {
+            st.phase = "transitioning";
+            st.transStart = now;
+            st.lastTickTime = now;
+          }
+          return;
+        }
+
+        // Interpolación exponencial basada en deltaTime real para máxima fluidez incluso a 14 FPS
+        const deltaSec = Math.max(0.001, (now - st.lastTickTime) / 1000);
+        st.lastTickTime = now;
+
+        const elapsed = now - st.transStart;
+        const finished = elapsed >= METRIC_SCALE_CONFIG.transitionMs;
+        const prevScale = st.currentScale;
+
+        if (finished) {
+          st.currentScale = METRIC_SCALE_CONFIG.targetScale;
+        } else {
+          const speed = 1000 / METRIC_SCALE_CONFIG.transitionMs;
+          const lerpFactor = 1.0 - Math.exp(-speed * deltaSec);
+          st.currentScale += (METRIC_SCALE_CONFIG.targetScale - st.currentScale) * lerpFactor;
+        }
+
+        e.Scale.set(world, eid, { x: st.currentScale, y: st.currentScale, z: st.currentScale });
+
+        // Mantenimiento estricto del pivote de suelo: compensa el desplazamiento vertical que introduce el cambio de escala
+        if (st.groundOffsetY) {
+          try {
+            const pos = world.transform.getWorldPosition(eid);
+            const deltaY = -st.groundOffsetY * (st.currentScale - prevScale);
+            world.transform.setWorldPosition(eid, { x: pos.x, y: pos.y + deltaY, z: pos.z });
+          } catch (err) {}
+        }
+
+        if (finished) {
+          st.phase = "done";
+          world.events.dispatch(world.events.globalId, "scale-stabilization-complete");
+          if (typeof window.onScaleStabilizationComplete === "function") {
+            window.onScaleStabilizationComplete();
+          }
+        }
+      }
+    });
+
     const r = e.defineQuery([t]);
     e.registerComponent({
       name: "reset-button",
@@ -575,6 +663,11 @@
                 "duration": 2000,
                 "toY": 0.001
               }
+            },
+            "metric-scale-stabilizer-comp": {
+              "id": "metric-scale-stabilizer-comp",
+              "name": "metric-scale-stabilizer",
+              "parameters": {}
             }
           },
           "name": "Model",
