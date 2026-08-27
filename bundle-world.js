@@ -1,4 +1,4 @@
-﻿// 9th Wall v4.02 Apple Probe
+﻿// 9th Wall v4.03 Apple Probe
 (() => {
   var e = {
     574() {
@@ -61,6 +61,7 @@
   const DRAG_RETICLE_CONFIG = Object.freeze({
     liftHeight: 0.05,
     liftSmoothingRate: 8.0,
+    dragActivationThreshold: 0.012,
     size: 0.34,
     thickness: 0.02,
     cornerRadius: 0.05,
@@ -178,13 +179,14 @@
             color: DRAG_RETICLE_CONFIG.color,
             transparent: true,
             opacity: 0.85,
-            depthTest: false,
+            depthTest: true,
+            depthWrite: false,
             side: THREE_INSTANCE.DoubleSide
           });
           reticleMesh = new THREE_INSTANCE.Mesh(geometry, material);
           reticleMesh.rotation.x = -Math.PI / 2;
           reticleMesh.visible = false;
-          reticleMesh.renderOrder = 999;
+          reticleMesh.renderOrder = 0;
           scene.add(reticleMesh);
           return reticleMesh;
         };
@@ -228,6 +230,11 @@
             planarX = n.x,
             planarZ = n.z;
             if (!i || !r) return;
+
+            // Cancela un rebote anterior para que el siguiente arrastre no compita con esa animación.
+            try {
+              if (e.PositionAnimation && e.PositionAnimation.remove) e.PositionAnimation.remove(t, a);
+            } catch (err) {}
             const d = new r.Raycaster(),
             s = new r.Vector2(o.data.position.x * 2 - 1, 1 - o.data.position.y * 2),
             l = new r.Plane(new r.Vector3(0, 1, 0), -dragPlaneY),
@@ -238,20 +245,14 @@
               dragOffsetZ = n.z - c.z
             }
 
-            // v4.02: la retícula aparece de inmediato; la elevación del modelo sube sola y suavemente en el bucle
-            isDragActive = !0;
-            if (t.three.scene) {
-              const ret = obtenerReticula(r, t.three.scene);
-              ret.rotation.z = 0;
-              ret.position.set(planarX, dragPlaneY + 0.002, planarZ);
-              ret.visible = true;
-            }
+            // La pulsación sola no altera el objeto: se espera un desplazamiento mínimo real.
+            isDragActive = !1;
           })
           .listen(t.events.globalId, e.input.SCREEN_TOUCH_START, o => {
             if (isModelTouchActive) activePointerIds.add(o.data.pointerId)
           })
           .listen(t.events.globalId, e.input.SCREEN_TOUCH_MOVE, o => {
-            if (!isModelTouchActive || isTwoFingerGesture || waitForAllTouchesToEnd || o.data.pointerId !== dragPointerId) return;
+            if (!isModelTouchActive || isTwoFingerGesture || waitForAllTouchesToEnd || activePointerIds.size > 1 || o.data.pointerId !== dragPointerId) return;
             const n = t.three.activeCamera,
             i = window.THREE;
             if (!n || !i) return;
@@ -261,8 +262,21 @@
             l = new i.Vector3();
             r.setFromCamera(d, n);
             if (r.ray.intersectPlane(s, l)) {
-              planarX = l.x + dragOffsetX;
-              planarZ = l.z + dragOffsetZ;
+              const nextX = l.x + dragOffsetX;
+              const nextZ = l.z + dragOffsetZ;
+              if (!isDragActive && Math.hypot(nextX - planarX, nextZ - planarZ) < DRAG_RETICLE_CONFIG.dragActivationThreshold) return;
+
+              planarX = nextX;
+              planarZ = nextZ;
+              if (!isDragActive) {
+                isDragActive = !0;
+                if (t.three.scene) {
+                  const ret = obtenerReticula(i, t.three.scene);
+                  ret.rotation.z = 0;
+                  ret.position.set(planarX, dragPlaneY + 0.002, planarZ);
+                  ret.visible = true;
+                }
+              }
               if (reticleMesh) reticleMesh.position.set(planarX, dragPlaneY + 0.002, planarZ);
             }
           })
@@ -302,9 +316,13 @@
             if (isDragActive) {
               isDragActive = !1;
               currentLift = 0;
-              if (reticleMesh) reticleMesh.visible = false;
               const n = t.transform.getWorldPosition(a);
               t.transform.setWorldPosition(a, { x: n.x, y: dragPlaneY, z: n.z });
+            }
+            if (t.three.scene && window.THREE) {
+              const ret = obtenerReticula(window.THREE, t.three.scene);
+              ret.position.set(planarX, dragPlaneY + 0.002, planarZ);
+              ret.visible = true;
             }
           })
           .listen(t.events.globalId, e.input.GESTURE_MOVE, o => {
@@ -362,9 +380,9 @@
         } catch (err) {}
 
         // La entidad se instancia justo en el momento de la colocación: "add" ya marca t=0 de la ventana VIO
-        const placedAt = performance.now();
-        let lastFrameTime = placedAt;
-        let phase = "waiting-vio";
+        let placedAt = 0;
+        let lastFrameTime = 0;
+        let phase = "waiting-placement";
         let transStart = 0;
         let currentScale = METRIC_SCALE_CONFIG.apparentScale;
 
@@ -374,6 +392,16 @@
           if (phase === "done") return;
 
           const now = performance.now();
+
+          if (phase === "waiting-placement") {
+            if (window.metricScalePlacementTime) {
+              placedAt = window.metricScalePlacementTime;
+              lastFrameTime = placedAt;
+              phase = "waiting-vio";
+            }
+            requestAnimationFrame(actualizarEscala);
+            return;
+          }
 
           if (phase === "waiting-vio") {
             if (now - placedAt >= METRIC_SCALE_CONFIG.vioWindowMs) {
@@ -396,7 +424,7 @@
           if (finished) {
             currentScale = METRIC_SCALE_CONFIG.targetScale;
           } else {
-            const speed = 1000 / METRIC_SCALE_CONFIG.transitionMs;
+            const speed = Math.log(200) / (METRIC_SCALE_CONFIG.transitionMs / 1000);
             const lerpFactor = 1.0 - Math.exp(-speed * deltaSec);
             currentScale += (METRIC_SCALE_CONFIG.targetScale - currentScale) * lerpFactor;
           }
