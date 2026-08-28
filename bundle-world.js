@@ -1,4 +1,4 @@
-﻿// 9th Wall v4.08 Apple Probe
+﻿// 9th Wall v4.09 Apple Probe
 (() => {
   var e = {
     574() {
@@ -39,12 +39,12 @@
     slamPointCloud: IS_DEBUG
   });
 
-  // Controles del único modelo colocado.
+  // Controles del único modelo colocado (límites de escala ajustados: 0.90 min, 1.20 max)
   const MODEL_GESTURES = Object.freeze({
-    minimumScale: 0.75,
-    maximumScale: 1.45,
+    minimumScale: 0.90,
+    maximumScale: 1.20,
     rotationSensitivity: 7,
-    pinchActivationThreshold: 0.05,
+    pinchActivationThreshold: 0.045,
     rotationActivationThreshold: 0.008
   });
 
@@ -84,6 +84,7 @@
     outer.holes.push(crearFormaRectRedondeada(THREE_INSTANCE, innerSize, innerRadius));
     return new THREE_INSTANCE.ShapeGeometry(outer);
   }
+
   function a(o) {
     var n = t[o];
     if (void 0 !== n) return n.exports;
@@ -160,12 +161,21 @@
         currentLift = 0,
         planarX = 0,
         planarZ = 0,
+        consecutiveRotationFrames = 0,
         lastLiftFrameTime = performance.now();
 
-        // v4.02: retícula plana con esquinas redondeadas (mesh, no línea: el grosor de línea de WebGL no es fiable)
+        // v4.08: retícula plana con esquinas redondeadas sincronizada en escala con el modelo
         const obtenerReticula = (THREE_INSTANCE, scene) => {
-          if (reticleMesh) return reticleMesh;
-          const geometry = crearGeometriaMarcoReticula(THREE_INSTANCE, DRAG_RETICLE_CONFIG.size, DRAG_RETICLE_CONFIG.thickness, DRAG_RETICLE_CONFIG.cornerRadius);
+          if (reticleMesh) {
+            reticleMesh.scale.set(currentScale, currentScale, currentScale);
+            return reticleMesh;
+          }
+          const geometry = crearGeometriaMarcoReticula(
+            THREE_INSTANCE,
+            DRAG_RETICLE_CONFIG.size,
+            DRAG_RETICLE_CONFIG.thickness,
+            DRAG_RETICLE_CONFIG.cornerRadius
+          );
           const material = new THREE_INSTANCE.MeshBasicMaterial({
             color: DRAG_RETICLE_CONFIG.color,
             transparent: true,
@@ -176,6 +186,7 @@
           });
           reticleMesh = new THREE_INSTANCE.Mesh(geometry, material);
           reticleMesh.rotation.x = -Math.PI / 2;
+          reticleMesh.scale.set(currentScale, currentScale, currentScale);
           reticleMesh.visible = false;
           reticleMesh.renderOrder = 0;
           scene.add(reticleMesh);
@@ -193,7 +204,11 @@
           currentLift += (targetLift - currentLift) * lerpStep;
 
           if (isModelTouchActive && !isTwoFingerGesture) {
-            t.transform.setWorldPosition(a, { x: planarX, y: dragPlaneY + currentLift, z: planarZ });
+            t.transform.setWorldPosition(a, {
+              x: planarX,
+              y: dragPlaneY + currentLift,
+              z: planarZ
+            });
           }
 
           requestAnimationFrame(actualizarElevacion);
@@ -224,8 +239,11 @@
 
             // Cancela un rebote anterior para que el siguiente arrastre no compita con esa animación.
             try {
-              if (e.PositionAnimation && e.PositionAnimation.remove) e.PositionAnimation.remove(t, a);
+              if (e.PositionAnimation && e.PositionAnimation.remove) {
+                e.PositionAnimation.remove(t, a);
+              }
             } catch (err) {}
+
             const d = new r.Raycaster(),
             s = new r.Vector2(o.data.position.x * 2 - 1, 1 - o.data.position.y * 2),
             l = new r.Plane(new r.Vector3(0, 1, 0), -dragPlaneY),
@@ -240,7 +258,7 @@
             isDragActive = !1;
           })
           .listen(t.events.globalId, e.input.SCREEN_TOUCH_START, o => {
-            if (isModelTouchActive) activePointerIds.add(o.data.pointerId)
+            if (isModelTouchActive) activePointerIds.add(o.data.pointerId);
           })
           .listen(t.events.globalId, e.input.SCREEN_TOUCH_MOVE, o => {
             if (!isModelTouchActive || isTwoFingerGesture || waitForAllTouchesToEnd || activePointerIds.size > 1 || o.data.pointerId !== dragPointerId) return;
@@ -264,17 +282,21 @@
                 if (t.three.scene) {
                   const ret = obtenerReticula(i, t.three.scene);
                   ret.rotation.z = 0;
+                  ret.scale.set(currentScale, currentScale, currentScale);
                   ret.position.set(planarX, dragPlaneY + 0.002, planarZ);
                   ret.visible = true;
                 }
               }
-              if (reticleMesh) reticleMesh.position.set(planarX, dragPlaneY + 0.002, planarZ);
+              if (reticleMesh) {
+                reticleMesh.position.set(planarX, dragPlaneY + 0.002, planarZ);
+                reticleMesh.scale.set(currentScale, currentScale, currentScale);
+              }
             }
           })
           .listen(t.events.globalId, e.input.SCREEN_TOUCH_END, o => {
             activePointerIds.delete(o.data.pointerId);
             if (0 === activePointerIds.size) {
-              // v4.08: al soltar tras arrastrar, rebote amortiguado hacia arriba asentándose en Y = 0 sin rebasarlo
+              // v4.08: al soltar tras arrastrar, rebote Bounce hacia arriba asentándose en Y = 0 sin rebasarlo
               if (isDragActive) {
                 isDragActive = !1;
                 if (reticleMesh) reticleMesh.visible = false;
@@ -284,16 +306,20 @@
                   loop: !1,
                   easeOut: !0,
                   easingFunction: DRAG_RETICLE_CONFIG.bounceEasing,
-                  fromX: n.x, toX: n.x,
-                  fromY: n.y, toY: dragPlaneY,
-                  fromZ: n.z, toZ: n.z
+                  fromX: n.x,
+                  toX: n.x,
+                  fromY: n.y,
+                  toY: dragPlaneY,
+                  fromZ: n.z,
+                  toZ: n.z
                 });
               }
 
               isModelTouchActive = !1,
               dragPointerId = null,
               waitForAllTouchesToEnd = !1,
-              gestureMode = "none"
+              gestureMode = "none",
+              consecutiveRotationFrames = 0;
             }
           })
           .listen(t.events.globalId, e.input.GESTURE_START, o => {
@@ -301,6 +327,7 @@
             isTwoFingerGesture = !0,
             waitForAllTouchesToEnd = !0,
             gestureMode = "none",
+            consecutiveRotationFrames = 0,
             scaleAtGestureStart = currentScale;
 
             // v4.02: al pasar a gesto de dos dedos se cancela el arrastre y el modelo vuelve a su altura de reposo
@@ -313,39 +340,67 @@
             if (t.three.scene && window.THREE) {
               const ret = obtenerReticula(window.THREE, t.three.scene);
               ret.position.set(planarX, dragPlaneY + 0.002, planarZ);
+              ret.scale.set(currentScale, currentScale, currentScale);
               ret.visible = true;
             }
           })
           .listen(t.events.globalId, e.input.GESTURE_MOVE, o => {
             if (!isModelTouchActive || !isTwoFingerGesture || 2 !== o.data.touchCount) return;
-            const n = o.data.startSpread > 0 ? Math.abs(o.data.spread - o.data.startSpread) / o.data.startSpread : 0,
-            i = Math.abs(o.data.position.x - o.data.startPosition.x);
 
-            // Arbitraje dinámico de gestos: escala vs rotación
+            const spreadRatioDelta = o.data.startSpread > 0
+              ? Math.abs(o.data.spread - o.data.startSpread) / o.data.startSpread
+              : 0;
+
+            const deltaX = Math.abs(o.data.positionChange ? o.data.positionChange.x : 0);
+            const deltaY = Math.abs(o.data.positionChange ? o.data.positionChange.y : 0);
+            const instantSpreadChange = Math.abs(o.data.spreadChange || 0);
+
+            // Heurística direccional: el movimiento vertical es rotación; el horizontal/diagonal con spread es escala
+            const isVerticalDominant = (deltaY > deltaX * 1.3 && deltaY > 0.003);
+            const isHorizontalSpreadDominant = (spreadRatioDelta >= MODEL_GESTURES.pinchActivationThreshold && deltaX >= deltaY * 0.7);
+
             if ("none" === gestureMode) {
-              if (!pinchScaleLocked && n >= MODEL_GESTURES.pinchActivationThreshold && n / MODEL_GESTURES.pinchActivationThreshold >= i / MODEL_GESTURES.rotationActivationThreshold) {
+              if (!pinchScaleLocked && isHorizontalSpreadDominant) {
                 gestureMode = "scale";
-              } else if (i >= MODEL_GESTURES.rotationActivationThreshold) {
+                consecutiveRotationFrames = 0;
+              } else if (isVerticalDominant || deltaX >= MODEL_GESTURES.rotationActivationThreshold) {
                 gestureMode = "rotate";
-              }
-            } else if ("rotate" === gestureMode && !pinchScaleLocked) {
-              // Si los dedos varían su separación claramente, cambiamos a escala
-              if (n >= MODEL_GESTURES.pinchActivationThreshold && Math.abs(o.data.spreadChange || 0) > Math.abs(o.data.positionChange.x) * 1.1) {
-                gestureMode = "scale";
-                const currentSpreadFactor = o.data.startSpread > 0 ? o.data.spread / o.data.startSpread : 1;
-                scaleAtGestureStart = currentScale / (currentSpreadFactor || 1);
               }
             } else if ("scale" === gestureMode) {
-              // Si el movimiento angular domina y la separación apenas varía, conmutamos a rotación
-              if (Math.abs(o.data.positionChange.x) >= MODEL_GESTURES.rotationActivationThreshold && Math.abs(o.data.positionChange.x) > Math.abs(o.data.spreadChange || 0) * 1.5) {
-                gestureMode = "rotate";
+              // Si estamos en escala pero los dedos no cambian distancia y giran de forma continuada, rectificamos a rotación
+              if (instantSpreadChange < 0.0025 && (deltaX > 0.005 || isVerticalDominant)) {
+                consecutiveRotationFrames++;
+                if (consecutiveRotationFrames >= 3) {
+                  gestureMode = "rotate";
+                  consecutiveRotationFrames = 0;
+                }
+              } else {
+                consecutiveRotationFrames = 0;
+              }
+            } else if ("rotate" === gestureMode && !pinchScaleLocked) {
+              // Si estamos rotando y se detecta una apertura/cierre de dedos inequívoca en horizontal, conmutamos a escala
+              if (spreadRatioDelta >= MODEL_GESTURES.pinchActivationThreshold * 1.4 && instantSpreadChange > 0.006) {
+                gestureMode = "scale";
+                consecutiveRotationFrames = 0;
+                const spreadFactor = o.data.startSpread > 0 ? o.data.spread / o.data.startSpread : 1;
+                scaleAtGestureStart = currentScale / (spreadFactor || 1);
               }
             }
 
             if ("scale" === gestureMode && !pinchScaleLocked) {
-              const n = o.data.startSpread > 0 ? o.data.spread / o.data.startSpread : 1;
-              currentScale = Math.max(MODEL_GESTURES.minimumScale, Math.min(MODEL_GESTURES.maximumScale, scaleAtGestureStart * n)),
-              e.Scale.set(t, a, { x: currentScale, y: currentScale, z: currentScale })
+              const spreadFactor = o.data.startSpread > 0 ? o.data.spread / o.data.startSpread : 1;
+              currentScale = Math.max(
+                MODEL_GESTURES.minimumScale,
+                Math.min(MODEL_GESTURES.maximumScale, scaleAtGestureStart * spreadFactor)
+              );
+
+              // Escalado sincronizado tanto para el modelo como para la retícula
+              e.Scale.set(t, a, { x: currentScale, y: currentScale, z: currentScale });
+
+              if (t.three.scene && window.THREE) {
+                const ret = obtenerReticula(window.THREE, t.three.scene);
+                ret.scale.set(currentScale, currentScale, currentScale);
+              }
             } else if ("rotate" === gestureMode) {
               const angleDelta = o.data.positionChange.x * MODEL_GESTURES.rotationSensitivity;
               t.transform.rotateSelf(a, e.math.quat.yRadians(angleDelta));
@@ -355,6 +410,7 @@
                 const ret = obtenerReticula(window.THREE, t.three.scene);
                 const pos = t.transform.getWorldPosition(a);
                 ret.position.set(pos.x, dragPlaneY + 0.002, pos.z);
+                ret.scale.set(currentScale, currentScale, currentScale);
                 ret.visible = true;
                 ret.rotateZ(angleDelta);
               }
@@ -363,6 +419,7 @@
           .listen(t.events.globalId, e.input.GESTURE_END, o => {
             if (o.data.nextTouchCount < 2) isTwoFingerGesture = !1;
             if (reticleMesh && !isDragActive) reticleMesh.visible = false;
+            consecutiveRotationFrames = 0;
           })
       }
     });
@@ -516,7 +573,9 @@
           },
           "name": "Logo",
           "order": 8.599486645057333,
-          "shadow": { "castShadow": false },
+          "shadow": {
+            "castShadow": false
+          },
           "prefab": true
         },
 
@@ -565,7 +624,12 @@
           "name": "Camera",
           "camera": {
             "type": "perspective",
-            "xr": { "xrCameraType": "world", "phone": "AR", "desktop": "disabled", "headset": "disabled" }
+            "xr": {
+              "xrCameraType": "world",
+              "phone": "AR",
+              "desktop": "disabled",
+              "headset": "disabled"
+            }
           },
           "order": 2.1029089692509704
         },
@@ -618,7 +682,10 @@
             "color": "#ffffff",
             "fontSize": 24,
             "type": "3d",
-            "font": { "type": "font", "font": "Roboto" },
+            "font": {
+              "type": "font",
+              "font": "Roboto"
+            },
             "textAlign": "center",
             "verticalTextAlign": "center"
           },
@@ -632,21 +699,34 @@
           "position": [0, 0.001, 0],
           "rotation": [-0.7071068, 0, 0, 0.7071068],
           "scale": [5, 5, 5],
-          "geometry": { "type": "plane", "width": 1, "height": 1 },
-          "material": { "type": "shadow", "color": "#000000", "opacity": 0.5 },
+          "geometry": {
+            "type": "plane",
+            "width": 1,
+            "height": 1
+          },
+          "material": {
+            "type": "shadow",
+            "color": "#000000",
+            "opacity": 0.5
+          },
           "parentId": "84028e73-ee70-412d-b8d4-c09bf07c655c",
           "components": {
             "efcfa10c-5fe6-4a92-85de-a602a68683b2": {
               "id": "efcfa10c-5fe6-4a92-85de-a602a68683b2",
               "name": "tap-to-place",
               "parameters": {
-                "prefab": { "type": "entity", "id": "b534657a-38e6-4275-a37d-77b655561d5b" }
+                "prefab": {
+                  "type": "entity",
+                  "id": "b534657a-38e6-4275-a37d-77b655561d5b"
+                }
               }
             }
           },
           "name": "Ground",
           "order": 5.877553308364804,
-          "shadow": { "receiveShadow": true }
+          "shadow": {
+            "receiveShadow": true
+          }
         },
 
         // Plano Ocultador (Hider)
@@ -655,8 +735,14 @@
           "position": [0, -0.001, 0],
           "rotation": [-0.707106799999999, 0, 0, 0.7071067623730954],
           "scale": [2, 2, 2],
-          "geometry": { "type": "plane", "width": 1, "height": 1 },
-          "material": { "type": "hider" },
+          "geometry": {
+            "type": "plane",
+            "width": 1,
+            "height": 1
+          },
+          "material": {
+            "type": "hider"
+          },
           "parentId": "84028e73-ee70-412d-b8d4-c09bf07c655c",
           "components": {},
           "name": "Hider",
@@ -688,7 +774,10 @@
             "right": "",
             "stackingOrder": -1,
             "color": "#ffffff",
-            "font": { "type": "font", "font": "Roboto" }
+            "font": {
+              "type": "font",
+              "font": "Roboto"
+            }
           },
           "name": "Tap Prompt",
           "order": 10.427624126637916
@@ -719,7 +808,10 @@
             "right": "",
             "stackingOrder": -2,
             "color": "#000000",
-            "font": { "type": "font", "font": "Roboto" }
+            "font": {
+              "type": "font",
+              "font": "Roboto"
+            }
           },
           "name": "Tap Prompt Shadow",
           "order": 11.644447501347162
@@ -749,11 +841,16 @@
           "name": "Model",
           "order": 1.1209803013844988,
           "gltfModel": {
-            "src": { "type": "asset", "asset": "assets/8-jewel.glb" },
+            "src": {
+              "type": "asset",
+              "asset": "assets/8-jewel.glb"
+            },
             "animationClip": "",
             "loop": true
           },
-          "shadow": { "castShadow": true }
+          "shadow": {
+            "castShadow": true
+          }
         },
 
         // Botón UI (Reset)
@@ -812,7 +909,10 @@
             "text": "Reset",
             "color": "#ffffff",
             "fontSize": 16,
-            "font": { "type": "font", "font": "Roboto" }
+            "font": {
+              "type": "font",
+              "font": "Roboto"
+            }
           },
           "order": 1.2563868233834565
         },
@@ -829,7 +929,9 @@
           "components": {},
           "name": "Main Screen",
           "order": 14.958687422311806,
-          "ui": { "type": "overlay" }
+          "ui": {
+            "type": "overlay"
+          }
         }
       },
       "spaces": {

@@ -1,4 +1,4 @@
-<!-- 9th Wall v4.08 Apple Probe -->
+<!-- 9th Wall v4.09 Apple Probe -->
 <html>
 <head>
   <meta charset="UTF-8">
@@ -11,15 +11,15 @@
 <body>
   <div id="touchBlocker" style="position:fixed;inset:0;width:100vw;height:100vh;z-index:999990;pointer-events:auto;background:transparent;"></div>
 
-  <!-- Disparador invisible en esquina superior derecha: 4 toques en < 1000ms activan modo debug -->
-  <div id="secretDebugTrigger" style="position:fixed;top:0;right:0;width:200px;height:200px;z-index:1000002;pointer-events:auto;background:transparent;"></div>
+  <!-- Disparador secreto: activo únicamente en modo limpio (4 toques en < 1000ms en zona 200x200) -->
+  <div id="secretDebugTrigger" style="position:fixed;top:0;right:0;width:200px;height:200px;z-index:999995;pointer-events:auto;background:transparent;display:none;"></div>
 
   <div id="debugLog" onclick="this.classList.toggle('minimized')"
-    style="position:fixed;top:10px;right:10px;z-index:1000000;background:rgba(0,0,0,0.9);color:#0f0;font-family:monospace;font-size:12px;padding:8px;border-radius:4px;cursor:pointer;line-height:1.3;border:1px solid #0f0;display:none;">
+    style="position:fixed;top:10px;right:10px;z-index:1000000;background:rgba(0,0,0,0.9);color:#0f0;font-family:monospace;font-size:12px;padding:8px;border-radius:4px;cursor:pointer;line-height:1.3;border:1px solid #0f0;display:none;pointer-events:auto;">
     <div id="debugTitle">FPS: --</div>
     <div id="debugContent">
-      ar-world: v4.08<br>
-      bundle: v4.08<br>
+      ar-world: v4.09<br>
+      bundle: v4.09<br>
       <span id="envVerdictSpan" style="color:#0f0;">Entorno: ESPERANDO MESA...</span><br>
       <span id="telemetrySpan" style="color:#0f0;">P98: -- (/255) | Lum: -- (/255) | Cálido: --%</span><br>
       <span id="lightsCountSpan" style="color:#0f0;">Luces: 1</span><br>
@@ -189,12 +189,35 @@
 
     document.getElementById('envToggle').addEventListener('click', () => toggleEnv());
 
-    const isDebugActive = sessionStorage.getItem("debug_features") === "true";
-    const debugToggleBtn = document.getElementById('debugToggle');
+    // Gestión estricta de los 3 modos: 'clean' (cliente), 'buttons' (normal dev), 'slam' (debug SLAM)
+    let currentUIMode = sessionStorage.getItem("ar_ui_mode");
+    if (!currentUIMode) {
+      currentUIMode = "clean";
+      sessionStorage.setItem("ar_ui_mode", "clean");
+      sessionStorage.setItem("debug_features", "false");
+    }
+
     const debugLogEl = document.getElementById('debugLog');
     const envToggleBtn = document.getElementById('envToggle');
+    const debugToggleBtn = document.getElementById('debugToggle');
+    const secretTrigger = document.getElementById('secretDebugTrigger');
 
-    if (isDebugActive) {
+    if (currentUIMode === "clean") {
+      if (debugLogEl) debugLogEl.style.display = "none";
+      if (envToggleBtn) envToggleBtn.style.display = "none";
+      if (debugToggleBtn) debugToggleBtn.style.display = "none";
+      if (secretTrigger) secretTrigger.style.display = "block";
+    } else if (currentUIMode === "buttons") {
+      if (debugLogEl) debugLogEl.style.display = "block";
+      if (envToggleBtn) envToggleBtn.style.display = "block";
+      if (debugToggleBtn) {
+        debugToggleBtn.style.display = "block";
+        debugToggleBtn.innerText = "Debug: OFF";
+        debugToggleBtn.style.borderColor = "white";
+        debugToggleBtn.style.color = "white";
+      }
+      if (secretTrigger) secretTrigger.style.display = "none";
+    } else if (currentUIMode === "slam") {
       if (debugLogEl) debugLogEl.style.display = "block";
       if (envToggleBtn) envToggleBtn.style.display = "block";
       if (debugToggleBtn) {
@@ -203,17 +226,23 @@
         debugToggleBtn.style.borderColor = "#0f0";
         debugToggleBtn.style.color = "#0f0";
       }
+      if (secretTrigger) secretTrigger.style.display = "none";
     }
 
     if (debugToggleBtn) {
       debugToggleBtn.addEventListener('click', () => {
-        sessionStorage.setItem("debug_features", isDebugActive ? "false" : "true");
+        if (currentUIMode === "slam") {
+          sessionStorage.setItem("ar_ui_mode", "buttons");
+          sessionStorage.setItem("debug_features", "false");
+        } else {
+          sessionStorage.setItem("ar_ui_mode", "slam");
+          sessionStorage.setItem("debug_features", "true");
+        }
         window.location.reload();
       });
     }
 
-    // Receptor secreto: 4 toques en menos de 1000ms dentro del cuadrante 200x200 px
-    const secretTrigger = document.getElementById('secretDebugTrigger');
+    // Receptor secreto de 4 toques (<1000ms) para pasar a Modo Normal con Botones
     if (secretTrigger) {
       let secretTaps = [];
       const procesarToqueSecreto = () => {
@@ -222,7 +251,8 @@
         secretTaps = secretTaps.filter(t => (now - t) <= 1000);
         if (secretTaps.length >= 4) {
           secretTaps = [];
-          sessionStorage.setItem("debug_features", "true");
+          sessionStorage.setItem("ar_ui_mode", "buttons");
+          sessionStorage.setItem("debug_features", "false");
           window.location.reload();
         }
       };
