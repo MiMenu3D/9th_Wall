@@ -1,4 +1,4 @@
-﻿// 9th Wall v4.11 Apple Probe
+﻿// 9th Wall v4.12 Apple Probe
 (() => {
   var e = {
     574() {
@@ -101,42 +101,25 @@
       }
     });
 
-    const t = e.registerComponent({ name: "logo" }),
-    o = "object-placed",
-    n = "object-removed";
-    let placementGroundEid = null;
+    // Componente de generación única tras la calibración (con rotación binaria fija a 0° o 180°)
     e.registerComponent({
-      name: "tap-to-place",
+      name: "dish-spawner",
       schema: { prefab: "eid" },
       stateMachine: ({ world: t, eid: a, schemaAttribute: schemaAttr, defineState: i }) => {
-        placementGroundEid = a;
         let isPlaced = false;
-        i("initial").initial().onEnter(() => {
-          isPlaced = false;
-        }).listen(a, e.input.SCREEN_TOUCH_START, i => {
+        i("initial").initial().listen(t.events.globalId, "auto-place-dish", ev => {
           if (isPlaced) return;
-          if (!i.data.worldPosition) return;
+          if (!ev.data || !ev.data.worldPosition) return;
           isPlaced = true;
-          const r = t.createEntity(schemaAttr.get(a).prefab),
-          d = t.getEntity(r);
-          d.setLocalPosition(i.data.worldPosition),
-          d.set(e.Quaternion, e.math.quat.yRadians(Math.random() * Math.PI)),
-          t.events.dispatch(a, o),
-          t.events.dispatch(t.events.globalId, o)
-        }).listen(t.events.globalId, "auto-place-dish", i => {
-          if (isPlaced) return;
-          if (!i.data || !i.data.worldPosition) return;
-          isPlaced = true;
-          const r = t.createEntity(schemaAttr.get(a).prefab),
-          d = t.getEntity(r);
-          d.setLocalPosition(i.data.worldPosition),
-          d.set(e.Quaternion, e.math.quat.yRadians(Math.random() * Math.PI)),
-          t.events.dispatch(a, o),
-          t.events.dispatch(t.events.globalId, o)
-        }).onEvent(o, "placed", { target: a }),
-        i("placed").onEvent(n, "initial", { target: a }).onEnter(() => {
-          isPlaced = true;
-        })
+          const prefabEid = schemaAttr.get(a).prefab;
+          const r = t.createEntity(prefabEid);
+          const d = t.getEntity(r);
+          d.setLocalPosition(ev.data.worldPosition);
+
+          // Rotación binaria fija (0° o 180°)
+          const initialRotY = Math.random() < 0.5 ? 0 : Math.PI;
+          d.set(e.Quaternion, e.math.quat.yRadians(initialRotY));
+        });
       }
     });
 
@@ -387,36 +370,6 @@
       }
     });
 
-    const r = e.defineQuery([t]);
-    e.registerComponent({
-      name: "reset-button",
-      stateMachine: ({ world: t, entity: a, defineState: i }) => {
-        i("nothing-placed").initial().onEvent(o, "placed", { target: t.events.globalId }).onEnter(() => a.hide()).onExit(() => a.show()),
-        i("placed").onEvent(e.input.UI_CLICK, "resetting"),
-        i("resetting").wait(1e3, "nothing-placed").onEnter(() => {
-          const a = e.math.vec3.zero();
-          r(t).forEach(o => {
-            t.transform.getLocalPosition(o, a),
-            e.PositionAnimation.set(t, o, {
-              duration: 1e3,
-              loop: !1,
-              fromX: a.x,
-              fromY: a.y,
-              fromZ: a.z,
-              toX: a.x,
-              toY: -4,
-              toZ: a.z,
-              easeIn: !0,
-              easingFunction: "Quadratic"
-            })
-          })
-        }).onExit(() => {
-          r(t).forEach(e => { t.deleteEntity(e) }),
-          null !== placementGroundEid && t.events.dispatch(placementGroundEid, n)
-        })
-      }
-    });
-
     // Componente oficial para visualizar la nube de puntos (SLAM) de 8th Wall (Solo activo en debug)
     e.registerComponent({
       name: "point-cloud-visualizer",
@@ -516,18 +469,13 @@
     const i = {
       "objects": {
 
-        // Prefab del objeto que se clona (Logo)
+        // Prefab del objeto que se clona (Logo / Plato)
         "b534657a-38e6-4275-a37d-77b655561d5b": {
           "id": "b534657a-38e6-4275-a37d-77b655561d5b",
           "position": [0, 0, 0],
           "rotation": [0, 0, 0, 1],
           "scale": [1, 1, 1],
           "components": {
-            "92cc446e-2931-499b-9be0-0472f042433a": {
-              "id": "92cc446e-2931-499b-9be0-0472f042433a",
-              "name": "logo",
-              "parameters": {}
-            },
             "model-gesture-controls-comp": {
               "id": "model-gesture-controls-comp",
               "name": "model-gesture-controls",
@@ -563,7 +511,7 @@
           "order": 0.6785011504707911
         },
 
-        // Camera de Realidad Aumentada
+        // Cámara de Realidad Aumentada
         "52ba8a86-a459-4df8-b954-a570e85e0484": {
           "id": "52ba8a86-a459-4df8-b954-a570e85e0484",
           "position": [0, 0.23, 0.10],
@@ -656,7 +604,7 @@
           "order": 1.9632252822400198
         },
 
-        // Plano del suelo (Ground)
+        // Plano del suelo (Ground) con colocador único automático
         "bc7753ae-2b39-4f48-910a-7921b756487b": {
           "id": "bc7753ae-2b39-4f48-910a-7921b756487b",
           "position": [0, 0.001, 0],
@@ -674,9 +622,9 @@
           },
           "parentId": "84028e73-ee70-412d-b8d4-c09bf07c655c",
           "components": {
-            "efcfa10c-5fe6-4a92-85de-a602a68683b2": {
-              "id": "efcfa10c-5fe6-4a92-85de-a602a68683b2",
-              "name": "tap-to-place",
+            "dish-spawner-comp": {
+              "id": "dish-spawner-comp",
+              "name": "dish-spawner",
               "parameters": {
                 "prefab": {
                   "type": "entity",
@@ -712,74 +660,6 @@
           "order": 7.322553197845954
         },
 
-        // Texto UI "Tap to place"
-        "9b5668bc-b512-4bb6-9c6b-8ba97d3f8af0": {
-          "id": "9b5668bc-b512-4bb6-9c6b-8ba97d3f8af0",
-          "position": [16.857510635812545, 15.927690665172552, 0],
-          "rotation": [0, 0, 0, 1],
-          "scale": [1, 1, 1],
-          "geometry": null,
-          "material": null,
-          "parentId": "904308fe-98f5-4c93-bf62-f39d50c6e602",
-          "components": {},
-          "ui": {
-            "text": "Tap to place",
-            "width": "100%",
-            "height": 100,
-            "type": "overlay",
-            "verticalTextAlign": "start",
-            "textAlign": "center",
-            "fontSize": 32,
-            "position": "absolute",
-            "top": 10,
-            "left": 10,
-            "bottom": "",
-            "right": "",
-            "stackingOrder": -1,
-            "color": "#ffffff",
-            "font": {
-              "type": "font",
-              "font": "Roboto"
-            }
-          },
-          "name": "Tap Prompt",
-          "order": 10.427624126637916
-        },
-
-        // Sombra del texto UI "Tap to place"
-        "637f7413-261d-48bb-99c9-154bd99360da": {
-          "id": "637f7413-261d-48bb-99c9-154bd99360da",
-          "position": [16.857510635812545, 15.927690665172552, 0],
-          "rotation": [0, 0, 0, 1],
-          "scale": [1, 1, 1],
-          "geometry": null,
-          "material": null,
-          "parentId": "904308fe-98f5-4c93-bf62-f39d50c6e602",
-          "components": {},
-          "ui": {
-            "text": "Tap to place",
-            "width": "100%",
-            "height": 100,
-            "type": "overlay",
-            "verticalTextAlign": "start",
-            "textAlign": "center",
-            "fontSize": 32,
-            "position": "absolute",
-            "top": 12,
-            "left": 12,
-            "bottom": "",
-            "right": "",
-            "stackingOrder": -2,
-            "color": "#000000",
-            "font": {
-              "type": "font",
-              "font": "Roboto"
-            }
-          },
-          "name": "Tap Prompt Shadow",
-          "order": 11.644447501347162
-        },
-
         // Entidad del Modelo 3D (El archivo .glb)
         "a02b4479-461e-40c2-ba91-0ccabbd1bd83": {
           "id": "a02b4479-461e-40c2-ba91-0ccabbd1bd83",
@@ -813,87 +693,6 @@
           },
           "shadow": {
             "castShadow": true
-          }
-        },
-
-        // Botón UI (Reset)
-        "5ac3deca-2126-4b56-b6a2-1442d035047a": {
-          "id": "5ac3deca-2126-4b56-b6a2-1442d035047a",
-          "position": [-8.46107198766815, 7.181789778649719, 0],
-          "rotation": [0, 0, 0, 1],
-          "scale": [1, 1, 1],
-          "geometry": null,
-          "material": null,
-          "parentId": "904308fe-98f5-4c93-bf62-f39d50c6e602",
-          "components": {
-            "2100d3e9-8fed-4773-bc39-6f2ca5042375": {
-              "id": "2100d3e9-8fed-4773-bc39-6f2ca5042375",
-              "name": "reset-button",
-              "parameters": {}
-            }
-          },
-          "ui": {
-            "type": "overlay",
-            "width": 100,
-            "height": 36,
-            "background": "#cb1010",
-            "borderRadius": 5,
-            "flexDirection": "row",
-            "backgroundOpacity": 1,
-            "padding": "10",
-            "gap": "6",
-            "alignItems": "center",
-            "justifyContent": "center",
-            "position": "absolute",
-            "top": "",
-            "left": "",
-            "bottom": 20,
-            "right": 20,
-            "stackingOrder": 2
-          },
-          "name": "Button",
-          "order": 13.280785398189009
-        },
-
-        // Texto del Botón Reset
-        "543540e1-7086-4068-a4e3-394084c146f8": {
-          "id": "543540e1-7086-4068-a4e3-394084c146f8",
-          "position": [0, 0, 0],
-          "rotation": [0, 0, 0, 1],
-          "scale": [1, 1, 1],
-          "geometry": null,
-          "material": null,
-          "parentId": "5ac3deca-2126-4b56-b6a2-1442d035047a",
-          "components": {},
-          "name": "Text",
-          "ui": {
-            "width": 50,
-            "height": 14,
-            "text": "Reset",
-            "color": "#ffffff",
-            "fontSize": 16,
-            "font": {
-              "type": "font",
-              "font": "Roboto"
-            }
-          },
-          "order": 1.2563868233834565
-        },
-
-        // Contenedor principal UI
-        "904308fe-98f5-4c93-bf62-f39d50c6e602": {
-          "id": "904308fe-98f5-4c93-bf62-f39d50c6e602",
-          "position": [9.546973370717888, 17.058059801097308, 0],
-          "rotation": [0, 0, 0, 1],
-          "scale": [1, 1, 1],
-          "geometry": null,
-          "material": null,
-          "parentId": "84028e73-ee70-412d-b8d4-c09bf07c655c",
-          "components": {},
-          "name": "Main Screen",
-          "order": 14.958687422311806,
-          "ui": {
-            "type": "overlay"
           }
         }
       },
