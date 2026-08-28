@@ -1,4 +1,4 @@
-﻿// 9th Wall v4.09 Apple Probe
+﻿// 9th Wall v4.10 Apple Probe
 (() => {
   var e = {
     574() {
@@ -39,13 +39,12 @@
     slamPointCloud: IS_DEBUG
   });
 
-  // Controles del único modelo colocado (límites de escala ajustados: 0.90 min, 1.20 max)
+  // Controles del modelo: rotación desacoplada y escala con umbral de activación (Scene Viewer / Quick Look spec)
   const MODEL_GESTURES = Object.freeze({
     minimumScale: 0.90,
     maximumScale: 1.20,
-    rotationSensitivity: 7,
-    pinchActivationThreshold: 0.045,
-    rotationActivationThreshold: 0.008
+    rotationSensitivity: 6.0,
+    scaleDeadzone: 0.05
   });
 
   // v4.08: retícula estilo Scene Viewer y rebote Bounce estrictamente sobre el plano Y >= 0
@@ -152,16 +151,13 @@
         dragOffsetZ = 0,
         activePointerIds = new Set(),
         waitForAllTouchesToEnd = !1,
-        gestureMode = "none",
         currentScale = 1,
         scaleAtGestureStart = 1,
         isDragActive = !1,
-        pinchScaleLocked = !1,
         reticleMesh = null,
         currentLift = 0,
         planarX = 0,
         planarZ = 0,
-        consecutiveRotationFrames = 0,
         lastLiftFrameTime = performance.now();
 
         // v4.08: retícula plana con esquinas redondeadas sincronizada en escala con el modelo
@@ -317,17 +313,13 @@
 
               isModelTouchActive = !1,
               dragPointerId = null,
-              waitForAllTouchesToEnd = !1,
-              gestureMode = "none",
-              consecutiveRotationFrames = 0;
+              waitForAllTouchesToEnd = !1;
             }
           })
           .listen(t.events.globalId, e.input.GESTURE_START, o => {
             if (!isModelTouchActive || 2 !== o.data.touchCount) return;
             isTwoFingerGesture = !0,
             waitForAllTouchesToEnd = !0,
-            gestureMode = "none",
-            consecutiveRotationFrames = 0,
             scaleAtGestureStart = currentScale;
 
             // v4.02: al pasar a gesto de dos dedos se cancela el arrastre y el modelo vuelve a su altura de reposo
@@ -347,65 +339,11 @@
           .listen(t.events.globalId, e.input.GESTURE_MOVE, o => {
             if (!isModelTouchActive || !isTwoFingerGesture || 2 !== o.data.touchCount) return;
 
-            const spreadRatioDelta = o.data.startSpread > 0
-              ? Math.abs(o.data.spread - o.data.startSpread) / o.data.startSpread
-              : 0;
-
-            const deltaX = Math.abs(o.data.positionChange ? o.data.positionChange.x : 0);
-            const deltaY = Math.abs(o.data.positionChange ? o.data.positionChange.y : 0);
-            const instantSpreadChange = Math.abs(o.data.spreadChange || 0);
-
-            // Heurística direccional: el movimiento vertical es rotación; el horizontal/diagonal con spread es escala
-            const isVerticalDominant = (deltaY > deltaX * 1.3 && deltaY > 0.003);
-            const isHorizontalSpreadDominant = (spreadRatioDelta >= MODEL_GESTURES.pinchActivationThreshold && deltaX >= deltaY * 0.7);
-
-            if ("none" === gestureMode) {
-              if (!pinchScaleLocked && isHorizontalSpreadDominant) {
-                gestureMode = "scale";
-                consecutiveRotationFrames = 0;
-              } else if (isVerticalDominant || deltaX >= MODEL_GESTURES.rotationActivationThreshold) {
-                gestureMode = "rotate";
-              }
-            } else if ("scale" === gestureMode) {
-              // Si estamos en escala pero los dedos no cambian distancia y giran de forma continuada, rectificamos a rotación
-              if (instantSpreadChange < 0.0025 && (deltaX > 0.005 || isVerticalDominant)) {
-                consecutiveRotationFrames++;
-                if (consecutiveRotationFrames >= 3) {
-                  gestureMode = "rotate";
-                  consecutiveRotationFrames = 0;
-                }
-              } else {
-                consecutiveRotationFrames = 0;
-              }
-            } else if ("rotate" === gestureMode && !pinchScaleLocked) {
-              // Si estamos rotando y se detecta una apertura/cierre de dedos inequívoca en horizontal, conmutamos a escala
-              if (spreadRatioDelta >= MODEL_GESTURES.pinchActivationThreshold * 1.4 && instantSpreadChange > 0.006) {
-                gestureMode = "scale";
-                consecutiveRotationFrames = 0;
-                const spreadFactor = o.data.startSpread > 0 ? o.data.spread / o.data.startSpread : 1;
-                scaleAtGestureStart = currentScale / (spreadFactor || 1);
-              }
-            }
-
-            if ("scale" === gestureMode && !pinchScaleLocked) {
-              const spreadFactor = o.data.startSpread > 0 ? o.data.spread / o.data.startSpread : 1;
-              currentScale = Math.max(
-                MODEL_GESTURES.minimumScale,
-                Math.min(MODEL_GESTURES.maximumScale, scaleAtGestureStart * spreadFactor)
-              );
-
-              // Escalado sincronizado tanto para el modelo como para la retícula
-              e.Scale.set(t, a, { x: currentScale, y: currentScale, z: currentScale });
-
-              if (t.three.scene && window.THREE) {
-                const ret = obtenerReticula(window.THREE, t.three.scene);
-                ret.scale.set(currentScale, currentScale, currentScale);
-              }
-            } else if ("rotate" === gestureMode) {
+            // 1. ROTACIÓN ESTÁNDAR (8th Wall / Quick Look / Scene Viewer): Giro horizontal fluido
+            if (o.data.positionChange && o.data.positionChange.x) {
               const angleDelta = o.data.positionChange.x * MODEL_GESTURES.rotationSensitivity;
               t.transform.rotateSelf(a, e.math.quat.yRadians(angleDelta));
 
-              // v4.02: la retícula acompaña al modelo también durante el gesto de rotación de dos dedos
               if (t.three.scene && window.THREE) {
                 const ret = obtenerReticula(window.THREE, t.three.scene);
                 const pos = t.transform.getWorldPosition(a);
@@ -415,11 +353,35 @@
                 ret.rotateZ(angleDelta);
               }
             }
+
+            // 2. ESCALA CON DEADZONE: Solo altera tamaño si hay variación intencionada de separación (> 5%)
+            if (o.data.startSpread > 0 && o.data.spread > 0) {
+              const spreadRatio = o.data.spread / o.data.startSpread;
+              const spreadDeltaRatio = Math.abs(spreadRatio - 1.0);
+
+              if (spreadDeltaRatio >= MODEL_GESTURES.scaleDeadzone) {
+                // Mapeo continuo suave a partir del umbral de activación
+                const effectiveFactor = spreadRatio > 1.0
+                  ? 1.0 + (spreadRatio - 1.0 - MODEL_GESTURES.scaleDeadzone)
+                  : 1.0 - (1.0 - spreadRatio - MODEL_GESTURES.scaleDeadzone);
+
+                currentScale = Math.max(
+                  MODEL_GESTURES.minimumScale,
+                  Math.min(MODEL_GESTURES.maximumScale, scaleAtGestureStart * effectiveFactor)
+                );
+
+                e.Scale.set(t, a, { x: currentScale, y: currentScale, z: currentScale });
+
+                if (t.three.scene && window.THREE) {
+                  const ret = obtenerReticula(window.THREE, t.three.scene);
+                  ret.scale.set(currentScale, currentScale, currentScale);
+                }
+              }
+            }
           })
           .listen(t.events.globalId, e.input.GESTURE_END, o => {
             if (o.data.nextTouchCount < 2) isTwoFingerGesture = !1;
             if (reticleMesh && !isDragActive) reticleMesh.visible = false;
-            consecutiveRotationFrames = 0;
           })
       }
     });
