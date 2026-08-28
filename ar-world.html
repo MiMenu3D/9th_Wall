@@ -1,4 +1,4 @@
-<!-- 9th Wall v4.12 Apple Probe -->
+<!-- 9th Wall vA1.00 (IBL 512 + Specular Hack) -->
 <html>
 <head>
   <meta charset="UTF-8">
@@ -18,11 +18,11 @@
     style="position:fixed;top:10px;right:10px;z-index:1000000;background:rgba(0,0,0,0.9);color:#0f0;font-family:monospace;font-size:12px;padding:8px;border-radius:4px;cursor:pointer;line-height:1.3;border:1px solid #0f0;display:none;pointer-events:auto;">
     <div id="debugTitle">FPS: --</div>
     <div id="debugContent">
-      ar-world: v4.12<br>
+      ar-world: vA1.00<br>
       bundle: v4.12<br>
       <span id="envVerdictSpan" style="color:#0f0;">Entorno: ESPERANDO MESA...</span><br>
       <span id="telemetrySpan" style="color:#0f0;">P98: -- (/255) | Lum: -- (/255) | Cálido: --%</span><br>
-      <span id="lightsCountSpan" style="color:#0f0;">Luces: 1</span><br>
+      <span id="lightsCountSpan" style="color:#0f0;">Luces: 0 (IBL Puro 512)</span><br>
       <span id="latencySpan" style="color:#0f0;">Latencia: -- ms</span>
     </div>
   </div>
@@ -52,7 +52,7 @@
 
   <script>
     const LIGHTING_CONFIG = {
-      pmrem_resolution: 64,
+      pmrem_resolution: 512, // vA1.00: Subido a 512x512 para máxima definición en reflejos IBL
       pmrem_interval_ms: 200,
       scan_interval_ms: 300,
       calibration_frames_target: 4,
@@ -177,7 +177,7 @@
 
     const actualizarContadorLuces = () => {
       const lightsSpan = document.getElementById('lightsCountSpan');
-      if (lightsSpan) lightsSpan.innerText = `Luces: ${totalLightsDetected}`;
+      if (lightsSpan) lightsSpan.innerText = `Luces: 0 (IBL Puro 512)`;
     };
 
     const actualizarHUDTelemetria = (verdict, p98, lum, warmPct) => {
@@ -333,6 +333,8 @@
                   }
                 });
 
+                // vA1.00: DESACTIVADAS TEMPORALMENTE LAS LUCES DIRECCIONALES DINÁMICAS
+                /*
                 slotLight2.light = new nativeTHREE.DirectionalLight(0xffffff, 0.0);
                 slotLight2.light.position.set(0, 1.41, -1.69);
                 _scene.add(slotLight2.light);
@@ -355,6 +357,7 @@
                 );
                 _scene.add(slotLight4.light);
                 _scene.add(slotLight4.light.target);
+                */
 
                 try {
                   if (_renderer && _activeCamera && _scene) {
@@ -565,6 +568,23 @@
                     const isPBR = (mat.type === 'MeshStandardMaterial' || mat.type === 'MeshPhysicalMaterial');
                     if (!isPBR) return;
 
+                    // vA1.00: Hook onBeforeCompile para exagerar el especular indirecto del PMREM (+250%)
+                    if (!mat._specularHooked) {
+                      mat._specularHooked = true;
+                      mat.onBeforeCompile = (shader) => {
+                        shader.fragmentShader = shader.fragmentShader.replace(
+                          '#include <lights_fragment_end>',
+                          `
+                          #include <lights_fragment_end>
+                          // vA1.00: Hack Especular Indirecto (PMREM IBL) exagerado (+250%)
+                          // Aplicamos curva de potencia para limpiar el pedestal 8-bit y multiplicamos fuertemente el especular
+                          reflectedLight.indirectSpecular = pow(reflectedLight.indirectSpecular, vec3(1.3)) * 3.5;
+                          `
+                        );
+                      };
+                      mat.needsUpdate = true;
+                    }
+
                     const isMetal = mat.metalness !== undefined && mat.metalness > LIGHTING_CONFIG.metalness_bypass_threshold;
                     if (!isMetal && mat.roughness !== undefined && mat.roughness < LIGHTING_CONFIG.min_material_roughness) {
                       mat.roughness = LIGHTING_CONFIG.min_material_roughness;
@@ -774,6 +794,7 @@
                       actualizarHUDTelemetria(verdict, avgP98, avgLumFinal, avgWarmRatio * 100);
 
                       if (_activeCamera) {
+                        /*
                         let targetX2 = pmremSize * 0.5, targetY2 = pmremSize * 0.4;
                         if (maxBinCount > (count * 0.20) && colorBinWeight[dominantBin] > 0) {
                           targetX2 = colorBinLumSumX[dominantBin] / colorBinWeight[dominantBin];
@@ -803,6 +824,7 @@
                         iniciarTransicionRanura(slotLight2, currentDirectBudget * LIGHTING_CONFIG.weights_1_light[0], LIGHTING_CONFIG.transition_duration_ms, light2Pos, light2Pos.clone().normalize());
                         initialLightPlaced = true;
                         actualizarContadorLuces();
+                        */
 
                         if (!isObjectPlaced && _ecsWorld) {
                           isObjectPlaced = true;
@@ -843,6 +865,8 @@
                   targetExposure = normalizedBrightness * currentPmremMult * LIGHTING_CONFIG.master_exposure_scale;
                   if (isNaN(targetExposure)) targetExposure = 0.45;
 
+                  // vA1.00: DESACTIVADA DETECCIÓN DE EMISORES Y ANCLAJE DE LUCES
+                  /*
                   if (initialLightPlaced && !detectionPermanentlyStopped && _activeCamera) {
                     const candidateX = corePixelCount > 0 ? (coreSumX / corePixelCount) : maxLumX;
                     const candidateY = corePixelCount > 0 ? (coreSumY / corePixelCount) : maxLumY;
@@ -934,6 +958,7 @@
                       }
                     }
                   }
+                  */
                 }
 
                 if (now - lastPmremTime >= LIGHTING_CONFIG.pmrem_interval_ms) {
@@ -955,6 +980,8 @@
                   _activeCamera.getWorldPosition(camWorldPos);
                 }
 
+                // vA1.00: DESACTIVADA ACTUALIZACIÓN DE LUCES EN EL BUCLE
+                /*
                 carruselSlots.forEach(slot => {
                   if (!slot.light) return;
                   slot.light.target.position.set(0, 0, 0);
@@ -987,6 +1014,7 @@
                     slot.light.intensity = 0.0;
                   }
                 });
+                */
 
                 const expLerpStep = 1.0 - Math.exp(-LIGHTING_CONFIG.smoothing_rate * deltaSec);
                 if (isNaN(renderer.toneMappingExposure)) renderer.toneMappingExposure = 1.0;
