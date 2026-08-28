@@ -1,4 +1,4 @@
-﻿// 9th Wall v4.06 Apple Probe
+﻿// 9th Wall v4.08 Apple Probe
 (() => {
   var e = {
     574() {
@@ -44,11 +44,11 @@
     minimumScale: 0.75,
     maximumScale: 1.45,
     rotationSensitivity: 7,
-    pinchActivationThreshold: 0.09,
+    pinchActivationThreshold: 0.05,
     rotationActivationThreshold: 0.008
   });
 
-  // v4.02: retícula estilo Scene Viewer (marco grueso de esquinas redondeadas) y rebote al soltar tras arrastrar
+  // v4.08: retícula estilo Scene Viewer y rebote Bounce estrictamente sobre el plano Y >= 0
   const DRAG_RETICLE_CONFIG = Object.freeze({
     liftHeight: 0.05,
     liftSmoothingRate: 8.0,
@@ -57,8 +57,8 @@
     thickness: 0.02,
     cornerRadius: 0.05,
     color: 0x66ffff,
-    bounceDuration: 2000,
-    bounceEasing: "Elastic"
+    bounceDuration: 1200,
+    bounceEasing: "Bounce"
   });
 
   // v4.02: rectángulo con esquinas redondeadas (recurso estándar de three.js: Shape + hole interior)
@@ -274,7 +274,7 @@
           .listen(t.events.globalId, e.input.SCREEN_TOUCH_END, o => {
             activePointerIds.delete(o.data.pointerId);
             if (0 === activePointerIds.size) {
-              // v4.02: al soltar tras arrastrar, la retícula desaparece y el modelo rebota igual que en su aparición
+              // v4.08: al soltar tras arrastrar, rebote amortiguado hacia arriba asentándose en Y = 0 sin rebasarlo
               if (isDragActive) {
                 isDragActive = !1;
                 if (reticleMesh) reticleMesh.visible = false;
@@ -320,11 +320,28 @@
             if (!isModelTouchActive || !isTwoFingerGesture || 2 !== o.data.touchCount) return;
             const n = o.data.startSpread > 0 ? Math.abs(o.data.spread - o.data.startSpread) / o.data.startSpread : 0,
             i = Math.abs(o.data.position.x - o.data.startPosition.x);
+
+            // Arbitraje dinámico de gestos: escala vs rotación
             if ("none" === gestureMode) {
-              if (!pinchScaleLocked && n >= MODEL_GESTURES.pinchActivationThreshold && n / MODEL_GESTURES.pinchActivationThreshold >= i / MODEL_GESTURES.rotationActivationThreshold) gestureMode = "scale";
-              else if (i >= MODEL_GESTURES.rotationActivationThreshold) gestureMode = "rotate";
-              else return
+              if (!pinchScaleLocked && n >= MODEL_GESTURES.pinchActivationThreshold && n / MODEL_GESTURES.pinchActivationThreshold >= i / MODEL_GESTURES.rotationActivationThreshold) {
+                gestureMode = "scale";
+              } else if (i >= MODEL_GESTURES.rotationActivationThreshold) {
+                gestureMode = "rotate";
+              }
+            } else if ("rotate" === gestureMode && !pinchScaleLocked) {
+              // Si los dedos varían su separación claramente, cambiamos a escala
+              if (n >= MODEL_GESTURES.pinchActivationThreshold && Math.abs(o.data.spreadChange || 0) > Math.abs(o.data.positionChange.x) * 1.1) {
+                gestureMode = "scale";
+                const currentSpreadFactor = o.data.startSpread > 0 ? o.data.spread / o.data.startSpread : 1;
+                scaleAtGestureStart = currentScale / (currentSpreadFactor || 1);
+              }
+            } else if ("scale" === gestureMode) {
+              // Si el movimiento angular domina y la separación apenas varía, conmutamos a rotación
+              if (Math.abs(o.data.positionChange.x) >= MODEL_GESTURES.rotationActivationThreshold && Math.abs(o.data.positionChange.x) > Math.abs(o.data.spreadChange || 0) * 1.5) {
+                gestureMode = "rotate";
+              }
             }
+
             if ("scale" === gestureMode && !pinchScaleLocked) {
               const n = o.data.startSpread > 0 ? o.data.spread / o.data.startSpread : 1;
               currentScale = Math.max(MODEL_GESTURES.minimumScale, Math.min(MODEL_GESTURES.maximumScale, scaleAtGestureStart * n)),

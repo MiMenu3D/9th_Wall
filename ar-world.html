@@ -1,4 +1,4 @@
-<!-- 9th Wall v4.07 Apple Probe -->
+<!-- 9th Wall v4.08 Apple Probe -->
 <html>
 <head>
   <meta charset="UTF-8">
@@ -11,12 +11,15 @@
 <body>
   <div id="touchBlocker" style="position:fixed;inset:0;width:100vw;height:100vh;z-index:999990;pointer-events:auto;background:transparent;"></div>
 
+  <!-- Disparador invisible en esquina superior derecha: 4 toques en < 1000ms activan modo debug -->
+  <div id="secretDebugTrigger" style="position:fixed;top:0;right:0;width:200px;height:200px;z-index:1000002;pointer-events:auto;background:transparent;"></div>
+
   <div id="debugLog" onclick="this.classList.toggle('minimized')"
-    style="position:fixed;top:10px;right:10px;z-index:1000000;background:rgba(0,0,0,0.9);color:#0f0;font-family:monospace;font-size:12px;padding:8px;border-radius:4px;cursor:pointer;line-height:1.3;border:1px solid #0f0;">
+    style="position:fixed;top:10px;right:10px;z-index:1000000;background:rgba(0,0,0,0.9);color:#0f0;font-family:monospace;font-size:12px;padding:8px;border-radius:4px;cursor:pointer;line-height:1.3;border:1px solid #0f0;display:none;">
     <div id="debugTitle">FPS: --</div>
     <div id="debugContent">
-      ar-world: v4.07<br>
-      bundle: v4.06<br>
+      ar-world: v4.08<br>
+      bundle: v4.08<br>
       <span id="envVerdictSpan" style="color:#0f0;">Entorno: ESPERANDO MESA...</span><br>
       <span id="telemetrySpan" style="color:#0f0;">P98: -- (/255) | Lum: -- (/255) | Cálido: --%</span><br>
       <span id="lightsCountSpan" style="color:#0f0;">Luces: 1</span><br>
@@ -38,12 +41,12 @@
   </div>
 
   <button id="envToggle"
-    style="position:fixed;bottom:20px;left:20px;z-index:1000000;padding:10px 14px;border-radius:10px;border:1px solid white;background:rgba(0,0,0,0.7);color:white;font-size:13px;pointer-events:auto !important;">
+    style="position:fixed;bottom:20px;left:20px;z-index:1000000;padding:10px 14px;border-radius:10px;border:1px solid white;background:rgba(0,0,0,0.7);color:white;font-size:13px;pointer-events:auto !important;display:none;">
     Env: CAM
   </button>
 
   <button id="debugToggle"
-    style="position:fixed;bottom:20px;left:120px;z-index:1000000;padding:10px 14px;border-radius:10px;border:1px solid white;background:rgba(0,0,0,0.7);color:white;font-size:13px;pointer-events:auto !important;">
+    style="position:fixed;bottom:20px;left:120px;z-index:1000000;padding:10px 14px;border-radius:10px;border:1px solid white;background:rgba(0,0,0,0.7);color:white;font-size:13px;pointer-events:auto !important;display:none;">
     Debug: OFF
   </button>
 
@@ -52,7 +55,7 @@
       pmrem_resolution: 64,
       pmrem_interval_ms: 200,
       scan_interval_ms: 300,
-      calibration_frames_target: 8,
+      calibration_frames_target: 4,
       shadow_map_size: 512,
       day_shadow_radius: 4.0,
       night_shadow_radius: 8.0,
@@ -188,14 +191,43 @@
 
     const isDebugActive = sessionStorage.getItem("debug_features") === "true";
     const debugToggleBtn = document.getElementById('debugToggle');
+    const debugLogEl = document.getElementById('debugLog');
+    const envToggleBtn = document.getElementById('envToggle');
+
+    if (isDebugActive) {
+      if (debugLogEl) debugLogEl.style.display = "block";
+      if (envToggleBtn) envToggleBtn.style.display = "block";
+      if (debugToggleBtn) {
+        debugToggleBtn.style.display = "block";
+        debugToggleBtn.innerText = "Debug: ON";
+        debugToggleBtn.style.borderColor = "#0f0";
+        debugToggleBtn.style.color = "#0f0";
+      }
+    }
+
     if (debugToggleBtn) {
-      debugToggleBtn.innerText = isDebugActive ? "Debug: ON" : "Debug: OFF";
-      debugToggleBtn.style.borderColor = isDebugActive ? "#0f0" : "white";
-      debugToggleBtn.style.color = isDebugActive ? "#0f0" : "white";
       debugToggleBtn.addEventListener('click', () => {
         sessionStorage.setItem("debug_features", isDebugActive ? "false" : "true");
         window.location.reload();
       });
+    }
+
+    // Receptor secreto: 4 toques en menos de 1000ms dentro del cuadrante 200x200 px
+    const secretTrigger = document.getElementById('secretDebugTrigger');
+    if (secretTrigger) {
+      let secretTaps = [];
+      const procesarToqueSecreto = () => {
+        const now = performance.now();
+        secretTaps.push(now);
+        secretTaps = secretTaps.filter(t => (now - t) <= 1000);
+        if (secretTaps.length >= 4) {
+          secretTaps = [];
+          sessionStorage.setItem("debug_features", "true");
+          window.location.reload();
+        }
+      };
+      secretTrigger.addEventListener('touchstart', procesarToqueSecreto, { passive: true });
+      secretTrigger.addEventListener('pointerdown', procesarToqueSecreto);
     }
 
     if (window.ecs) {
@@ -223,7 +255,6 @@
                 });
 
                 _scene.traverse((node) => {
-                  if (node.name === 'Hider') node.visible = false;
                   if (node.isMesh && node.material && (node.material.type === 'ShadowMaterial' || node.name === 'Ground')) {
                     _groundMesh = node;
                     if (_groundMesh.material) {
@@ -861,7 +892,6 @@
             };
           }
         }
-        delete c.objects['17af117a-efce-48dd-857e-e383a3649c7b'];
         return _i.call(ecs.application, c);
       };
     }
