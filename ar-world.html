@@ -1,4 +1,4 @@
-<!-- 9th Wall vB1.00 (Pure Specular Directional Lights) -->
+<!-- 9th Wall vA1.01 (Pseudo-HDR Float32 IBL + Micro-Noise) -->
 <html>
 <head>
   <meta charset="UTF-8">
@@ -18,11 +18,11 @@
     style="position:fixed;top:10px;right:10px;z-index:1000000;background:rgba(0,0,0,0.9);color:#0f0;font-family:monospace;font-size:12px;padding:8px;border-radius:4px;cursor:pointer;line-height:1.3;border:1px solid #0f0;display:none;pointer-events:auto;">
     <div id="debugTitle">FPS: --</div>
     <div id="debugContent">
-      ar-world: vB1.00<br>
+      ar-world: vA1.01<br>
       bundle: v4.12<br>
       <span id="envVerdictSpan" style="color:#0f0;">Entorno: ESPERANDO MESA...</span><br>
       <span id="telemetrySpan" style="color:#0f0;">P98: -- (/255) | Lum: -- (/255) | Cálido: --%</span><br>
-      <span id="lightsCountSpan" style="color:#0f0;">Luces: 1</span><br>
+      <span id="lightsCountSpan" style="color:#0f0;">Luces: 0 (IBL HDR Float32 512)</span><br>
       <span id="latencySpan" style="color:#0f0;">Latencia: -- ms</span>
     </div>
   </div>
@@ -52,7 +52,7 @@
 
   <script>
     const LIGHTING_CONFIG = {
-      pmrem_resolution: 64,
+      pmrem_resolution: 512, // vA1.01: Alta definición para PMREM Float32
       pmrem_interval_ms: 200,
       scan_interval_ms: 300,
       calibration_frames_target: 4,
@@ -95,7 +95,7 @@
       halo_drop_threshold: 34,
       upper_half_limit: 0.45,
       debounce_cycles: 1,
-      min_material_roughness: 0.35,
+      min_material_roughness: 0.04, // vA1.01: Liberado para permitir destellos nítidos
       metalness_bypass_threshold: 0.50,
       albedo_desaturation: 0.15,
       temporal_blend_alpha: 0.25
@@ -177,7 +177,7 @@
 
     const actualizarContadorLuces = () => {
       const lightsSpan = document.getElementById('lightsCountSpan');
-      if (lightsSpan) lightsSpan.innerText = `Luces: ${totalLightsDetected}`;
+      if (lightsSpan) lightsSpan.innerText = `Luces: 0 (IBL HDR Float32 512)`;
     };
 
     const actualizarHUDTelemetria = (verdict, p98, lum, warmPct) => {
@@ -333,6 +333,8 @@
                   }
                 });
 
+                // vA1.01: Luces direccionales dinámicas desactivadas (Experimento IBL puro)
+                /*
                 slotLight2.light = new nativeTHREE.DirectionalLight(0xffffff, 0.0);
                 slotLight2.light.position.set(0, 1.41, -1.69);
                 _scene.add(slotLight2.light);
@@ -355,6 +357,7 @@
                 );
                 _scene.add(slotLight4.light);
                 _scene.add(slotLight4.light.target);
+                */
 
                 try {
                   if (_renderer && _activeCamera && _scene) {
@@ -516,9 +519,16 @@
               pmremCtx.getImageData(0, 0, pmremSize, pmremSize);
             } catch (e) {}
 
-            const envTexture = new THREE_INSTANCE.CanvasTexture(pmremCanvas);
-            envTexture.mapping = THREE_INSTANCE.EquirectangularReflectionMapping;
-            if (THREE_INSTANCE.sRGBEncoding) envTexture.encoding = THREE_INSTANCE.sRGBEncoding;
+            // vA1.01: Búfer de coma flotante para síntesis de rango dinámico real (Float32 Pseudo-HDR)
+            const hdrFloatArray = new Float32Array(pmremSize * pmremSize * 4);
+            const hdrTexture = new THREE_INSTANCE.DataTexture(
+              hdrFloatArray,
+              pmremSize,
+              pmremSize,
+              THREE_INSTANCE.RGBAFormat,
+              THREE_INSTANCE.FloatType
+            );
+            hdrTexture.mapping = THREE_INSTANCE.EquirectangularReflectionMapping;
 
             let smoothedBrightness = 128;
             let targetExposure = 0.45;
@@ -565,18 +575,29 @@
                     const isPBR = (mat.type === 'MeshStandardMaterial' || mat.type === 'MeshPhysicalMaterial');
                     if (!isPBR) return;
 
-                    // vB1.00: Hook onBeforeCompile para desacoplar luces directas (Especular Puro Exagerado +250%)
+                    // vA1.01: Inyección de Micro-Ruido Procedural + Ganancia IBL HDR
                     if (!mat._specularHooked) {
                       mat._specularHooked = true;
                       mat.onBeforeCompile = (shader) => {
                         shader.fragmentShader = shader.fragmentShader.replace(
+                          '#include <roughnessmap_fragment>',
+                          `
+                          #include <roughnessmap_fragment>
+                          #ifndef USE_ROUGHNESSMAP
+                            if (roughnessFactor >= 0.95) {
+                              roughnessFactor = 0.35;
+                            }
+                          #endif
+                          float microNoise = fract(sin(dot(vNormal.xyz * 75.0 + vViewPosition.xyz * 100.0, vec3(12.9898, 78.233, 45.164))) * 43758.5453);
+                          roughnessFactor = clamp(roughnessFactor + (microNoise - 0.5) * 0.08, 0.04, 1.0);
+                          `
+                        );
+                        shader.fragmentShader = shader.fragmentShader.replace(
                           '#include <lights_fragment_end>',
                           `
                           #include <lights_fragment_end>
-                          // vB1.00: Desacople de luces directas
-                          // Anulamos el difuso directo para no quemar el albedo y multiplicamos fuertemente el especular analítico GGX (+250%)
-                          reflectedLight.directDiffuse = vec3(0.0);
-                          reflectedLight.directSpecular *= 3.5;
+                          // vA1.01: Refuerzo del IBL con energía HDR
+                          reflectedLight.indirectSpecular *= 1.75;
                           `
                         );
                       };
@@ -792,6 +813,7 @@
                       actualizarHUDTelemetria(verdict, avgP98, avgLumFinal, avgWarmRatio * 100);
 
                       if (_activeCamera) {
+                        /*
                         let targetX2 = pmremSize * 0.5, targetY2 = pmremSize * 0.4;
                         if (maxBinCount > (count * 0.20) && colorBinWeight[dominantBin] > 0) {
                           targetX2 = colorBinLumSumX[dominantBin] / colorBinWeight[dominantBin];
@@ -821,6 +843,7 @@
                         iniciarTransicionRanura(slotLight2, currentDirectBudget * LIGHTING_CONFIG.weights_1_light[0], LIGHTING_CONFIG.transition_duration_ms, light2Pos, light2Pos.clone().normalize());
                         initialLightPlaced = true;
                         actualizarContadorLuces();
+                        */
 
                         if (!isObjectPlaced && _ecsWorld) {
                           isObjectPlaced = true;
@@ -861,97 +884,12 @@
                   targetExposure = normalizedBrightness * currentPmremMult * LIGHTING_CONFIG.master_exposure_scale;
                   if (isNaN(targetExposure)) targetExposure = 0.45;
 
+                  // vA1.01: Luces direccionales desactivadas
+                  /*
                   if (initialLightPlaced && !detectionPermanentlyStopped && _activeCamera) {
-                    const candidateX = corePixelCount > 0 ? (coreSumX / corePixelCount) : maxLumX;
-                    const candidateY = corePixelCount > 0 ? (coreSumY / corePixelCount) : maxLumY;
-
-                    const getPixelLum = (px, py) => {
-                      const cx = Math.max(0, Math.min(pmremSize - 1, Math.floor(px)));
-                      const cy = Math.max(0, Math.min(pmremSize - 1, Math.floor(py)));
-                      const pIdx = (cy * pmremSize + cx) * 4;
-                      return data[pIdx] * 0.299 + data[pIdx + 1] * 0.587 + data[pIdx + 2] * 0.114;
-                    };
-
-                    const R = LIGHTING_CONFIG.halo_radius_px;
-                    const coreLum = getPixelLum(candidateX, candidateY);
-                    const sampleRightX = corePixelCount > 0 ? (maxCoreX + R) : (candidateX + R);
-                    const sampleLeftX  = corePixelCount > 0 ? (minCoreX - R) : (candidateX - R);
-                    const sampleDownY  = corePixelCount > 0 ? (maxCoreY + R) : (candidateY + R);
-                    const sampleUpY    = corePixelCount > 0 ? (minCoreY - R) : (candidateY - R);
-
-                    let steepDrops = 0;
-                    if ((coreLum - getPixelLum(sampleRightX, candidateY)) >= LIGHTING_CONFIG.halo_drop_threshold) steepDrops++;
-                    if ((coreLum - getPixelLum(sampleLeftX, candidateY)) >= LIGHTING_CONFIG.halo_drop_threshold) steepDrops++;
-                    if ((coreLum - getPixelLum(candidateX, sampleDownY)) >= LIGHTING_CONFIG.halo_drop_threshold) steepDrops++;
-                    if ((coreLum - getPixelLum(candidateX, sampleUpY)) >= LIGHTING_CONFIG.halo_drop_threshold) steepDrops++;
-
-                    const hasRadialHalo = (steepDrops >= 2);
-                    const hasCompactCore = corePixelCount >= LIGHTING_CONFIG.min_core_pixels;
-                    const contrastDelta = coreLum - avgLum;
-                    const hasSufficientContrast = (contrastDelta >= LIGHTING_CONFIG.contrast_delta_threshold) || (temporalDrop >= LIGHTING_CONFIG.temporal_drop_threshold);
-
-                    const isConfirmedRealLight = (candidateY < scanEmitterHeight) && hasCompactCore && hasRadialHalo && hasSufficientContrast;
-
-                    if (isConfirmedRealLight) {
-                      const ndcX = (candidateX / pmremSize) * 2 - 1;
-                      const ndcY = 1 - (candidateY / pmremSize) * 2;
-
-                      _activeCamera.getWorldPosition(camWorldPos);
-                      probeNDC.set(ndcX, ndcY, 0.5);
-                      probeNDC.unproject(_activeCamera);
-                      rayDir.subVectors(probeNDC, camWorldPos).normalize();
-
-                      aplicarRestriccionesMesa(candidatePos, camWorldPos, rayDir, LIGHTING_CONFIG.light_distance);
-
-                      let isInsideExistingCone = false;
-                      carruselSlots.forEach(slot => {
-                        if (slot.isAnchored && slot.state !== 'fading_out') {
-                          if (rayDir.angleTo(slot.anchoredDir) < LIGHTING_CONFIG.min_separation_angle) {
-                            isInsideExistingCone = true;
-                          }
-                        }
-                      });
-
-                      if (!isInsideExistingCone) {
-                        if (candidateDebounce.active &&
-                            Math.abs(candidateDebounce.screenX - candidateX) < 16 &&
-                            Math.abs(candidateDebounce.screenY - candidateY) < 16) {
-                          candidateDebounce.consecutiveCycles++;
-                        } else {
-                          candidateDebounce.active = true;
-                          candidateDebounce.screenX = candidateX;
-                          candidateDebounce.screenY = candidateY;
-                          candidateDebounce.consecutiveCycles = 1;
-                          candidateDebounce.dir.copy(rayDir);
-                        }
-
-                        if (candidateDebounce.consecutiveCycles >= LIGHTING_CONFIG.debounce_cycles) {
-                          candidateDebounce.active = false;
-                          candidateDebounce.consecutiveCycles = 0;
-
-                          if (!slotLight3.isAnchored && slotLight3.state === 'idle') {
-                            iniciarTransicionRanura(slotLight2, currentDirectBudget * LIGHTING_CONFIG.weights_2_lights[0], LIGHTING_CONFIG.transition_duration_ms);
-                            iniciarTransicionRanura(slotLight3, currentDirectBudget * LIGHTING_CONFIG.weights_2_lights[1], LIGHTING_CONFIG.transition_duration_ms, candidatePos, rayDir);
-                            totalRealLightsAnchored = 1;
-                            totalLightsDetected = 2;
-                            actualizarContadorLuces();
-                          }
-                          else if (!slotLight4.isAnchored && slotLight4.state === 'idle') {
-                            iniciarTransicionRanura(slotLight2, 0.0, LIGHTING_CONFIG.transition_duration_ms);
-                            iniciarTransicionRanura(slotLight3, currentDirectBudget * LIGHTING_CONFIG.weights_real_focus[0], LIGHTING_CONFIG.transition_duration_ms);
-                            iniciarTransicionRanura(slotLight4, currentDirectBudget * LIGHTING_CONFIG.weights_real_focus[1], LIGHTING_CONFIG.transition_duration_ms, candidatePos, rayDir);
-                            totalRealLightsAnchored = 2;
-                            totalLightsDetected = 3;
-                            actualizarContadorLuces();
-                            detectionPermanentlyStopped = true;
-                          }
-                        }
-                      } else {
-                        candidateDebounce.active = false;
-                        candidateDebounce.consecutiveCycles = 0;
-                      }
-                    }
+                    ...
                   }
+                  */
                 }
 
                 if (now - lastPmremTime >= LIGHTING_CONFIG.pmrem_interval_ms) {
@@ -961,9 +899,32 @@
                   pmremCtx.drawImage(video, 0, 0, pmremSize, pmremSize);
                   pmremCtx.globalAlpha = 1.0;
 
-                  envTexture.needsUpdate = true;
+                  // vA1.01: Transformación Float32 con Expansión Pseudo-HDR antes de PMREM
+                  const imgData = pmremCtx.getImageData(0, 0, pmremSize, pmremSize);
+                  const d = imgData.data;
+                  for (let p = 0; p < d.length; p += 4) {
+                    let r = d[p] / 255.0;
+                    let g = d[p + 1] / 255.0;
+                    let b = d[p + 2] / 255.0;
+                    const lum = r * 0.299 + g * 0.587 + b * 0.114;
+
+                    // Umbral dinámico: Píxeles brillantes (>175) se disparan exponencialmente hasta 25.0
+                    if (lum > 0.68) {
+                      const boost = 1.0 + Math.pow((lum - 0.68) / 0.32, 2.4) * 24.0;
+                      r *= boost;
+                      g *= boost;
+                      b *= boost;
+                    }
+
+                    hdrFloatArray[p] = r;
+                    hdrFloatArray[p + 1] = g;
+                    hdrFloatArray[p + 2] = b;
+                    hdrFloatArray[p + 3] = 1.0;
+                  }
+
+                  hdrTexture.needsUpdate = true;
                   const oldRT = cameraRT;
-                  cameraRT = pmremGenerator.fromEquirectangular(envTexture);
+                  cameraRT = pmremGenerator.fromEquirectangular(hdrTexture);
                   if (envMode === 'cam') scene.environment = cameraRT.texture;
                   if (oldRT) oldRT.dispose();
                 }
@@ -973,38 +934,12 @@
                   _activeCamera.getWorldPosition(camWorldPos);
                 }
 
+                // vA1.01: Actualización de luces comentada
+                /*
                 carruselSlots.forEach(slot => {
-                  if (!slot.light) return;
-                  slot.light.target.position.set(0, 0, 0);
-
-                  if (slot.state === 'transitioning' || slot.state === 'fading_out') {
-                    const elapsed = now - slot.transition.startTime;
-                    const progress = Math.min(1.0, elapsed / slot.transition.duration);
-                    slot.light.intensity = THREE_INSTANCE.MathUtils.lerp(slot.transition.startIntensity, slot.transition.destIntensity, progress);
-
-                    if (progress >= 1.0) {
-                      if (slot.transition.destIntensity <= 0.0) {
-                        slot.state = 'idle';
-                        slot.isAnchored = false;
-                        slot.light.intensity = 0.0;
-                      } else {
-                        slot.state = 'active';
-                        slot.anchoredIntensity = slot.transition.destIntensity;
-                      }
-                    }
-                  } else if (slot.state === 'active') {
-                    const isFacing = _activeCamera ? (rayDir.angleTo(slot.anchoredDir) < LIGHTING_CONFIG.min_separation_angle) : true;
-                    const effectiveTarget = isFacing
-                      ? slot.anchoredIntensity
-                      : (slot.anchoredIntensity * LIGHTING_CONFIG.out_of_frame_retention);
-
-                    const rate = 1000.0 / LIGHTING_CONFIG.transition_duration_ms;
-                    const lerpStep = 1.0 - Math.exp(-rate * deltaSec);
-                    slot.light.intensity += (effectiveTarget - slot.light.intensity) * lerpStep;
-                  } else if (slot.state === 'idle') {
-                    slot.light.intensity = 0.0;
-                  }
+                  ...
                 });
+                */
 
                 const expLerpStep = 1.0 - Math.exp(-LIGHTING_CONFIG.smoothing_rate * deltaSec);
                 if (isNaN(renderer.toneMappingExposure)) renderer.toneMappingExposure = 1.0;
