@@ -1,4 +1,4 @@
-﻿// 9th Wall v4.10 Apple Probe
+﻿// 9th Wall v4.11 Apple Probe
 (() => {
   var e = {
     574() {
@@ -39,12 +39,12 @@
     slamPointCloud: IS_DEBUG
   });
 
-  // Controles del modelo: rotación desacoplada y escala con umbral de activación (Scene Viewer / Quick Look spec)
+  // Controles del modelo: rotación desacoplada y escala con umbral blindado (Scene Viewer / Quick Look spec)
   const MODEL_GESTURES = Object.freeze({
     minimumScale: 0.90,
     maximumScale: 1.20,
     rotationSensitivity: 6.0,
-    scaleDeadzone: 0.05
+    scaleDeadzone: 0.085
   });
 
   // v4.08: retícula estilo Scene Viewer y rebote Bounce estrictamente sobre el plano Y >= 0
@@ -354,7 +354,7 @@
               }
             }
 
-            // 2. ESCALA CON DEADZONE: Solo altera tamaño si hay variación intencionada de separación (> 5%)
+            // 2. ESCALA CON DEADZONE BLINDADO: Solo altera tamaño si la apertura/cierre supera el 8.5%
             if (o.data.startSpread > 0 && o.data.spread > 0) {
               const spreadRatio = o.data.spread / o.data.startSpread;
               const spreadDeltaRatio = Math.abs(spreadRatio - 1.0);
@@ -370,6 +370,7 @@
                   Math.min(MODEL_GESTURES.maximumScale, scaleAtGestureStart * effectiveFactor)
                 );
 
+                // Escalado sincronizado tanto para el modelo como para la retícula
                 e.Scale.set(t, a, { x: currentScale, y: currentScale, z: currentScale });
 
                 if (t.three.scene && window.THREE) {
