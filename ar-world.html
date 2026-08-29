@@ -1,4 +1,4 @@
-<!-- 9th Wall vB1.01 (Calibrated Decoupled Specular + Micro-Noise) -->
+<!-- 9th Wall vB1.02 (Organic Lobe Sweet Spot: 160% Specular / 85% Diffuse) -->
 <html>
 <head>
   <meta charset="UTF-8">
@@ -18,7 +18,7 @@
     style="position:fixed;top:10px;right:10px;z-index:1000000;background:rgba(0,0,0,0.9);color:#0f0;font-family:monospace;font-size:12px;padding:8px;border-radius:4px;cursor:pointer;line-height:1.3;border:1px solid #0f0;display:none;pointer-events:auto;">
     <div id="debugTitle">FPS: --</div>
     <div id="debugContent">
-      ar-world: vB1.01<br>
+      ar-world: vB1.02<br>
       bundle: v4.12<br>
       <span id="envVerdictSpan" style="color:#0f0;">Entorno: ESPERANDO MESA...</span><br>
       <span id="telemetrySpan" style="color:#0f0;">P98: -- (/255) | Lum: -- (/255) | Cálido: --%</span><br>
@@ -95,7 +95,7 @@
       halo_drop_threshold: 34,
       upper_half_limit: 0.45,
       debounce_cycles: 1,
-      min_material_roughness: 0.04, // vB1.01: Liberado para permitir brillos nítidos
+      min_material_roughness: 0.12, // vB1.02: Punto dulce calibrado (evita el efecto purpurina y el plástico ancho)
       metalness_bypass_threshold: 0.50,
       albedo_desaturation: 0.15,
       temporal_blend_alpha: 0.25
@@ -565,7 +565,7 @@
                     const isPBR = (mat.type === 'MeshStandardMaterial' || mat.type === 'MeshPhysicalMaterial');
                     if (!isPBR) return;
 
-                    // vB1.01: Inyección de Micro-Ruido Procedural + Calibración Independiente (175% Specular, 90% Diffuse)
+                    // vB1.02: Inyección de Micro-Ruido Suave y Ajuste Calibrado (160% Specular, 85% Diffuse)
                     if (!mat._specularHooked) {
                       mat._specularHooked = true;
                       mat.onBeforeCompile = (shader) => {
@@ -575,20 +575,21 @@
                           #include <roughnessmap_fragment>
                           #ifndef USE_ROUGHNESSMAP
                             if (roughnessFactor >= 0.95) {
-                              roughnessFactor = 0.35;
+                              roughnessFactor = 0.30;
                             }
                           #endif
-                          float microNoise = fract(sin(dot(vNormal.xyz * 75.0 + vViewPosition.xyz * 100.0, vec3(12.9898, 78.233, 45.164))) * 43758.5453);
-                          roughnessFactor = clamp(roughnessFactor + (microNoise - 0.5) * 0.08, 0.04, 1.0);
+                          // vB1.02: Micro-grano orgánico estabilizado a frecuencia suave
+                          float microNoise = fract(sin(dot(vNormal.xyz * 28.0 + vViewPosition.xyz * 32.0, vec3(12.9898, 78.233, 45.164))) * 43758.5453);
+                          roughnessFactor = clamp(roughnessFactor + (microNoise - 0.5) * 0.04, 0.12, 1.0);
                           `
                         );
                         shader.fragmentShader = shader.fragmentShader.replace(
                           '#include <lights_fragment_end>',
                           `
                           #include <lights_fragment_end>
-                          // vB1.01: 90% difuso para proteger el albedo y 175% especular analítico (+75% pop)
-                          reflectedLight.directDiffuse *= 0.90;
-                          reflectedLight.directSpecular *= 1.75;
+                          // vB1.02: 85% difuso para proteger el albedo y 160% especular analítico (+60% de ganancia)
+                          reflectedLight.directDiffuse *= 0.85;
+                          reflectedLight.directSpecular *= 1.60;
                           `
                         );
                       };
