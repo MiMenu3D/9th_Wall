@@ -1,4 +1,4 @@
-<!-- 9th Wall v4.24 (Dual-Lobe GGX Specular / Consolidated Telemetry / Auto-Gain) -->
+<!-- 9th Wall v4.25 (Dual-Lobe GGX Specular / Consolidated Telemetry / Auto-Gain) -->
 <html>
 <head>
   <meta charset="UTF-8">
@@ -18,8 +18,8 @@
     style="position:fixed;top:10px;right:10px;z-index:1000000;background:rgba(0,0,0,0.9);color:#0f0;font-family:monospace;font-size:12px;padding:8px;border-radius:4px;cursor:pointer;line-height:1.3;border:1px solid #0f0;display:none;pointer-events:auto;">
     <div id="debugTitle">FPS: --</div>
     <div id="debugContent">
-      ar-world: v4.24<br>
-      bundle: v4.24<br>
+      ar-world: v4.25<br>
+      bundle: v4.25<br>
       <span id="envVerdictSpan" style="color:#0f0;">Entorno: ESPERANDO MESA...</span><br>
       <span id="telemetrySpan" style="color:#0f0;">P98: -- (/255) | Lum: -- (/255) | Cálido: --%</span><br>
       <span id="lightsCountSpan" style="color:#0f0;">Luces: 1</span><br>
@@ -280,7 +280,7 @@
       secretTrigger.addEventListener('pointerdown', procesarToqueSecreto);
     }
 
-    // v4.24: Función global para aplicar ajustes de shader y albedo (Doble Lóbulo GGX Físico Re-calibrado)
+    // v4.25: Función global para aplicar ajustes de shader y albedo (Doble Lóbulo GGX Físico Re-calibrado)
     window.aplicarAjustesSceneViewer = function () {
       if (!_scene) return;
       _scene.traverse((child) => {
@@ -290,10 +290,10 @@
             const isPBR = (mat.type === 'MeshStandardMaterial' || mat.type === 'MeshPhysicalMaterial');
             if (!isPBR) return;
 
-            // v4.24: Doble Lóbulo GGX Físico (Núcleo 0.89x concentrado + Halo 0.38x amplio = 1.27x total) + Ruido UV estático
+            // v4.25: Doble Lóbulo GGX Físico (Núcleo 0.89x concentrado + Halo 0.38x amplio = 1.27x total) + Ruido UV estático
             if (!mat._specularHooked) {
               mat._specularHooked = true;
-              mat.customProgramCacheKey = () => 'v424_dual_lobe_ggx';
+              mat.customProgramCacheKey = () => 'v425_dual_lobe_ggx';
               mat.onBeforeCompile = (shader) => {
                 shader.fragmentShader = shader.fragmentShader.replace(
                   '#include <roughnessmap_fragment>',
@@ -301,11 +301,11 @@
                   #include <roughnessmap_fragment>
                   #ifndef USE_ROUGHNESSMAP
                     if (roughnessFactor >= 0.95) {
-                      roughnessFactor = 0.24; // v4.24: Núcleo nítido condensado
+                      roughnessFactor = 0.24; // v4.25: Núcleo nítido condensado
                     }
                   #endif
                   #ifdef USE_UV
-                    // v4.24: Micro-ruido 100% estático anclado a la textura/malla
+                    // v4.25: Micro-ruido 100% estático anclado a la textura/malla
                     float microNoise = fract(sin(dot(vUv * 120.0, vec2(12.9898, 78.233))) * 43758.5453);
                     roughnessFactor = clamp(roughnessFactor + (microNoise - 0.5) * 0.05, 0.06, 1.0);
                   #endif
@@ -315,7 +315,7 @@
                   '#include <lights_fragment_end>',
                   `
                   #include <lights_fragment_end>
-                  // v4.24: Doble Lóbulo Especular Analítico Calibrado (0.89x núcleo concentrado + 0.38x halo suave amplio = 1.27x total)
+                  // v4.25: Doble Lóbulo Especular Analítico Calibrado (0.89x núcleo concentrado + 0.38x halo suave amplio = 1.27x total)
                   reflectedLight.directSpecular *= 1.27;
                   `
                 );

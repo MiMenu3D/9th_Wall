@@ -1,4 +1,4 @@
-﻿// 9th Wall v4.24
+﻿// 9th Wall v4.25
 (() => {
   var e = {
     574() {
@@ -53,7 +53,7 @@
     scaleDeadzone: 0.085
   });
 
-  // v4.24: retícula adaptativa al Bounding Box y rebote acelerado un 10% adicional (970ms) estrictamente sobre Y >= 0
+  // v4.25: retícula adaptativa al Bounding Box y rebote acelerado (940ms) estrictamente sobre Y >= 0
   const DRAG_RETICLE_CONFIG = Object.freeze({
     liftHeight: 0.05,
     liftSmoothingRate: 8.0,
@@ -62,7 +62,7 @@
     thickness: 0.02,
     cornerRadius: 0.05,
     color: 0x66ffff,
-    bounceDuration: 970, // v4.24: Acelerado otro 10%
+    bounceDuration: 940, // v4.25: Acelerado a 940ms
     bounceEasing: "Bounce"
   });
 
@@ -122,6 +122,7 @@
           isPlaced = true;
           const prefabEid = schemaAttr.get(a).prefab;
           const r = t.createEntity(prefabEid);
+          const d = t.getEntity(r);
 
           const targetX = ev.data.worldPosition.x;
           const targetY = ev.data.worldPosition.y;
@@ -130,8 +131,8 @@
           // Rotación binaria base (0° o 180°)
           const baseRotY = Math.random() < 0.5 ? 0 : Math.PI;
 
-          // v4.24: Cinemática continua de Spawn a 60 FPS (Ascenso Y: -0.50m a 0.001m + Giro 360° horario en 1000ms Cubic)
-          // Integración directa con las APIs oficiales del Transform de ECS
+          // v4.25: Cinemática continua de Spawn a 60 FPS (Ascenso Y: -0.50m a 0.001m + Giro 360° horario en 1000ms Cubic)
+          // Uso de métodos nativos verificados de entidad ECS para evitar bloqueos
           const spawnDuration = 1000;
           const spawnStartTime = performance.now();
           const totalSpinAngle = -Math.PI * 2; // -360° horario
@@ -145,14 +146,14 @@
             const currentY = (targetY - 0.50) + (0.501 * ease);
             const currentAngle = baseRotY + (totalSpinAngle * ease);
 
-            t.transform.setWorldPosition(r, { x: targetX, y: currentY, z: targetZ });
-            t.transform.setWorldRotation(r, e.math.quat.yRadians(currentAngle));
+            d.setLocalPosition({ x: targetX, y: currentY, z: targetZ });
+            d.set(e.Quaternion, e.math.quat.yRadians(currentAngle));
 
             if (progress < 1.0) {
               requestAnimationFrame(animarSpawnCompleto);
             } else {
-              t.transform.setWorldPosition(r, { x: targetX, y: targetY + 0.001, z: targetZ });
-              t.transform.setWorldRotation(r, e.math.quat.yRadians(baseRotY + totalSpinAngle));
+              d.setLocalPosition({ x: targetX, y: targetY + 0.001, z: targetZ });
+              d.set(e.Quaternion, e.math.quat.yRadians(baseRotY + totalSpinAngle));
             }
           };
           requestAnimationFrame(animarSpawnCompleto);
@@ -178,12 +179,11 @@
         currentLift = 0,
         planarX = 0,
         planarZ = 0,
-        currentRotationY = 0,
         lastLiftFrameTime = performance.now(),
         bboxSizeX = DRAG_RETICLE_CONFIG.baseSize,
         bboxSizeZ = DRAG_RETICLE_CONFIG.baseSize;
 
-        // v4.24: Medición precisa de la Bounding Box del modelo en escena
+        // v4.25: Medición precisa y limpia del Bounding Box del modelo activo
         const actualizarBoundingBox = (THREE_INSTANCE) => {
           if (!t.three.scene) return;
           const modelObj = t.three.scene.getObjectByName("Model");
@@ -198,18 +198,10 @@
           }
         };
 
-        // v4.24: Sincronización robusta y matemática de la retícula
-        const sincronizarTransformReticula = (ret) => {
-          if (!ret) return;
-          ret.position.set(planarX, dragPlaneY + 0.002, planarZ);
-          ret.rotation.set(-Math.PI / 2, 0, currentRotationY);
-          ret.scale.set(currentScale, currentScale, currentScale);
-        };
-
-        // v4.24: retícula adaptativa al tamaño exacto de la caja envolvente
+        // v4.25: retícula adaptativa al tamaño exacto de la caja envolvente
         const obtenerReticula = (THREE_INSTANCE, scene) => {
           if (reticleMesh) {
-            sincronizarTransformReticula(reticleMesh);
+            reticleMesh.scale.set(currentScale, currentScale, currentScale);
             return reticleMesh;
           }
           actualizarBoundingBox(THREE_INSTANCE);
@@ -229,7 +221,8 @@
             side: THREE_INSTANCE.DoubleSide
           });
           reticleMesh = new THREE_INSTANCE.Mesh(geometry, material);
-          sincronizarTransformReticula(reticleMesh);
+          reticleMesh.rotation.x = -Math.PI / 2;
+          reticleMesh.scale.set(currentScale, currentScale, currentScale);
           reticleMesh.visible = false;
           reticleMesh.renderOrder = 0;
           scene.add(reticleMesh);
@@ -321,19 +314,22 @@
                 isDragActive = !0;
                 if (t.three.scene) {
                   const ret = obtenerReticula(i, t.three.scene);
-                  sincronizarTransformReticula(ret);
+                  ret.rotation.z = 0;
+                  ret.scale.set(currentScale, currentScale, currentScale);
+                  ret.position.set(planarX, dragPlaneY + 0.002, planarZ);
                   ret.visible = true;
                 }
               }
               if (reticleMesh) {
-                sincronizarTransformReticula(reticleMesh);
+                reticleMesh.position.set(planarX, dragPlaneY + 0.002, planarZ);
+                reticleMesh.scale.set(currentScale, currentScale, currentScale);
               }
             }
           })
           .listen(t.events.globalId, e.input.SCREEN_TOUCH_END, o => {
             activePointerIds.delete(o.data.pointerId);
             if (0 === activePointerIds.size) {
-              // v4.24: caída acelerada (970ms) asentándose en Y = 0 sin rebasarlo
+              // v4.25: caída acelerada (940ms) asentándose en Y = 0 sin rebasarlo
               if (isDragActive) {
                 isDragActive = !1;
                 if (reticleMesh) reticleMesh.visible = false;
@@ -371,7 +367,8 @@
             }
             if (t.three.scene && window.THREE) {
               const ret = obtenerReticula(window.THREE, t.three.scene);
-              sincronizarTransformReticula(ret);
+              ret.position.set(planarX, dragPlaneY + 0.002, planarZ);
+              ret.scale.set(currentScale, currentScale, currentScale);
               ret.visible = true;
             }
           })
@@ -381,13 +378,15 @@
             // 1. ROTACIÓN ESTÁNDAR
             if (o.data.positionChange && o.data.positionChange.x) {
               const angleDelta = o.data.positionChange.x * MODEL_GESTURES.rotationSensitivity;
-              currentRotationY += angleDelta;
               t.transform.rotateSelf(a, e.math.quat.yRadians(angleDelta));
 
               if (t.three.scene && window.THREE) {
                 const ret = obtenerReticula(window.THREE, t.three.scene);
-                sincronizarTransformReticula(ret);
+                const pos = t.transform.getWorldPosition(a);
+                ret.position.set(pos.x, dragPlaneY + 0.002, pos.z);
+                ret.scale.set(currentScale, currentScale, currentScale);
                 ret.visible = true;
+                ret.rotateZ(angleDelta);
               }
             }
 
@@ -410,7 +409,7 @@
 
                 if (t.three.scene && window.THREE) {
                   const ret = obtenerReticula(window.THREE, t.three.scene);
-                  sincronizarTransformReticula(ret);
+                  ret.scale.set(currentScale, currentScale, currentScale);
                 }
               }
             }
