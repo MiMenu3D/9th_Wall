@@ -1,4 +1,4 @@
-<!-- 9th Wall vB1.03 Apple Probe (Final Calibrated Checkpoint: 138% Specular / 88% Diffuse / 0.08 Floor) -->
+<!-- 9th Wall v4.22 (Dual-Lobe GGX Specular / Consolidated Telemetry / Auto-Gain) -->
 <html>
 <head>
   <meta charset="UTF-8">
@@ -18,8 +18,8 @@
     style="position:fixed;top:10px;right:10px;z-index:1000000;background:rgba(0,0,0,0.9);color:#0f0;font-family:monospace;font-size:12px;padding:8px;border-radius:4px;cursor:pointer;line-height:1.3;border:1px solid #0f0;display:none;pointer-events:auto;">
     <div id="debugTitle">FPS: --</div>
     <div id="debugContent">
-      ar-world: vB1.03<br>
-      bundle: v4.12<br>
+      ar-world: v4.22<br>
+      bundle: v4.22<br>
       <span id="envVerdictSpan" style="color:#0f0;">Entorno: ESPERANDO MESA...</span><br>
       <span id="telemetrySpan" style="color:#0f0;">P98: -- (/255) | Lum: -- (/255) | Cálido: --%</span><br>
       <span id="lightsCountSpan" style="color:#0f0;">Luces: 1</span><br>
@@ -52,7 +52,7 @@
 
   <script>
     const LIGHTING_CONFIG = {
-      pmrem_resolution: 64,
+      pmrem_resolution: 256, // Antes 64
       pmrem_interval_ms: 200,
       scan_interval_ms: 300,
       calibration_frames_target: 4,
@@ -61,12 +61,13 @@
       night_shadow_radius: 8.0,
       ground_opacity_fixed: 0.40,
 
-      day_total_energy: 5.20,
-      day_pmrem_mult: 1.50,
+      // v4.20: Presupuestos maestros consolidados (-10% día, -8% ambiente, +PMREM)
+      day_total_energy: 4.68,
+      day_pmrem_mult: 1.65,
       day_pedestal: 0.035,
 
-      night_total_energy: 0.80,
-      night_pmrem_mult: 3.20,
+      night_total_energy: 0.74,
+      night_pmrem_mult: 3.45,
       night_pedestal: 0.050,
 
       weights_1_light: [1.00],
@@ -95,7 +96,7 @@
       halo_drop_threshold: 34,
       upper_half_limit: 0.45,
       debounce_cycles: 1,
-      min_material_roughness: 0.08, // vB1.03: Suelo óptimo calibrado
+      min_material_roughness: 0.08, // v4.20: Suelo calibrado
       metalness_bypass_threshold: 0.50,
       albedo_desaturation: 0.15,
       temporal_blend_alpha: 0.25
@@ -189,9 +190,9 @@
 
     document.getElementById('envToggle').addEventListener('click', () => toggleEnv());
 
-    // Gestión de los 3 modos: 'clean' (cliente), 'buttons' (normal dev), 'slam' (debug SLAM)
+    // v4.20: Forzamos arranque limpio por defecto
     let currentUIMode = sessionStorage.getItem("ar_ui_mode");
-    if (!currentUIMode) {
+    if (!currentUIMode || currentUIMode !== "buttons" && currentUIMode !== "slam") {
       currentUIMode = "clean";
       sessionStorage.setItem("ar_ui_mode", "clean");
       sessionStorage.setItem("debug_features", "false");
@@ -249,7 +250,7 @@
       });
     }
 
-    // Receptor secreto permanente: 4 toques (<1000ms) conmuta en vivo sin recargas
+    // Receptor secreto Easter Egg permanente: 4 toques (<1000ms) conmuta en vivo sin recargas
     if (secretTrigger) {
       let secretTaps = [];
       const procesarToqueSecreto = () => {
@@ -278,6 +279,73 @@
       };
       secretTrigger.addEventListener('pointerdown', procesarToqueSecreto);
     }
+
+    // v4.22: Función global para aplicar ajustes de shader y albedo de forma asíncrona segura
+    window.aplicarAjustesSceneViewer = function () {
+      if (!_scene) return;
+      _scene.traverse((child) => {
+        if (child.isMesh && child.material) {
+          const mats = Array.isArray(child.material) ? child.material : [child.material];
+          mats.forEach((mat) => {
+            const isPBR = (mat.type === 'MeshStandardMaterial' || mat.type === 'MeshPhysicalMaterial');
+            if (!isPBR) return;
+
+            // v4.20: Doble Lóbulo GGX Físico (Nítido 1.05x + Suave 0.33x) + Ruido UV estático
+            if (!mat._specularHooked) {
+              mat._specularHooked = true;
+              mat.customProgramCacheKey = () => 'v422_dual_lobe_ggx';
+              mat.onBeforeCompile = (shader) => {
+                shader.fragmentShader = shader.fragmentShader.replace(
+                  '#include <roughnessmap_fragment>',
+                  `
+                  #include <roughnessmap_fragment>
+                  #ifndef USE_ROUGHNESSMAP
+                    if (roughnessFactor >= 0.95) {
+                      roughnessFactor = 0.28;
+                    }
+                  #endif
+                  #ifdef USE_UV
+                    // v4.20: Micro-ruido 100% estático anclado a la textura/malla
+                    float microNoise = fract(sin(dot(vUv * 120.0, vec2(12.9898, 78.233))) * 43758.5453);
+                    roughnessFactor = clamp(roughnessFactor + (microNoise - 0.5) * 0.06, 0.08, 1.0);
+                  #endif
+                  `
+                );
+                shader.fragmentShader = shader.fragmentShader.replace(
+                  '#include <lights_fragment_end>',
+                  `
+                  #include <lights_fragment_end>
+                  // v4.20: Doble Lóbulo Especular analítico (1.05 núcleo nítido + 0.33 halo suave)
+                  reflectedLight.directSpecular *= 1.38;
+                  `
+                );
+              };
+              mat.needsUpdate = true;
+            }
+
+            const isMetal = mat.metalness !== undefined && mat.metalness > LIGHTING_CONFIG.metalness_bypass_threshold;
+            if (!isMetal && mat.roughness !== undefined && mat.roughness < LIGHTING_CONFIG.min_material_roughness) {
+              mat.roughness = LIGHTING_CONFIG.min_material_roughness;
+            }
+
+            if (mat.emissive !== undefined) {
+              const p = currentPedestal;
+              if (mat.emissive.r < p && mat.emissive.g < p && mat.emissive.b < p) {
+                mat.emissive.setRGB(p, p, p);
+              }
+            }
+
+            if (mat.color && !mat._desaturated) {
+              const hsl = { h: 0, s: 0, l: 0 };
+              mat.color.getHSL(hsl);
+              hsl.s = Math.max(0.0, hsl.s * (1.0 - LIGHTING_CONFIG.albedo_desaturation));
+              mat.color.setHSL(hsl.h, hsl.s, hsl.l);
+              mat._desaturated = true;
+            }
+          });
+        }
+      });
+    };
 
     if (window.ecs) {
       window.ecs.registerComponent({
@@ -556,72 +624,6 @@
               if (newDir) slot.anchoredDir.copy(newDir);
             };
 
-            const aplicarAjustesSceneViewer = () => {
-              if (!_scene) return;
-              _scene.traverse((child) => {
-                if (child.isMesh && child.material) {
-                  const mats = Array.isArray(child.material) ? child.material : [child.material];
-                  mats.forEach((mat) => {
-                    const isPBR = (mat.type === 'MeshStandardMaterial' || mat.type === 'MeshPhysicalMaterial');
-                    if (!isPBR) return;
-
-                    // vB1.03: Checkpoint Definitivo (138% Specular, 88% Diffuse, Ruido UV estático)
-                    if (!mat._specularHooked) {
-                      mat._specularHooked = true;
-                      mat.onBeforeCompile = (shader) => {
-                        shader.fragmentShader = shader.fragmentShader.replace(
-                          '#include <roughnessmap_fragment>',
-                          `
-                          #include <roughnessmap_fragment>
-                          #ifndef USE_ROUGHNESSMAP
-                            if (roughnessFactor >= 0.95) {
-                              roughnessFactor = 0.28;
-                            }
-                          #endif
-                          #ifdef USE_UV
-                            // vB1.03: Micro-ruido 100% estático anclado a la textura/malla
-                            float microNoise = fract(sin(dot(vUv * 120.0, vec2(12.9898, 78.233))) * 43758.5453);
-                            roughnessFactor = clamp(roughnessFactor + (microNoise - 0.5) * 0.06, 0.08, 1.0);
-                          #endif
-                          `
-                        );
-                        shader.fragmentShader = shader.fragmentShader.replace(
-                          '#include <lights_fragment_end>',
-                          `
-                          #include <lights_fragment_end>
-                          // vB1.03: Calibración final fina (88% Difuso y 138% Especular analítico)
-                          reflectedLight.directDiffuse *= 0.88;
-                          reflectedLight.directSpecular *= 1.38;
-                          `
-                        );
-                      };
-                      mat.needsUpdate = true;
-                    }
-
-                    const isMetal = mat.metalness !== undefined && mat.metalness > LIGHTING_CONFIG.metalness_bypass_threshold;
-                    if (!isMetal && mat.roughness !== undefined && mat.roughness < LIGHTING_CONFIG.min_material_roughness) {
-                      mat.roughness = LIGHTING_CONFIG.min_material_roughness;
-                    }
-
-                    if (mat.emissive !== undefined) {
-                      const p = currentPedestal;
-                      if (mat.emissive.r < p && mat.emissive.g < p && mat.emissive.b < p) {
-                        mat.emissive.setRGB(p, p, p);
-                      }
-                    }
-
-                    if (mat.color && !mat._desaturated) {
-                      const hsl = { h: 0, s: 0, l: 0 };
-                      mat.color.getHSL(hsl);
-                      hsl.s = Math.max(0.0, hsl.s * (1.0 - LIGHTING_CONFIG.albedo_desaturation));
-                      mat.color.setHSL(hsl.h, hsl.s, hsl.l);
-                      mat._desaturated = true;
-                    }
-                  });
-                }
-              });
-            };
-
             const lumaBins = new Int32Array(16);
 
             const readyBtn = document.getElementById('readyBtn');
@@ -697,7 +699,7 @@
                       if (py < minCoreY) minCoreY = py; if (py > maxCoreY) maxCoreY = py;
                     }
 
-                    // Evaluación de Calidez Global del píxel (Cr > Cb + 4 en espacio YCbCr)
+                    // Evaluación de Calidez Global del píxel
                     const cb = -0.168736 * r - 0.331264 * g + 0.5 * b + 128;
                     const cr = 0.5 * r - 0.418688 * g - 0.081312 * b + 128;
                     if (lum >= 15 && cr > (cb + 4)) {
@@ -751,39 +753,40 @@
                       const avgLumFinal = mediaPoblacionalPodada(accumulatedAvgLumSamples);
                       const avgWarmRatio = mediaPoblacionalPodada(accumulatedWarmRatioSamples);
 
-                      // Factores normalizados (0.0 = Día Máximo, 1.0 = Penumbra)
+                      // v4.20: Factores normalizados con 70% peso para Lum y 30% para P98
                       const p98Factor = Math.max(0.0, Math.min(1.0, 1.0 - (avgP98 - 110.0) / (225.0 - 110.0)));
                       const lumFactor = Math.max(0.0, Math.min(1.0, 1.0 - (avgLumFinal - 50.0) / (155.0 - 50.0)));
 
-                      // Matriz de decisión: Lum (60%) + P98 (40%), modulada por cobertura cálida global
-                      const isFullSceneWarm = (avgWarmRatio >= 0.70);
+                      // v4.20: Filtro de seguridad para ruido cromático ISO (si Lum < 75, ignora calidez espuria)
+                      const isHighIsoNoise = (avgLumFinal < 75.0);
+                      const isFullSceneWarm = !isHighIsoNoise && (avgWarmRatio >= 0.70);
 
                       if (isFullSceneWarm) {
-                        const warmWeight = 0.50;
-                        const remainingWeight = 0.50;
+                        const warmWeight = 0.40;
+                        const remainingWeight = 0.60;
                         const warmInfluence = 0.75;
 
-                        environmentFactor = (lumFactor * 0.60 * remainingWeight) +
-                                            (p98Factor * 0.40 * remainingWeight) +
+                        environmentFactor = (lumFactor * 0.70 * remainingWeight) +
+                                            (p98Factor * 0.30 * remainingWeight) +
                                             (warmInfluence * warmWeight);
                       } else {
-                        const warmWeight = 0.15;
-                        const remainingWeight = 0.85;
+                        const warmWeight = isHighIsoNoise ? 0.0 : 0.10;
+                        const remainingWeight = 1.0 - warmWeight;
 
-                        environmentFactor = (lumFactor * 0.60 * remainingWeight) +
-                                            (p98Factor * 0.40 * remainingWeight) +
+                        environmentFactor = (lumFactor * 0.70 * remainingWeight) +
+                                            (p98Factor * 0.30 * remainingWeight) +
                                             (lumFactor * warmWeight);
                       }
 
-                      // Guardarraíles Cruzados y Clasificación Calibrada (v3.57)
+                      // v4.20: Guardarraíles calibrados (+6% de tolerancia)
                       let verdict = "DIA_NORMAL";
-                      if (avgP98 > 225 && avgLumFinal > 140) {
+                      if (avgP98 > 238 && avgLumFinal > 148) {
                         environmentFactor = 0.0;
                         verdict = "DIRECCIONAL_FUERTE";
-                      } else if (avgLumFinal > 155 || (environmentFactor < 0.30 && avgLumFinal >= 80)) {
+                      } else if (avgLumFinal > 164 || (environmentFactor < 0.30 && avgLumFinal >= 88)) {
                         environmentFactor = Math.max(0.25, Math.min(environmentFactor, 0.40));
                         verdict = "DIA_NORMAL";
-                      } else if (environmentFactor < 0.65 || (avgP98 > 170 && avgLumFinal >= 75)) {
+                      } else if (environmentFactor < 0.65 || (avgP98 > 175 && avgLumFinal >= 75)) {
                         environmentFactor = Math.max(0.60, Math.min(environmentFactor, 0.75));
                         verdict = "AMBIENTE_SUAVE";
                       } else {
@@ -798,7 +801,6 @@
                       currentPmremMult = THREE_INSTANCE.MathUtils.lerp(LIGHTING_CONFIG.day_pmrem_mult, LIGHTING_CONFIG.night_pmrem_mult, environmentFactor);
                       currentPedestal = THREE_INSTANCE.MathUtils.lerp(LIGHTING_CONFIG.day_pedestal, LIGHTING_CONFIG.night_pedestal, environmentFactor);
 
-                      // Sombra dinámica: 4.0 en sol directo a 8.0 en penumbra
                       const currentShadowRadius = THREE_INSTANCE.MathUtils.lerp(LIGHTING_CONFIG.day_shadow_radius, LIGHTING_CONFIG.night_shadow_radius, environmentFactor);
                       if (_baseLight1 && _baseLight1.shadow) {
                         _baseLight1.shadow.radius = currentShadowRadius;
@@ -870,10 +872,18 @@
                     }
                   }
 
-                  const effectiveIlluminance = (avgLum * 0.30) + (p90Lum * 0.70);
+                  // v4.20: Auto-Gain de Exposición con juicio combinado Lum (70%) + P90 (30%)
+                  const effectiveIlluminance = (avgLum * 0.70) + (p90Lum * 0.30);
                   smoothedBrightness = effectiveIlluminance;
                   const normalizedBrightness = Math.max(0.001, Math.min(1.0, smoothedBrightness / 255));
                   targetExposure = normalizedBrightness * currentPmremMult * LIGHTING_CONFIG.master_exposure_scale;
+
+                  if (effectiveIlluminance < 55) {
+                    targetExposure *= 1.15; // Realce compensatorio en superficies oscuras
+                  } else if (effectiveIlluminance > 175) {
+                    targetExposure *= 0.90; // Atenuación suave en superficies blancas
+                  }
+
                   if (isNaN(targetExposure)) targetExposure = 0.45;
 
                   if (initialLightPlaced && !detectionPermanentlyStopped && _activeCamera) {
@@ -1025,7 +1035,7 @@
                 if (isNaN(renderer.toneMappingExposure)) renderer.toneMappingExposure = 1.0;
                 renderer.toneMappingExposure += (targetExposure - renderer.toneMappingExposure) * expLerpStep;
 
-                aplicarAjustesSceneViewer();
+                window.aplicarAjustesSceneViewer();
 
               } catch (e) {}
             }, 50);
@@ -1043,7 +1053,7 @@
       ecs.application.init = c => {
         for (const k in c.objects) {
           const obj = c.objects[k];
-          if (obj.name === 'Loading Screen') delete c.objects[k];
+          if (obj.name === 'Loading Screen' || obj.name === 'Text') delete c.objects[k];
 
           if (obj.name === 'Directional Light') {
             if (obj.light) obj.light.intensity = 0.0;
@@ -1051,10 +1061,16 @@
 
           if (obj.name === 'Model') {
             obj.scale = [1.01, 1.01, 1.01];
-            const anim = obj.components['a2c75775-5a0f-44d7-910c-c111bc850bf6'];
-            if (anim && anim.parameters) anim.parameters.toY = 0;
+            const anim = obj.components && obj.components['a2c75775-5a0f-44d7-910c-c111bc850bf6'];
+            if (anim && anim.parameters) {
+              anim.parameters.fromY = -0.50;
+              anim.parameters.toY = 0.001;
+              anim.parameters.duration = 1000;
+              anim.parameters.easingFunction = "Cubic";
+            }
           }
           if (obj.name === 'Camera') {
+            obj.components = obj.components || {};
             obj.components['scene-capturer-comp'] = {
               id: 'scene-capturer-comp',
               name: 'scene-capturer',
