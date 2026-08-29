@@ -1,4 +1,4 @@
-﻿// 9th Wall v4.12 Apple Probe
+﻿// 9th Wall v4.20
 (() => {
   var e = {
     574() {
@@ -31,6 +31,12 @@
   },
   t = {};
 
+  // Forzamos arranque siempre limpio a menos que se use el disparador secreto
+  if (!sessionStorage.getItem("ar_ui_mode")) {
+    sessionStorage.setItem("ar_ui_mode", "clean");
+    sessionStorage.setItem("debug_features", "false");
+  }
+
   // Leemos de forma nativa el estado del interruptor debug persistido en sessionStorage
   const IS_DEBUG = sessionStorage.getItem("debug_features") === "true";
 
@@ -47,40 +53,43 @@
     scaleDeadzone: 0.085
   });
 
-  // v4.08: retícula estilo Scene Viewer y rebote Bounce estrictamente sobre el plano Y >= 0
+  // v4.20: retícula adaptativa al Bounding Box y rebote acelerado un 10% (1080ms) estrictamente sobre Y >= 0
   const DRAG_RETICLE_CONFIG = Object.freeze({
     liftHeight: 0.05,
     liftSmoothingRate: 8.0,
     dragActivationThreshold: 0.012,
-    size: 0.272,
+    baseSize: 0.272,
     thickness: 0.02,
     cornerRadius: 0.05,
     color: 0x66ffff,
-    bounceDuration: 1200,
+    bounceDuration: 1080, // v4.20: Acelerado 10%
     bounceEasing: "Bounce"
   });
 
-  // v4.02: rectángulo con esquinas redondeadas (recurso estándar de three.js: Shape + hole interior)
-  function crearFormaRectRedondeada(THREE_INSTANCE, size, radius) {
-    const s = size / 2;
+  // v4.20: rectángulo con esquinas redondeadas adaptativo a dimensiones X y Z
+  function crearFormaRectRedondeada(THREE_INSTANCE, sizeX, sizeZ, radius) {
+    const sx = sizeX / 2;
+    const sz = sizeZ / 2;
+    const r = Math.min(radius, Math.min(sx, sz) * 0.5);
     const shape = new THREE_INSTANCE.Shape();
-    shape.moveTo(-s, -s + radius);
-    shape.lineTo(-s, s - radius);
-    shape.quadraticCurveTo(-s, s, -s + radius, s);
-    shape.lineTo(s - radius, s);
-    shape.quadraticCurveTo(s, s, s, s - radius);
-    shape.lineTo(s, -s + radius);
-    shape.quadraticCurveTo(s, -s, s - radius, -s);
-    shape.lineTo(-s + radius, -s);
-    shape.quadraticCurveTo(-s, -s, -s, -s + radius);
+    shape.moveTo(-sx, -sz + r);
+    shape.lineTo(-sx, sz - r);
+    shape.quadraticCurveTo(-sx, sz, -sx + r, sz);
+    shape.lineTo(sx - r, sz);
+    shape.quadraticCurveTo(sx, sz, sx, sz - r);
+    shape.lineTo(sx, -sz + r);
+    shape.quadraticCurveTo(sx, -sz, sx - r, -sz);
+    shape.lineTo(-sx + r, -sz);
+    shape.quadraticCurveTo(-sx, -sz, -sx, -sz + r);
     return shape;
   }
 
-  function crearGeometriaMarcoReticula(THREE_INSTANCE, outerSize, thickness, radius) {
-    const outer = crearFormaRectRedondeada(THREE_INSTANCE, outerSize, radius);
-    const innerSize = Math.max(0.02, outerSize - thickness * 2);
+  function crearGeometriaMarcoReticula(THREE_INSTANCE, sizeX, sizeZ, thickness, radius) {
+    const outer = crearFormaRectRedondeada(THREE_INSTANCE, sizeX, sizeZ, radius);
+    const innerX = Math.max(0.02, sizeX - thickness * 2);
+    const innerZ = Math.max(0.02, sizeZ - thickness * 2);
     const innerRadius = Math.max(0.001, radius - thickness);
-    outer.holes.push(crearFormaRectRedondeada(THREE_INSTANCE, innerSize, innerRadius));
+    outer.holes.push(crearFormaRectRedondeada(THREE_INSTANCE, innerX, innerZ, innerRadius));
     return new THREE_INSTANCE.ShapeGeometry(outer);
   }
 
@@ -141,17 +150,36 @@
         currentLift = 0,
         planarX = 0,
         planarZ = 0,
-        lastLiftFrameTime = performance.now();
+        lastLiftFrameTime = performance.now(),
+        bboxSizeX = DRAG_RETICLE_CONFIG.baseSize,
+        bboxSizeZ = DRAG_RETICLE_CONFIG.baseSize;
 
-        // v4.08: retícula plana con esquinas redondeadas sincronizada en escala con el modelo
+        // v4.20: Medición precisa y limpia del Bounding Box del modelo activo
+        const actualizarBoundingBox = (THREE_INSTANCE) => {
+          if (!t.three.scene) return;
+          const modelObj = t.three.scene.getObjectByName("Model");
+          if (modelObj) {
+            const box = new THREE_INSTANCE.Box3().setFromObject(modelObj);
+            const size = new THREE_INSTANCE.Vector3();
+            box.getSize(size);
+            if (size.x > 0.05 && size.z > 0.05) {
+              bboxSizeX = size.x;
+              bboxSizeZ = size.z;
+            }
+          }
+        };
+
+        // v4.20: retícula adaptativa al tamaño exacto de la caja envolvente
         const obtenerReticula = (THREE_INSTANCE, scene) => {
           if (reticleMesh) {
             reticleMesh.scale.set(currentScale, currentScale, currentScale);
             return reticleMesh;
           }
+          actualizarBoundingBox(THREE_INSTANCE);
           const geometry = crearGeometriaMarcoReticula(
             THREE_INSTANCE,
-            DRAG_RETICLE_CONFIG.size,
+            bboxSizeX,
+            bboxSizeZ,
             DRAG_RETICLE_CONFIG.thickness,
             DRAG_RETICLE_CONFIG.cornerRadius
           );
@@ -172,7 +200,7 @@
           return reticleMesh;
         };
 
-        // v4.02: elevación suave e independiente del evento (patrón rAF ya usado en este proyecto para el HUD)
+        // Elevación suave e independiente del evento
         const actualizarElevacion = () => {
           const now = performance.now();
           const deltaSec = Math.max(0.001, (now - lastLiftFrameTime) / 1000);
@@ -194,10 +222,9 @@
         };
         requestAnimationFrame(actualizarElevacion);
 
-        // El bloque de lógica multitáctil original (eventos nativos de 8th Wall: no se sustituyen, solo se afinan)
+        // Lógica multitáctil
         o("enabled").initial()
           .listen(a, e.input.SCREEN_TOUCH_START, o => {
-            // v4.02: un segundo dedo que también toca el modelo no debe reiniciar el arrastre del primero
             if (isModelTouchActive) {
               activePointerIds.add(o.data.pointerId);
               return;
@@ -216,7 +243,6 @@
             planarZ = n.z;
             if (!i || !r) return;
 
-            // Cancela un rebote anterior para que el siguiente arrastre no compita con esa animación.
             try {
               if (e.PositionAnimation && e.PositionAnimation.remove) {
                 e.PositionAnimation.remove(t, a);
@@ -233,7 +259,6 @@
               dragOffsetZ = n.z - c.z
             }
 
-            // La pulsación sola no altera el objeto: se espera un desplazamiento mínimo real.
             isDragActive = !1;
           })
           .listen(t.events.globalId, e.input.SCREEN_TOUCH_START, o => {
@@ -275,7 +300,7 @@
           .listen(t.events.globalId, e.input.SCREEN_TOUCH_END, o => {
             activePointerIds.delete(o.data.pointerId);
             if (0 === activePointerIds.size) {
-              // v4.08: al soltar tras arrastrar, rebote Bounce hacia arriba asentándose en Y = 0 sin rebasarlo
+              // v4.20: caída acelerada (1080ms) asentándose en Y = 0 sin rebasarlo
               if (isDragActive) {
                 isDragActive = !1;
                 if (reticleMesh) reticleMesh.visible = false;
@@ -305,7 +330,6 @@
             waitForAllTouchesToEnd = !0,
             scaleAtGestureStart = currentScale;
 
-            // v4.02: al pasar a gesto de dos dedos se cancela el arrastre y el modelo vuelve a su altura de reposo
             if (isDragActive) {
               isDragActive = !1;
               currentLift = 0;
@@ -322,7 +346,7 @@
           .listen(t.events.globalId, e.input.GESTURE_MOVE, o => {
             if (!isModelTouchActive || !isTwoFingerGesture || 2 !== o.data.touchCount) return;
 
-            // 1. ROTACIÓN ESTÁNDAR (8th Wall / Quick Look / Scene Viewer): Giro horizontal fluido
+            // 1. ROTACIÓN ESTÁNDAR
             if (o.data.positionChange && o.data.positionChange.x) {
               const angleDelta = o.data.positionChange.x * MODEL_GESTURES.rotationSensitivity;
               t.transform.rotateSelf(a, e.math.quat.yRadians(angleDelta));
@@ -337,13 +361,12 @@
               }
             }
 
-            // 2. ESCALA CON DEADZONE BLINDADO: Solo altera tamaño si la apertura/cierre supera el 8.5%
+            // 2. ESCALA CON DEADZONE BLINDADO
             if (o.data.startSpread > 0 && o.data.spread > 0) {
               const spreadRatio = o.data.spread / o.data.startSpread;
               const spreadDeltaRatio = Math.abs(spreadRatio - 1.0);
 
               if (spreadDeltaRatio >= MODEL_GESTURES.scaleDeadzone) {
-                // Mapeo continuo suave a partir del umbral de activación
                 const effectiveFactor = spreadRatio > 1.0
                   ? 1.0 + (spreadRatio - 1.0 - MODEL_GESTURES.scaleDeadzone)
                   : 1.0 - (1.0 - spreadRatio - MODEL_GESTURES.scaleDeadzone);
@@ -353,7 +376,6 @@
                   Math.min(MODEL_GESTURES.maximumScale, scaleAtGestureStart * effectiveFactor)
                 );
 
-                // Escalado sincronizado tanto para el modelo como para la retícula
                 e.Scale.set(t, a, { x: currentScale, y: currentScale, z: currentScale });
 
                 if (t.three.scene && window.THREE) {
@@ -400,7 +422,6 @@
         pointCloudMesh.frustumCulled = false;
         scene.add(pointCloudMesh);
 
-        // Bucle nativo sincronizado con el renderizado a 60 FPS
         const actualizarPuntos = () => {
           const worldPoints = window.latestWorldPoints;
           if (worldPoints) {
@@ -661,6 +682,7 @@
         },
 
         // Entidad del Modelo 3D (El archivo .glb)
+        // v4.20: Animación sincronizada a 1s (desde Y=-0.50 a 0.001 con giro 360° horario y frenada Cubic)
         "a02b4479-461e-40c2-ba91-0ccabbd1bd83": {
           "id": "a02b4479-461e-40c2-ba91-0ccabbd1bd83",
           "position": [0, 0, 0],
@@ -672,12 +694,25 @@
               "id": "a2c75775-5a0f-44d7-910c-c111bc850bf6",
               "name": "position-animation",
               "parameters": {
-                "fromY": -2,
+                "fromY": -0.50,
                 "loop": false,
                 "easeOut": true,
-                "easingFunction": "Elastic",
-                "duration": 2000,
+                "easingFunction": "Cubic",
+                "duration": 1000,
                 "toY": 0.001
+              }
+            },
+            "b2c85775-5a0f-44d7-910c-c111bc850bf7": {
+              "id": "b2c85775-5a0f-44d7-910c-c111bc850bf7",
+              "name": "rotation-animation",
+              "parameters": {
+                "fromY": 0,
+                "toY": -360,
+                "shortestPath": false,
+                "loop": false,
+                "easeOut": true,
+                "easingFunction": "Cubic",
+                "duration": 1000
               }
             }
           },
@@ -729,7 +764,6 @@
       };
     }
 
-    // Eliminación física y absoluta de los componentes de depuración si están inactivos
     if (!DEBUG_VISUALS.slamPointCloud) {
       delete i.objects["52ba8a86-a459-4df8-b954-a570e85e0484"].components["point-cloud-visualizer-comp"];
     }
