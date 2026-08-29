@@ -1,4 +1,4 @@
-﻿// 9th Wall v4.23
+﻿// 9th Wall v4.24
 (() => {
   var e = {
     574() {
@@ -53,7 +53,7 @@
     scaleDeadzone: 0.085
   });
 
-  // v4.20: retícula adaptativa al Bounding Box y rebote acelerado un 10% (1080ms) estrictamente sobre Y >= 0
+  // v4.24: retícula adaptativa al Bounding Box y rebote acelerado un 10% adicional (970ms) estrictamente sobre Y >= 0
   const DRAG_RETICLE_CONFIG = Object.freeze({
     liftHeight: 0.05,
     liftSmoothingRate: 8.0,
@@ -62,7 +62,7 @@
     thickness: 0.02,
     cornerRadius: 0.05,
     color: 0x66ffff,
-    bounceDuration: 1080, // v4.20: Acelerado 10%
+    bounceDuration: 970, // v4.24: Acelerado otro 10%
     bounceEasing: "Bounce"
   });
 
@@ -122,7 +122,6 @@
           isPlaced = true;
           const prefabEid = schemaAttr.get(a).prefab;
           const r = t.createEntity(prefabEid);
-          const d = t.getEntity(r);
 
           const targetX = ev.data.worldPosition.x;
           const targetY = ev.data.worldPosition.y;
@@ -131,8 +130,8 @@
           // Rotación binaria base (0° o 180°)
           const baseRotY = Math.random() < 0.5 ? 0 : Math.PI;
 
-          // v4.23: Cinemática continua de Spawn a 60 FPS (Ascenso Y: -0.50m a 0.001m + Giro 360° horario en 1000ms Cubic)
-          // La integración directa paso a paso en radianes evita que el quaternion colapse 360° a 0° por shortest path
+          // v4.24: Cinemática continua de Spawn a 60 FPS (Ascenso Y: -0.50m a 0.001m + Giro 360° horario en 1000ms Cubic)
+          // Integración directa con las APIs oficiales del Transform de ECS
           const spawnDuration = 1000;
           const spawnStartTime = performance.now();
           const totalSpinAngle = -Math.PI * 2; // -360° horario
@@ -146,14 +145,14 @@
             const currentY = (targetY - 0.50) + (0.501 * ease);
             const currentAngle = baseRotY + (totalSpinAngle * ease);
 
-            d.setLocalPosition({ x: targetX, y: currentY, z: targetZ });
-            d.set(e.Quaternion, e.math.quat.yRadians(currentAngle));
+            t.transform.setWorldPosition(r, { x: targetX, y: currentY, z: targetZ });
+            t.transform.setWorldRotation(r, e.math.quat.yRadians(currentAngle));
 
             if (progress < 1.0) {
               requestAnimationFrame(animarSpawnCompleto);
             } else {
-              d.setLocalPosition({ x: targetX, y: targetY + 0.001, z: targetZ });
-              d.set(e.Quaternion, e.math.quat.yRadians(baseRotY + totalSpinAngle));
+              t.transform.setWorldPosition(r, { x: targetX, y: targetY + 0.001, z: targetZ });
+              t.transform.setWorldRotation(r, e.math.quat.yRadians(baseRotY + totalSpinAngle));
             }
           };
           requestAnimationFrame(animarSpawnCompleto);
@@ -179,24 +178,19 @@
         currentLift = 0,
         planarX = 0,
         planarZ = 0,
+        currentRotationY = 0,
         lastLiftFrameTime = performance.now(),
         bboxSizeX = DRAG_RETICLE_CONFIG.baseSize,
         bboxSizeZ = DRAG_RETICLE_CONFIG.baseSize;
 
-        // v4.23: Medición precisa de la Bounding Box en espacio local (inmune a la rotación de la malla)
+        // v4.24: Medición precisa de la Bounding Box del modelo en escena
         const actualizarBoundingBox = (THREE_INSTANCE) => {
           if (!t.three.scene) return;
           const modelObj = t.three.scene.getObjectByName("Model");
           if (modelObj) {
-            const localBox = new THREE_INSTANCE.Box3();
-            modelObj.traverse((child) => {
-              if (child.isMesh && child.geometry) {
-                if (!child.geometry.boundingBox) child.geometry.computeBoundingBox();
-                localBox.union(child.geometry.boundingBox);
-              }
-            });
+            const box = new THREE_INSTANCE.Box3().setFromObject(modelObj);
             const size = new THREE_INSTANCE.Vector3();
-            localBox.getSize(size);
+            box.getSize(size);
             if (size.x > 0.05 && size.z > 0.05) {
               bboxSizeX = size.x;
               bboxSizeZ = size.z;
@@ -204,22 +198,18 @@
           }
         };
 
-        // v4.23: Sincronización angular continua para que la retícula sea siempre 100% paralela a los bordes del modelo
-        const sincronizarTransformReticula = (ret, THREE_INSTANCE) => {
+        // v4.24: Sincronización robusta y matemática de la retícula
+        const sincronizarTransformReticula = (ret) => {
           if (!ret) return;
-          const rotQuat = t.transform.getWorldRotation(a);
-          const q = new THREE_INSTANCE.Quaternion(rotQuat.x, rotQuat.y, rotQuat.z, rotQuat.w);
-          const euler = new THREE_INSTANCE.Euler().setFromQuaternion(q, 'YXZ');
-
           ret.position.set(planarX, dragPlaneY + 0.002, planarZ);
-          ret.rotation.set(-Math.PI / 2, 0, euler.y);
+          ret.rotation.set(-Math.PI / 2, 0, currentRotationY);
           ret.scale.set(currentScale, currentScale, currentScale);
         };
 
-        // v4.20: retícula adaptativa al tamaño exacto de la caja envolvente
+        // v4.24: retícula adaptativa al tamaño exacto de la caja envolvente
         const obtenerReticula = (THREE_INSTANCE, scene) => {
           if (reticleMesh) {
-            sincronizarTransformReticula(reticleMesh, THREE_INSTANCE);
+            sincronizarTransformReticula(reticleMesh);
             return reticleMesh;
           }
           actualizarBoundingBox(THREE_INSTANCE);
@@ -239,7 +229,7 @@
             side: THREE_INSTANCE.DoubleSide
           });
           reticleMesh = new THREE_INSTANCE.Mesh(geometry, material);
-          sincronizarTransformReticula(reticleMesh, THREE_INSTANCE);
+          sincronizarTransformReticula(reticleMesh);
           reticleMesh.visible = false;
           reticleMesh.renderOrder = 0;
           scene.add(reticleMesh);
@@ -331,19 +321,19 @@
                 isDragActive = !0;
                 if (t.three.scene) {
                   const ret = obtenerReticula(i, t.three.scene);
-                  sincronizarTransformReticula(ret, i);
+                  sincronizarTransformReticula(ret);
                   ret.visible = true;
                 }
               }
               if (reticleMesh) {
-                sincronizarTransformReticula(reticleMesh, i);
+                sincronizarTransformReticula(reticleMesh);
               }
             }
           })
           .listen(t.events.globalId, e.input.SCREEN_TOUCH_END, o => {
             activePointerIds.delete(o.data.pointerId);
             if (0 === activePointerIds.size) {
-              // v4.20: caída acelerada (1080ms) asentándose en Y = 0 sin rebasarlo
+              // v4.24: caída acelerada (970ms) asentándose en Y = 0 sin rebasarlo
               if (isDragActive) {
                 isDragActive = !1;
                 if (reticleMesh) reticleMesh.visible = false;
@@ -381,7 +371,7 @@
             }
             if (t.three.scene && window.THREE) {
               const ret = obtenerReticula(window.THREE, t.three.scene);
-              sincronizarTransformReticula(ret, window.THREE);
+              sincronizarTransformReticula(ret);
               ret.visible = true;
             }
           })
@@ -391,11 +381,12 @@
             // 1. ROTACIÓN ESTÁNDAR
             if (o.data.positionChange && o.data.positionChange.x) {
               const angleDelta = o.data.positionChange.x * MODEL_GESTURES.rotationSensitivity;
+              currentRotationY += angleDelta;
               t.transform.rotateSelf(a, e.math.quat.yRadians(angleDelta));
 
               if (t.three.scene && window.THREE) {
                 const ret = obtenerReticula(window.THREE, t.three.scene);
-                sincronizarTransformReticula(ret, window.THREE);
+                sincronizarTransformReticula(ret);
                 ret.visible = true;
               }
             }
@@ -419,7 +410,7 @@
 
                 if (t.three.scene && window.THREE) {
                   const ret = obtenerReticula(window.THREE, t.three.scene);
-                  sincronizarTransformReticula(ret, window.THREE);
+                  sincronizarTransformReticula(ret);
                 }
               }
             }
