@@ -1,4 +1,4 @@
-﻿// 9th Wall v4.22
+﻿// 9th Wall v4.23
 (() => {
   var e = {
     574() {
@@ -110,7 +110,7 @@
       }
     });
 
-    // Componente de generación única tras la calibración (con rotación 360° explícita blindada)
+    // Componente de generación única tras la calibración (con cinemática de spawn: ascenso -0.50m a 0m y giro 360° Cubic a 1s)
     e.registerComponent({
       name: "dish-spawner",
       schema: { prefab: "eid" },
@@ -123,31 +123,40 @@
           const prefabEid = schemaAttr.get(a).prefab;
           const r = t.createEntity(prefabEid);
           const d = t.getEntity(r);
-          d.setLocalPosition(ev.data.worldPosition);
+
+          const targetX = ev.data.worldPosition.x;
+          const targetY = ev.data.worldPosition.y;
+          const targetZ = ev.data.worldPosition.z;
 
           // Rotación binaria base (0° o 180°)
           const baseRotY = Math.random() < 0.5 ? 0 : Math.PI;
 
-          // v4.22: Giro completo de 360° horario (-2PI) con integración explícita Euler Y y frenada Cubic (1000ms)
-          // Evita que el quaternion colapse 0° y 360° por la regla del camino más corto (shortest path)
-          const spinDuration = 1000;
-          const spinStartTime = performance.now();
-          const totalSpinAngle = -Math.PI * 2;
+          // v4.23: Cinemática continua de Spawn a 60 FPS (Ascenso Y: -0.50m a 0.001m + Giro 360° horario en 1000ms Cubic)
+          // La integración directa paso a paso en radianes evita que el quaternion colapse 360° a 0° por shortest path
+          const spawnDuration = 1000;
+          const spawnStartTime = performance.now();
+          const totalSpinAngle = -Math.PI * 2; // -360° horario
 
-          const animarGiroSpawn = () => {
-            const elapsed = performance.now() - spinStartTime;
-            const progress = Math.min(1.0, elapsed / spinDuration);
+          const animarSpawnCompleto = () => {
+            const elapsed = performance.now() - spawnStartTime;
+            const progress = Math.min(1.0, elapsed / spawnDuration);
             // Easing Cubic Ease-Out
             const ease = 1.0 - Math.pow(1.0 - progress, 3);
+
+            const currentY = (targetY - 0.50) + (0.501 * ease);
             const currentAngle = baseRotY + (totalSpinAngle * ease);
 
+            d.setLocalPosition({ x: targetX, y: currentY, z: targetZ });
             d.set(e.Quaternion, e.math.quat.yRadians(currentAngle));
 
             if (progress < 1.0) {
-              requestAnimationFrame(animarGiroSpawn);
+              requestAnimationFrame(animarSpawnCompleto);
+            } else {
+              d.setLocalPosition({ x: targetX, y: targetY + 0.001, z: targetZ });
+              d.set(e.Quaternion, e.math.quat.yRadians(baseRotY + totalSpinAngle));
             }
           };
-          requestAnimationFrame(animarGiroSpawn);
+          requestAnimationFrame(animarSpawnCompleto);
         });
       }
     });
@@ -174,14 +183,20 @@
         bboxSizeX = DRAG_RETICLE_CONFIG.baseSize,
         bboxSizeZ = DRAG_RETICLE_CONFIG.baseSize;
 
-        // v4.20: Medición precisa y limpia del Bounding Box del modelo activo
+        // v4.23: Medición precisa de la Bounding Box en espacio local (inmune a la rotación de la malla)
         const actualizarBoundingBox = (THREE_INSTANCE) => {
           if (!t.three.scene) return;
           const modelObj = t.three.scene.getObjectByName("Model");
           if (modelObj) {
-            const box = new THREE_INSTANCE.Box3().setFromObject(modelObj);
+            const localBox = new THREE_INSTANCE.Box3();
+            modelObj.traverse((child) => {
+              if (child.isMesh && child.geometry) {
+                if (!child.geometry.boundingBox) child.geometry.computeBoundingBox();
+                localBox.union(child.geometry.boundingBox);
+              }
+            });
             const size = new THREE_INSTANCE.Vector3();
-            box.getSize(size);
+            localBox.getSize(size);
             if (size.x > 0.05 && size.z > 0.05) {
               bboxSizeX = size.x;
               bboxSizeZ = size.z;
@@ -189,10 +204,22 @@
           }
         };
 
+        // v4.23: Sincronización angular continua para que la retícula sea siempre 100% paralela a los bordes del modelo
+        const sincronizarTransformReticula = (ret, THREE_INSTANCE) => {
+          if (!ret) return;
+          const rotQuat = t.transform.getWorldRotation(a);
+          const q = new THREE_INSTANCE.Quaternion(rotQuat.x, rotQuat.y, rotQuat.z, rotQuat.w);
+          const euler = new THREE_INSTANCE.Euler().setFromQuaternion(q, 'YXZ');
+
+          ret.position.set(planarX, dragPlaneY + 0.002, planarZ);
+          ret.rotation.set(-Math.PI / 2, 0, euler.y);
+          ret.scale.set(currentScale, currentScale, currentScale);
+        };
+
         // v4.20: retícula adaptativa al tamaño exacto de la caja envolvente
         const obtenerReticula = (THREE_INSTANCE, scene) => {
           if (reticleMesh) {
-            reticleMesh.scale.set(currentScale, currentScale, currentScale);
+            sincronizarTransformReticula(reticleMesh, THREE_INSTANCE);
             return reticleMesh;
           }
           actualizarBoundingBox(THREE_INSTANCE);
@@ -212,8 +239,7 @@
             side: THREE_INSTANCE.DoubleSide
           });
           reticleMesh = new THREE_INSTANCE.Mesh(geometry, material);
-          reticleMesh.rotation.x = -Math.PI / 2;
-          reticleMesh.scale.set(currentScale, currentScale, currentScale);
+          sincronizarTransformReticula(reticleMesh, THREE_INSTANCE);
           reticleMesh.visible = false;
           reticleMesh.renderOrder = 0;
           scene.add(reticleMesh);
@@ -305,15 +331,12 @@
                 isDragActive = !0;
                 if (t.three.scene) {
                   const ret = obtenerReticula(i, t.three.scene);
-                  ret.rotation.z = 0;
-                  ret.scale.set(currentScale, currentScale, currentScale);
-                  ret.position.set(planarX, dragPlaneY + 0.002, planarZ);
+                  sincronizarTransformReticula(ret, i);
                   ret.visible = true;
                 }
               }
               if (reticleMesh) {
-                reticleMesh.position.set(planarX, dragPlaneY + 0.002, planarZ);
-                reticleMesh.scale.set(currentScale, currentScale, currentScale);
+                sincronizarTransformReticula(reticleMesh, i);
               }
             }
           })
@@ -358,8 +381,7 @@
             }
             if (t.three.scene && window.THREE) {
               const ret = obtenerReticula(window.THREE, t.three.scene);
-              ret.position.set(planarX, dragPlaneY + 0.002, planarZ);
-              ret.scale.set(currentScale, currentScale, currentScale);
+              sincronizarTransformReticula(ret, window.THREE);
               ret.visible = true;
             }
           })
@@ -373,11 +395,8 @@
 
               if (t.three.scene && window.THREE) {
                 const ret = obtenerReticula(window.THREE, t.three.scene);
-                const pos = t.transform.getWorldPosition(a);
-                ret.position.set(pos.x, dragPlaneY + 0.002, pos.z);
-                ret.scale.set(currentScale, currentScale, currentScale);
+                sincronizarTransformReticula(ret, window.THREE);
                 ret.visible = true;
-                ret.rotateZ(angleDelta);
               }
             }
 
@@ -400,7 +419,7 @@
 
                 if (t.three.scene && window.THREE) {
                   const ret = obtenerReticula(window.THREE, t.three.scene);
-                  ret.scale.set(currentScale, currentScale, currentScale);
+                  sincronizarTransformReticula(ret, window.THREE);
                 }
               }
             }
@@ -702,27 +721,13 @@
         },
 
         // Entidad del Modelo 3D (El archivo .glb)
-        // v4.20: Animación sincronizada a 1s (desde Y=-0.50 a 0.001 con frenada Cubic)
         "a02b4479-461e-40c2-ba91-0ccabbd1bd83": {
           "id": "a02b4479-461e-40c2-ba91-0ccabbd1bd83",
           "position": [0, 0, 0],
           "rotation": [0, 0, 0, 1],
           "scale": [1, 1, 1],
           "parentId": "b534657a-38e6-4275-a37d-77b655561d5b",
-          "components": {
-            "a2c75775-5a0f-44d7-910c-c111bc850bf6": {
-              "id": "a2c75775-5a0f-44d7-910c-c111bc850bf6",
-              "name": "position-animation",
-              "parameters": {
-                "fromY": -0.50,
-                "loop": false,
-                "easeOut": true,
-                "easingFunction": "Cubic",
-                "duration": 1000,
-                "toY": 0.001
-              }
-            }
-          },
+          "components": {},
           "name": "Model",
           "order": 1.1209803013844988,
           "gltfModel": {
