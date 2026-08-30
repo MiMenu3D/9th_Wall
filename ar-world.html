@@ -1,4 +1,4 @@
-<!-- 9th Wall v4.31 (Dual-Lobe Dynamic Specular / Post-Map Normal Noise / GPU-Synced Spawn) -->
+<!-- 9th Wall v4.29 (Live Specular Modes / Geometric Normal Noise / Pre-compiled Shaders) -->
 <html>
 <head>
   <meta charset="UTF-8">
@@ -18,8 +18,8 @@
     style="position:fixed;top:10px;right:10px;z-index:1000000;background:rgba(0,0,0,0.9);color:#0f0;font-family:monospace;font-size:12px;padding:8px;border-radius:4px;cursor:pointer;line-height:1.3;border:1px solid #0f0;display:none;pointer-events:auto;">
     <div id="debugTitle">FPS: --</div>
     <div id="debugContent">
-      ar-world: v4.31<br>
-      bundle: v4.31<br>
+      ar-world: v4.29<br>
+      bundle: v4.29<br>
       <span id="envVerdictSpan" style="color:#0f0;">Entorno: ESPERANDO MESA...</span><br>
       <span id="telemetrySpan" style="color:#0f0;">P98: -- (/255) | Lum: -- (/255) | Cálido: --%</span><br>
       <span id="lightsCountSpan" style="color:#0f0;">Luces: 1</span><br>
@@ -138,7 +138,7 @@
     let currentPedestal = LIGHTING_CONFIG.day_pedestal;
     let environmentFactor = 0.0;
 
-    // v4.31: Estado del modo especular (0: THIN, 1: WIDE, 2: BOTH por defecto)
+    // v4.29: Estado del modo especular (0: THIN, 1: WIDE, 2: BOTH por defecto)
     let currentSpecularMode = 2;
 
     const crearRanuraLuz = () => ({
@@ -198,7 +198,7 @@
 
     document.getElementById('envToggle').addEventListener('click', () => toggleEnv());
 
-    // v4.31: Conmutador dinámico de modo especular en GPU (0: THIN, 1: WIDE, 2: BOTH)
+    // v4.29: Conmutador dinámico de modo especular sin recargas ni recompilación (0: THIN, 1: WIDE, 2: BOTH)
     const specToggleBtn = document.getElementById('specToggle');
     if (specToggleBtn) {
       specToggleBtn.addEventListener('click', () => {
@@ -306,7 +306,7 @@
       secretTrigger.addEventListener('pointerdown', procesarToqueSecreto);
     }
 
-    // v4.31: Inyección de shaders PBR con Dual-Lobe físico y Ruido en Normales Post-Map (Declaración de uniform protegida)
+    // v4.29: Función de inyección de shaders (Ruido procedural en Normales y Uniform de modo especular)
     window.aplicarAjustesSceneViewer = function (targetNode) {
       const root = targetNode || _scene;
       if (!root) return;
@@ -322,61 +322,37 @@
               mat._specularHooked = true;
               mat.userData.uSpecularMode = { value: currentSpecularMode };
 
-              mat.customProgramCacheKey = () => 'v431_dual_lobe_normal_spec';
+              mat.customProgramCacheKey = () => 'v429_pbr_normal_spec';
               mat.onBeforeCompile = (shader) => {
                 shader.uniforms.uSpecularMode = mat.userData.uSpecularMode;
 
-                // v4.31: Declaración de Uniform segura dentro de #include <common> para preservar directivas de versión
+                // v4.29: Inyección de Ruido Procedural Directo sobre las Normales Geométricas (Exagerado al 200% para diagnóstico)
                 shader.fragmentShader = shader.fragmentShader.replace(
-                  '#include <common>',
+                  '#include <normal_fragment_begin>',
                   `
-                  #include <common>
-                  uniform int uSpecularMode;
-                  `
-                );
-
-                // v4.31: Modulación de Rugosidad física según el lóbulo seleccionado (0: THIN concentrado, 1: WIDE suave difuso)
-                shader.fragmentShader = shader.fragmentShader.replace(
-                  '#include <roughnessmap_fragment>',
-                  `
-                  #include <roughnessmap_fragment>
-                  if (uSpecularMode == 0) {
-                    roughnessFactor = clamp(roughnessFactor * 0.55, 0.05, 1.0); // THIN: foco hiper-nítido
-                  } else if (uSpecularMode == 1) {
-                    roughnessFactor = clamp(roughnessFactor * 1.65, 0.05, 1.0); // WIDE: halo amplio difuminado
-                  }
-                  `
-                );
-
-                // v4.31: Inyección de Ruido Procedural Directo POST-MAPS sobre el vector normal geométrico
-                shader.fragmentShader = shader.fragmentShader.replace(
-                  '#include <normal_fragment_maps>',
-                  `
-                  #include <normal_fragment_maps>
+                  #include <normal_fragment_begin>
                   #ifdef USE_UV
-                    float nNoiseX = sin(vUv.x * 280.0) * cos(vUv.y * 280.0);
-                    float nNoiseY = cos(vUv.x * 280.0) * sin(vUv.y * 280.0);
-                    vec3 nPerturb = vec3(nNoiseX, nNoiseY, 0.0) * 0.40;
+                    // v4.29: Micro-relieve procedural sobre el vector normal geométrico
+                    float nNoiseX = sin(vUv.x * 350.0) * cos(vUv.y * 350.0);
+                    float nNoiseY = cos(vUv.x * 350.0) * sin(vUv.y * 350.0);
+                    vec3 nPerturb = vec3(nNoiseX, nNoiseY, 0.0) * 0.35; // Intensidad exagerada de prueba
                     normal = normalize(normal + nPerturb);
-                  #else
-                    float nNoisePX = sin(vViewPosition.x * 280.0) * cos(vViewPosition.y * 280.0);
-                    float nNoisePY = cos(vViewPosition.x * 280.0) * sin(vViewPosition.y * 280.0);
-                    vec3 nPerturbP = vec3(nNoisePX, nNoisePY, 0.0) * 0.40;
-                    normal = normalize(normal + nPerturbP);
                   #endif
                   `
                 );
 
-                // v4.31: Ganancia de energía analítica según el modo activo
+                // v4.29: Uniform en GPU para alternar modos: 0 (THIN), 1 (WIDE), 2 (BOTH)
+                shader.fragmentShader = `uniform int uSpecularMode;\n` + shader.fragmentShader;
+
                 shader.fragmentShader = shader.fragmentShader.replace(
                   '#include <lights_fragment_end>',
                   `
                   #include <lights_fragment_end>
-                  float specMult = 1.27; // BOTH
+                  float specMult = 1.27;
                   if (uSpecularMode == 0) {
-                    specMult = 0.89; // THIN
+                    specMult = 0.89; // Solo lóbulo fino concentrado
                   } else if (uSpecularMode == 1) {
-                    specMult = 0.38; // WIDE
+                    specMult = 0.38; // Solo lóbulo ancho suave
                   }
                   reflectedLight.directSpecular *= specMult;
                   `
@@ -408,7 +384,7 @@
         }
       });
 
-      // Precompilación forzada en GPU protegida
+      // Precompilación forzada en GPU para evitar congelamientos en el primer fotograma
       if (_renderer && _activeCamera && _scene) {
         try { _renderer.compile(_scene, _activeCamera); } catch (e) {}
       }
@@ -812,8 +788,8 @@
                       const mediaPoblacionalPodada = (arr) => {
                         if (arr.length <= 2) return arr.reduce((a, b) => a + b, 0) / arr.length;
                         const ordenados = [...arr].sort((a, b) => a - b);
-                        const podadosFinal = ordenados.slice(1, ordenados.length - 1);
-                        return podadosFinal.reduce((a, b) => a + b, 0) / podadosFinal.length;
+                        const podados = ordenados.slice(1, ordenados.length - 1);
+                        return podados.reduce((a, b) => a + b, 0) / podados.length;
                       };
 
                       const avgP98 = mediaPoblacionalPodada(accumulatedP98Samples);
@@ -912,8 +888,8 @@
 
                           const spawnTarget = new THREE_INSTANCE.Vector3();
                           if (placementRay.intersectPlane(groundPlane, spawnTarget)) {
-                            const fDir = new THREE_INSTANCE.Vector3(spawnTarget.x - camWorldPos.x, 0, spawnTarget.z - camWorldPos.z).normalize();
-                            spawnTarget.addScaledVector(fDir, 0.05);
+                            const forwardDir = new THREE_INSTANCE.Vector3(spawnTarget.x - camWorldPos.x, 0, spawnTarget.z - camWorldPos.z).normalize();
+                            spawnTarget.addScaledVector(forwardDir, 0.05);
                             spawnTarget.y = 0.0;
                           } else {
                             const camDir = new THREE_INSTANCE.Vector3();
@@ -1066,10 +1042,10 @@
 
                   if (slot.state === 'transitioning' || slot.state === 'fading_out') {
                     const elapsed = now - slot.transition.startTime;
-                    const progressFinal = Math.min(1.0, elapsed / slot.transition.duration);
-                    slot.light.intensity = THREE_INSTANCE.MathUtils.lerp(slot.transition.startIntensity, slot.transition.destIntensity, progressFinal);
+                    const progress = Math.min(1.0, elapsed / slot.transition.duration);
+                    slot.light.intensity = THREE_INSTANCE.MathUtils.lerp(slot.transition.startIntensity, slot.transition.destIntensity, progress);
 
-                    if (progressFinal >= 1.0) {
+                    if (progress >= 1.0) {
                       if (slot.transition.destIntensity <= 0.0) {
                         slot.state = 'idle';
                         slot.isAnchored = false;

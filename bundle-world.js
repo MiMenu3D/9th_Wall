@@ -1,4 +1,4 @@
-﻿// 9th Wall v4.31
+﻿// 9th Wall v4.29
 (() => {
   var e = {
     574() {
@@ -50,20 +50,20 @@
     scaleDeadzone: 0.085
   });
 
-  // v4.31: retícula adaptativa ceñida exactamente al perímetro del plato y rebote calibrado (940ms)
+  // v4.29: retícula adaptativa al Bounding Box local con aristas blindadas y rebote calibrado (940ms)
   const DRAG_RETICLE_CONFIG = Object.freeze({
     liftHeight: 0.05,
     liftSmoothingRate: 8.0,
     dragActivationThreshold: 0.012,
-    baseSize: 0.235,
-    thickness: 0.016,
-    cornerRadius: 0.035,
+    baseSize: 0.272,
+    thickness: 0.018,
+    cornerRadius: 0.04,
     color: 0x66ffff,
     bounceDuration: 940,
     bounceEasing: "Bounce"
   });
 
-  // v4.31: Contorno exterior en sentido antihorario (CCW)
+  // v4.29: Contorno exterior en sentido antihorario (CCW)
   function crearFormaRectRedondeadaCCW(THREE_INSTANCE, sizeX, sizeZ, radius) {
     const sx = sizeX / 2;
     const sz = sizeZ / 2;
@@ -81,7 +81,7 @@
     return shape;
   }
 
-  // v4.31: Agujero interior en sentido horario (CW) para garantizar triangulación limpia sin aristas infinitas en X
+  // v4.29: Agujero interior en sentido horario (CW) para garantizar triangulación limpia sin aristas infinitas en X
   function crearFormaRectRedondeadaCW(THREE_INSTANCE, sizeX, sizeZ, radius) {
     const sx = sizeX / 2;
     const sz = sizeZ / 2;
@@ -125,7 +125,7 @@
       }
     });
 
-    // v4.31: Componente de generación sincronizado al onAfterRender del primer frame en GPU (3000ms Escala / 4000ms Giro 1.5 vueltas)
+    // v4.29: Componente de generación invisible con precompilación de shaders y cinemática (3000ms Escala / 4000ms Giro 1.5 vueltas)
     e.registerComponent({
       name: "dish-spawner",
       schema: { prefab: "eid" },
@@ -146,7 +146,7 @@
           // Rotación binaria base (0° o 180°)
           const baseRotY = Math.random() < 0.5 ? 0 : Math.PI;
 
-          // Posición fija sobre la mesa en escala 0 (esperando rasterización real de GPU)
+          // Posición fija sobre la mesa en escala 0 (Invisible al ojo durante el enganche de shaders)
           d.setLocalPosition({ x: targetX, y: targetY + 0.001, z: targetZ });
           e.Scale.set(t, r, { x: 0.0001, y: 0.0001, z: 0.0001 });
           d.set(e.Quaternion, e.math.quat.yRadians(baseRotY));
@@ -194,32 +194,25 @@
             requestAnimationFrame(animarSpawnCompleto);
           };
 
-          // Sondeo con enganche al primer render en GPU (onAfterRender)
+          // Sondeo con detección real de vértices, inyección de shaders y precompilación previa al disparo
           const comprobarMallaLista = () => {
             if (animationStarted) return;
-            let meshEncontrada = null;
+            let encontrada = false;
 
             if (t.three && t.three.scene) {
               t.three.scene.traverse((child) => {
-                if (!meshEncontrada && child.isMesh && child.geometry && child.geometry.attributes && child.geometry.attributes.position && child.geometry.attributes.position.count > 0 && child.name !== "Ground" && child.name !== "Hider") {
-                  meshEncontrada = child;
+                if (child.isMesh && child.geometry && child.geometry.attributes && child.geometry.attributes.position && child.geometry.attributes.position.count > 0 && child.name !== "Ground" && child.name !== "Hider") {
+                  encontrada = true;
                 }
               });
             }
 
-            if (meshEncontrada) {
+            if (encontrada) {
+              // Inyectamos shaders y precompilamos en GPU mientras el plato está en escala 0
               if (window.aplicarAjustesSceneViewer) {
                 window.aplicarAjustesSceneViewer(t.three.scene);
               }
-
-              // Sincronización estricta: iniciamos el cronómetro solo tras el primer fotograma real dibujado por la GPU
-              let primerFrameDibujado = false;
-              meshEncontrada.onAfterRender = () => {
-                if (primerFrameDibujado) return;
-                primerFrameDibujado = true;
-                meshEncontrada.onAfterRender = null;
-                dispararCinematicaSpawn();
-              };
+              dispararCinematicaSpawn();
             } else {
               requestAnimationFrame(comprobarMallaLista);
             }
@@ -251,37 +244,38 @@
         bboxSizeX = DRAG_RETICLE_CONFIG.baseSize,
         bboxSizeZ = DRAG_RETICLE_CONFIG.baseSize;
 
-        // v4.31: Medición precisa del Bounding Box local unificado por transformación de matrices de nodo (model-viewer spec)
+        // v4.29: Medición precisa del Bounding Box aislando exclusivamente la malla del plato
         const actualizarBoundingBox = (THREE_INSTANCE) => {
           if (!t.three || !t.three.scene) return;
-          const unifiedBox = new THREE_INSTANCE.Box3();
+          let minX = Infinity, maxX = -Infinity;
+          let minZ = Infinity, maxZ = -Infinity;
           let hasGeom = false;
 
           t.three.scene.traverse((child) => {
-            if (child.isMesh && child.geometry && child.name !== "Ground" && child.name !== "Hider" && child !== reticleMesh && (!child.material || child.material.type !== 'ShadowMaterial')) {
+            if (child.isMesh && child.geometry && child.geometry.attributes && child.geometry.attributes.position && child.name !== "Ground" && child.name !== "Hider" && child !== reticleMesh && (!child.material || child.material.type !== 'ShadowMaterial')) {
               if (!child.geometry.boundingBox) child.geometry.computeBoundingBox();
-              if (child.geometry.boundingBox) {
-                // Aplicamos la matriz local de cada sub-malla para unificar todas las piezas en el espacio raíz del plato
-                const meshBox = child.geometry.boundingBox.clone();
-                if (child.matrix) meshBox.applyMatrix4(child.matrix);
-                unifiedBox.union(meshBox);
-                hasGeom = true;
+              const bb = child.geometry.boundingBox;
+              if (bb) {
+                const szX = bb.max.x - bb.min.x;
+                const szZ = bb.max.z - bb.min.z;
+                if (szX < 1.5 && szZ < 1.5) {
+                  minX = Math.min(minX, bb.min.x);
+                  maxX = Math.max(maxX, bb.max.x);
+                  minZ = Math.min(minZ, bb.min.z);
+                  maxZ = Math.max(maxZ, bb.max.z);
+                  hasGeom = true;
+                }
               }
             }
           });
 
-          if (hasGeom) {
-            const sz = new THREE_INSTANCE.Vector3();
-            unifiedBox.getSize(sz);
-            if (sz.x > 0.05 && sz.z > 0.05 && sz.x < 1.5 && sz.z < 1.5) {
-              // v4.31: Ajuste perimétrico exacto ceñido al borde del plato (-3cm)
-              bboxSizeX = Math.max(0.12, sz.x - 0.03);
-              bboxSizeZ = Math.max(0.12, sz.z - 0.03);
-            }
+          if (hasGeom && (maxX - minX > 0.05) && (maxZ - minZ > 0.05)) {
+            bboxSizeX = (maxX - minX) + 0.04;
+            bboxSizeZ = (maxZ - minZ) + 0.04;
           }
         };
 
-        // v4.31: Sincronización angular mediante cuaterniones combinados (qYaw x qPitch)
+        // v4.29: Sincronización angular mediante cuaterniones combinados (qYaw x qPitch)
         const sincronizarTransformReticula = (ret, THREE_INSTANCE) => {
           if (!ret || !THREE_INSTANCE) return;
 
@@ -301,7 +295,7 @@
           ret.scale.set(currentScale, currentScale, currentScale);
         };
 
-        // v4.31: Generación de retícula adaptativa y orientada
+        // v4.29: Generación de retícula adaptativa y orientada
         const obtenerReticula = (THREE_INSTANCE, scene) => {
           if (reticleMesh) {
             sincronizarTransformReticula(reticleMesh, THREE_INSTANCE);
@@ -422,7 +416,7 @@
           .listen(t.events.globalId, e.input.SCREEN_TOUCH_END, o => {
             activePointerIds.delete(o.data.pointerId);
             if (0 === activePointerIds.size) {
-              // v4.31: caída acelerada (940ms) asentándose en Y = 0 sin rebasarlo
+              // v4.29: caída acelerada (940ms) asentándose en Y = 0 sin rebasarlo
               if (isDragActive) {
                 isDragActive = !1;
                 if (reticleMesh) reticleMesh.visible = false;
