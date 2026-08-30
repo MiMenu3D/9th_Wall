@@ -1,4 +1,4 @@
-﻿// 9th Wall v4.26
+﻿// 9th Wall v4.27
 (() => {
   var e = {
     574() {
@@ -50,7 +50,7 @@
     scaleDeadzone: 0.085
   });
 
-  // v4.26: retícula adaptativa al Bounding Box local y rebote calibrado (940ms) estrictamente sobre Y >= 0
+  // v4.27: retícula adaptativa al Bounding Box local y rebote calibrado (940ms) estrictamente sobre Y >= 0
   const DRAG_RETICLE_CONFIG = Object.freeze({
     liftHeight: 0.05,
     liftSmoothingRate: 8.0,
@@ -107,7 +107,7 @@
       }
     });
 
-    // v4.26: Componente de generación única con sondeo de carga de malla y cinemática majestuosa (2000ms Quartic)
+    // v4.27: Componente de generación reactivo con detección de carga GLTF nativa y cinemática (2000ms Quartic)
     e.registerComponent({
       name: "dish-spawner",
       schema: { prefab: "eid" },
@@ -134,51 +134,61 @@
 
           const spawnDuration = 2000;
           const totalSpinAngle = -Math.PI * 2; // -360° horario
+          let animationStarted = false;
 
-          // Sondeo: Esperar a que los nodos Mesh del modelo GLTF existan en el grafo de escena
-          const esperarCargaYMalla = () => {
-            let meshLoaded = false;
-            if (t.three.scene) {
-              const modelObj = t.three.scene.getObjectByName("Model");
-              if (modelObj) {
-                modelObj.traverse((child) => {
-                  if (child.isMesh && child.geometry) {
-                    meshLoaded = true;
-                  }
-                });
+          const dispararCinematicaSpawn = () => {
+            if (animationStarted) return;
+            animationStarted = true;
+
+            const spawnStartTime = performance.now();
+            const animarSpawnCompleto = () => {
+              const elapsed = performance.now() - spawnStartTime;
+              const progress = Math.min(1.0, elapsed / spawnDuration);
+              // Easing Quartic Ease-Out: 1 - (1 - t)^4
+              const ease = 1.0 - Math.pow(1.0 - progress, 4);
+
+              const currentY = (targetY - 0.50) + (0.501 * ease);
+              const currentAngle = baseRotY + (totalSpinAngle * ease);
+
+              d.setLocalPosition({ x: targetX, y: currentY, z: targetZ });
+              d.set(e.Quaternion, e.math.quat.yRadians(currentAngle));
+
+              if (progress < 1.0) {
+                requestAnimationFrame(animarSpawnCompleto);
+              } else {
+                d.setLocalPosition({ x: targetX, y: targetY + 0.001, z: targetZ });
+                d.set(e.Quaternion, e.math.quat.yRadians(baseRotY + totalSpinAngle));
               }
-            }
-
-            if (meshLoaded) {
-              const spawnStartTime = performance.now();
-
-              const animarSpawnCompleto = () => {
-                const elapsed = performance.now() - spawnStartTime;
-                const progress = Math.min(1.0, elapsed / spawnDuration);
-                // Easing Quartic Ease-Out: 1 - (1 - t)^4
-                const ease = 1.0 - Math.pow(1.0 - progress, 4);
-
-                const currentY = (targetY - 0.50) + (0.501 * ease);
-                const currentAngle = baseRotY + (totalSpinAngle * ease);
-
-                d.setLocalPosition({ x: targetX, y: currentY, z: targetZ });
-                d.set(e.Quaternion, e.math.quat.yRadians(currentAngle));
-
-                if (progress < 1.0) {
-                  requestAnimationFrame(animarSpawnCompleto);
-                } else {
-                  d.setLocalPosition({ x: targetX, y: targetY + 0.001, z: targetZ });
-                  d.set(e.Quaternion, e.math.quat.yRadians(baseRotY + totalSpinAngle));
-                }
-              };
-
-              requestAnimationFrame(animarSpawnCompleto);
-            } else {
-              requestAnimationFrame(esperarCargaYMalla);
-            }
+            };
+            requestAnimationFrame(animarSpawnCompleto);
           };
 
-          requestAnimationFrame(esperarCargaYMalla);
+          // 1. Escucha reactiva oficial del evento de motor GLTF_MODEL_LOADED
+          if (e.events && e.events.GLTF_MODEL_LOADED) {
+            const unlisten = t.events.addListener(t.events.globalId, e.events.GLTF_MODEL_LOADED, () => {
+              dispararCinematicaSpawn();
+              if (unlisten) unlisten();
+            });
+          }
+
+          // 2. Comprobación directa sobre la escena Three.js para modelos precargados o en caché
+          const comprobarMallaLista = () => {
+            if (animationStarted) return;
+            let encontrada = false;
+            if (t.three && t.three.scene) {
+              t.three.scene.traverse((child) => {
+                if (child.isMesh && child.geometry && child.name !== "Ground" && child.name !== "Hider") {
+                  encontrada = true;
+                }
+              });
+            }
+            if (encontrada) {
+              dispararCinematicaSpawn();
+            } else {
+              requestAnimationFrame(comprobarMallaLista);
+            }
+          };
+          requestAnimationFrame(comprobarMallaLista);
         });
       }
     });
@@ -205,32 +215,29 @@
         bboxSizeX = DRAG_RETICLE_CONFIG.baseSize,
         bboxSizeZ = DRAG_RETICLE_CONFIG.baseSize;
 
-        // v4.26: Medición precisa del Bounding Box en espacio local (invariante a la rotación del modelo)
+        // v4.27: Medición precisa del Bounding Box en espacio local (invariante a la rotación del modelo)
         const actualizarBoundingBox = (THREE_INSTANCE) => {
           if (!t.three.scene) return;
-          const modelObj = t.three.scene.getObjectByName("Model");
-          if (modelObj) {
-            const localBox = new THREE_INSTANCE.Box3();
-            let hasGeom = false;
-            modelObj.traverse((child) => {
-              if (child.isMesh && child.geometry) {
-                if (!child.geometry.boundingBox) child.geometry.computeBoundingBox();
-                localBox.union(child.geometry.boundingBox);
-                hasGeom = true;
-              }
-            });
-            if (hasGeom) {
-              const size = new THREE_INSTANCE.Vector3();
-              localBox.getSize(size);
-              if (size.x > 0.05 && size.z > 0.05) {
-                bboxSizeX = size.x;
-                bboxSizeZ = size.z;
-              }
+          const localBox = new THREE_INSTANCE.Box3();
+          let hasGeom = false;
+          t.three.scene.traverse((child) => {
+            if (child.isMesh && child.geometry && child.name !== "Ground" && child.name !== "Hider" && child !== reticleMesh) {
+              if (!child.geometry.boundingBox) child.geometry.computeBoundingBox();
+              localBox.union(child.geometry.boundingBox);
+              hasGeom = true;
+            }
+          });
+          if (hasGeom) {
+            const size = new THREE_INSTANCE.Vector3();
+            localBox.getSize(size);
+            if (size.x > 0.05 && size.z > 0.05) {
+              bboxSizeX = size.x;
+              bboxSizeZ = size.z;
             }
           }
         };
 
-        // v4.26: Sincronización angular y posicional continua de la retícula
+        // v4.27: Sincronización angular y posicional continua de la retícula
         const sincronizarTransformReticula = (ret, THREE_INSTANCE) => {
           if (!ret) return;
           const rotQuat = t.transform.getWorldRotation(a);
@@ -242,7 +249,7 @@
           ret.scale.set(currentScale, currentScale, currentScale);
         };
 
-        // v4.26: retícula adaptativa al tamaño exacto de la caja envolvente
+        // v4.27: retícula adaptativa al tamaño exacto de la caja envolvente
         const obtenerReticula = (THREE_INSTANCE, scene) => {
           if (reticleMesh) {
             sincronizarTransformReticula(reticleMesh, THREE_INSTANCE);
@@ -369,7 +376,7 @@
           .listen(t.events.globalId, e.input.SCREEN_TOUCH_END, o => {
             activePointerIds.delete(o.data.pointerId);
             if (0 === activePointerIds.size) {
-              // v4.26: caída acelerada (940ms) asentándose en Y = 0 sin rebasarlo
+              // v4.27: caída acelerada (940ms) asentándose en Y = 0 sin rebasarlo
               if (isDragActive) {
                 isDragActive = !1;
                 if (reticleMesh) reticleMesh.visible = false;
