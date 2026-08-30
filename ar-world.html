@@ -1,4 +1,4 @@
-<!-- 9th Wall v4.26 (Dual-Lobe GGX Specular / Consolidated Telemetry / Auto-Gain) -->
+<!-- 9th Wall v4.29 (Live Specular Modes / Geometric Normal Noise / Pre-compiled Shaders) -->
 <html>
 <head>
   <meta charset="UTF-8">
@@ -18,8 +18,8 @@
     style="position:fixed;top:10px;right:10px;z-index:1000000;background:rgba(0,0,0,0.9);color:#0f0;font-family:monospace;font-size:12px;padding:8px;border-radius:4px;cursor:pointer;line-height:1.3;border:1px solid #0f0;display:none;pointer-events:auto;">
     <div id="debugTitle">FPS: --</div>
     <div id="debugContent">
-      ar-world: v4.26<br>
-      bundle: v4.28<br>
+      ar-world: v4.29<br>
+      bundle: v4.29<br>
       <span id="envVerdictSpan" style="color:#0f0;">Entorno: ESPERANDO MESA...</span><br>
       <span id="telemetrySpan" style="color:#0f0;">P98: -- (/255) | Lum: -- (/255) | Cálido: --%</span><br>
       <span id="lightsCountSpan" style="color:#0f0;">Luces: 1</span><br>
@@ -46,13 +46,18 @@
   </button>
 
   <button id="debugToggle"
-    style="position:fixed;bottom:20px;left:120px;z-index:1000000;padding:10px 14px;border-radius:10px;border:1px solid white;background:rgba(0,0,0,0.7);color:white;font-size:13px;pointer-events:auto !important;display:none;">
+    style="position:fixed;bottom:20px;left:115px;z-index:1000000;padding:10px 14px;border-radius:10px;border:1px solid white;background:rgba(0,0,0,0.7);color:white;font-size:13px;pointer-events:auto !important;display:none;">
     Debug: OFF
+  </button>
+
+  <button id="specToggle"
+    style="position:fixed;bottom:20px;left:215px;z-index:1000000;padding:10px 14px;border-radius:10px;border:1px solid white;background:rgba(0,0,0,0.7);color:white;font-size:13px;pointer-events:auto !important;display:none;">
+    Spec: BOTH
   </button>
 
   <script>
     const LIGHTING_CONFIG = {
-      pmrem_resolution: 256, // Antes 64
+      pmrem_resolution: 256,
       pmrem_interval_ms: 200,
       scan_interval_ms: 300,
       calibration_frames_target: 4,
@@ -61,7 +66,7 @@
       night_shadow_radius: 8.0,
       ground_opacity_fixed: 0.40,
 
-      // v4.20: Presupuestos maestros consolidados (-10% día, -8% ambiente, +PMREM)
+      // Presupuestos maestros consolidados (-10% día, -8% ambiente, +PMREM)
       day_total_energy: 4.68,
       day_pmrem_mult: 1.65,
       day_pedestal: 0.035,
@@ -96,7 +101,7 @@
       halo_drop_threshold: 34,
       upper_half_limit: 0.45,
       debounce_cycles: 1,
-      min_material_roughness: 0.08, // v4.20: Suelo calibrado
+      min_material_roughness: 0.08,
       metalness_bypass_threshold: 0.50,
       albedo_desaturation: 0.15,
       temporal_blend_alpha: 0.25
@@ -132,6 +137,9 @@
     let currentPmremMult = LIGHTING_CONFIG.day_pmrem_mult;
     let currentPedestal = LIGHTING_CONFIG.day_pedestal;
     let environmentFactor = 0.0;
+
+    // v4.29: Estado del modo especular (0: THIN, 1: WIDE, 2: BOTH por defecto)
+    let currentSpecularMode = 2;
 
     const crearRanuraLuz = () => ({
       light: null,
@@ -190,6 +198,29 @@
 
     document.getElementById('envToggle').addEventListener('click', () => toggleEnv());
 
+    // v4.29: Conmutador dinámico de modo especular sin recargas ni recompilación (0: THIN, 1: WIDE, 2: BOTH)
+    const specToggleBtn = document.getElementById('specToggle');
+    if (specToggleBtn) {
+      specToggleBtn.addEventListener('click', () => {
+        currentSpecularMode = (currentSpecularMode + 1) % 3;
+        const labels = ["Spec: THIN", "Spec: WIDE", "Spec: BOTH"];
+        specToggleBtn.innerText = labels[currentSpecularMode];
+
+        if (_scene) {
+          _scene.traverse((child) => {
+            if (child.isMesh && child.material) {
+              const mats = Array.isArray(child.material) ? child.material : [child.material];
+              mats.forEach(m => {
+                if (m.userData && m.userData.uSpecularMode) {
+                  m.userData.uSpecularMode.value = currentSpecularMode;
+                }
+              });
+            }
+          });
+        }
+      });
+    }
+
     // v4.26: Gestión estricta de Modos UI (Arranque Clean por defecto)
     let currentUIMode = sessionStorage.getItem("ar_ui_mode");
     if (!currentUIMode || (currentUIMode !== "buttons" && currentUIMode !== "slam")) {
@@ -206,9 +237,11 @@
         if (debugLogEl) debugLogEl.style.display = "none";
         if (envToggleBtn) envToggleBtn.style.display = "none";
         if (debugToggleBtn) debugToggleBtn.style.display = "none";
+        if (specToggleBtn) specToggleBtn.style.display = "none";
       } else if (mode === "buttons") {
         if (debugLogEl) debugLogEl.style.display = "block";
         if (envToggleBtn) envToggleBtn.style.display = "block";
+        if (specToggleBtn) specToggleBtn.style.display = "block";
         if (debugToggleBtn) {
           debugToggleBtn.style.display = "block";
           debugToggleBtn.innerText = "Debug: OFF";
@@ -218,6 +251,7 @@
       } else if (mode === "slam") {
         if (debugLogEl) debugLogEl.style.display = "block";
         if (envToggleBtn) envToggleBtn.style.display = "block";
+        if (specToggleBtn) specToggleBtn.style.display = "block";
         if (debugToggleBtn) {
           debugToggleBtn.style.display = "block";
           debugToggleBtn.innerText = "Debug: ON";
@@ -251,7 +285,7 @@
       });
     }
 
-    // v4.26: Receptor secreto Easter Egg permanente (4 toques conmutan en vivo estrictamente entre clean y buttons)
+    // Receptor secreto Easter Egg permanente (4 toques conmutan en vivo estrictamente entre clean y buttons)
     if (secretTrigger) {
       let secretTaps = [];
       const procesarToqueSecreto = () => {
@@ -272,43 +306,55 @@
       secretTrigger.addEventListener('pointerdown', procesarToqueSecreto);
     }
 
-    // v4.25: Función global para aplicar ajustes de shader y albedo (Doble Lóbulo GGX Físico Re-calibrado)
-    window.aplicarAjustesSceneViewer = function () {
-      if (!_scene) return;
-      _scene.traverse((child) => {
+    // v4.29: Función de inyección de shaders (Ruido procedural en Normales y Uniform de modo especular)
+    window.aplicarAjustesSceneViewer = function (targetNode) {
+      const root = targetNode || _scene;
+      if (!root) return;
+
+      root.traverse((child) => {
         if (child.isMesh && child.material) {
           const mats = Array.isArray(child.material) ? child.material : [child.material];
           mats.forEach((mat) => {
             const isPBR = (mat.type === 'MeshStandardMaterial' || mat.type === 'MeshPhysicalMaterial');
             if (!isPBR) return;
 
-            // v4.25: Doble Lóbulo GGX Físico (Núcleo 0.89x concentrado + Halo 0.38x amplio = 1.27x total) + Ruido UV estático
             if (!mat._specularHooked) {
               mat._specularHooked = true;
-              mat.customProgramCacheKey = () => 'v426_dual_lobe_ggx';
+              mat.userData.uSpecularMode = { value: currentSpecularMode };
+
+              mat.customProgramCacheKey = () => 'v429_pbr_normal_spec';
               mat.onBeforeCompile = (shader) => {
+                shader.uniforms.uSpecularMode = mat.userData.uSpecularMode;
+
+                // v4.29: Inyección de Ruido Procedural Directo sobre las Normales Geométricas (Exagerado al 200% para diagnóstico)
                 shader.fragmentShader = shader.fragmentShader.replace(
-                  '#include <roughnessmap_fragment>',
+                  '#include <normal_fragment_begin>',
                   `
-                  #include <roughnessmap_fragment>
-                  #ifndef USE_ROUGHNESSMAP
-                    if (roughnessFactor >= 0.95) {
-                      roughnessFactor = 0.24; // v4.25: Núcleo nítido condensado
-                    }
-                  #endif
+                  #include <normal_fragment_begin>
                   #ifdef USE_UV
-                    // v4.25: Micro-ruido 100% estático anclado a la textura/malla
-                    float microNoise = fract(sin(dot(vUv * 120.0, vec2(12.9898, 78.233))) * 43758.5453);
-                    roughnessFactor = clamp(roughnessFactor + (microNoise - 0.5) * 0.05, 0.06, 1.0);
+                    // v4.29: Micro-relieve procedural sobre el vector normal geométrico
+                    float nNoiseX = sin(vUv.x * 350.0) * cos(vUv.y * 350.0);
+                    float nNoiseY = cos(vUv.x * 350.0) * sin(vUv.y * 350.0);
+                    vec3 nPerturb = vec3(nNoiseX, nNoiseY, 0.0) * 0.35; // Intensidad exagerada de prueba
+                    normal = normalize(normal + nPerturb);
                   #endif
                   `
                 );
+
+                // v4.29: Uniform en GPU para alternar modos: 0 (THIN), 1 (WIDE), 2 (BOTH)
+                shader.fragmentShader = `uniform int uSpecularMode;\n` + shader.fragmentShader;
+
                 shader.fragmentShader = shader.fragmentShader.replace(
                   '#include <lights_fragment_end>',
                   `
                   #include <lights_fragment_end>
-                  // v4.25: Doble Lóbulo Especular Analítico Calibrado (0.89x núcleo concentrado + 0.38x halo suave amplio = 1.27x total)
-                  reflectedLight.directSpecular *= 1.27;
+                  float specMult = 1.27;
+                  if (uSpecularMode == 0) {
+                    specMult = 0.89; // Solo lóbulo fino concentrado
+                  } else if (uSpecularMode == 1) {
+                    specMult = 0.38; // Solo lóbulo ancho suave
+                  }
+                  reflectedLight.directSpecular *= specMult;
                   `
                 );
               };
@@ -337,6 +383,11 @@
           });
         }
       });
+
+      // Precompilación forzada en GPU para evitar congelamientos en el primer fotograma
+      if (_renderer && _activeCamera && _scene) {
+        try { _renderer.compile(_scene, _activeCamera); } catch (e) {}
+      }
     };
 
     if (window.ecs) {
@@ -745,11 +796,9 @@
                       const avgLumFinal = mediaPoblacionalPodada(accumulatedAvgLumSamples);
                       const avgWarmRatio = mediaPoblacionalPodada(accumulatedWarmRatioSamples);
 
-                      // v4.20: Factores normalizados con 70% peso para Lum y 30% para P98
                       const p98Factor = Math.max(0.0, Math.min(1.0, 1.0 - (avgP98 - 110.0) / (225.0 - 110.0)));
                       const lumFactor = Math.max(0.0, Math.min(1.0, 1.0 - (avgLumFinal - 50.0) / (155.0 - 50.0)));
 
-                      // v4.20: Filtro de seguridad para ruido cromático ISO (si Lum < 75, ignora calidez espuria)
                       const isHighIsoNoise = (avgLumFinal < 75.0);
                       const isFullSceneWarm = !isHighIsoNoise && (avgWarmRatio >= 0.70);
 
@@ -770,7 +819,6 @@
                                             (lumFactor * warmWeight);
                       }
 
-                      // v4.20: Guardarraíles calibrados (+6% de tolerancia)
                       let verdict = "DIA_NORMAL";
                       if (avgP98 > 238 && avgLumFinal > 148) {
                         environmentFactor = 0.0;
@@ -788,7 +836,6 @@
 
                       environmentFactor = Math.max(0.0, Math.min(1.0, environmentFactor));
 
-                      // Interpolación Lineal Calibrada
                       currentDirectBudget = THREE_INSTANCE.MathUtils.lerp(LIGHTING_CONFIG.day_total_energy, LIGHTING_CONFIG.night_total_energy, environmentFactor);
                       currentPmremMult = THREE_INSTANCE.MathUtils.lerp(LIGHTING_CONFIG.day_pmrem_mult, LIGHTING_CONFIG.night_pmrem_mult, environmentFactor);
                       currentPedestal = THREE_INSTANCE.MathUtils.lerp(LIGHTING_CONFIG.day_pedestal, LIGHTING_CONFIG.night_pedestal, environmentFactor);
@@ -864,16 +911,15 @@
                     }
                   }
 
-                  // v4.20: Auto-Gain de Exposición con juicio combinado Lum (70%) + P90 (30%)
                   const effectiveIlluminance = (avgLum * 0.70) + (p90Lum * 0.30);
                   smoothedBrightness = effectiveIlluminance;
                   const normalizedBrightness = Math.max(0.001, Math.min(1.0, smoothedBrightness / 255));
                   targetExposure = normalizedBrightness * currentPmremMult * LIGHTING_CONFIG.master_exposure_scale;
 
                   if (effectiveIlluminance < 55) {
-                    targetExposure *= 1.15; // Realce compensatorio en superficies oscuras
+                    targetExposure *= 1.15;
                   } else if (effectiveIlluminance > 175) {
-                    targetExposure *= 0.90; // Atenuación suave en superficies blancas
+                    targetExposure *= 0.90;
                   }
 
                   if (isNaN(targetExposure)) targetExposure = 0.45;
@@ -1026,8 +1072,6 @@
                 const expLerpStep = 1.0 - Math.exp(-LIGHTING_CONFIG.smoothing_rate * deltaSec);
                 if (isNaN(renderer.toneMappingExposure)) renderer.toneMappingExposure = 1.0;
                 renderer.toneMappingExposure += (targetExposure - renderer.toneMappingExposure) * expLerpStep;
-
-                window.aplicarAjustesSceneViewer();
 
               } catch (e) {}
             }, 50);

@@ -1,4 +1,4 @@
-﻿// 9th Wall v4.28
+﻿// 9th Wall v4.29
 (() => {
   var e = {
     574() {
@@ -50,7 +50,7 @@
     scaleDeadzone: 0.085
   });
 
-  // v4.28: retícula adaptativa al Bounding Box local y rebote calibrado (940ms) estrictamente sobre Y >= 0
+  // v4.29: retícula adaptativa al Bounding Box local con aristas blindadas y rebote calibrado (940ms)
   const DRAG_RETICLE_CONFIG = Object.freeze({
     liftHeight: 0.05,
     liftSmoothingRate: 8.0,
@@ -63,8 +63,8 @@
     bounceEasing: "Bounce"
   });
 
-  // v4.28: rectángulo con esquinas redondeadas adaptativo a dimensiones X y Z
-  function crearFormaRectRedondeada(THREE_INSTANCE, sizeX, sizeZ, radius) {
+  // v4.29: Contorno exterior en sentido antihorario (CCW)
+  function crearFormaRectRedondeadaCCW(THREE_INSTANCE, sizeX, sizeZ, radius) {
     const sx = sizeX / 2;
     const sz = sizeZ / 2;
     const r = Math.min(radius, Math.min(sx, sz) * 0.5);
@@ -81,12 +81,30 @@
     return shape;
   }
 
+  // v4.29: Agujero interior en sentido horario (CW) para garantizar triangulación limpia sin aristas infinitas en X
+  function crearFormaRectRedondeadaCW(THREE_INSTANCE, sizeX, sizeZ, radius) {
+    const sx = sizeX / 2;
+    const sz = sizeZ / 2;
+    const r = Math.min(radius, Math.min(sx, sz) * 0.5);
+    const path = new THREE_INSTANCE.Path();
+    path.moveTo(-sx, sz - r);
+    path.lineTo(-sx, -sz + r);
+    path.quadraticCurveTo(-sx, -sz, -sx + r, -sz);
+    path.lineTo(sx - r, -sz);
+    path.quadraticCurveTo(sx, -sz, sx, -sz + r);
+    path.lineTo(sx, sz - r);
+    path.quadraticCurveTo(sx, sz, sx - r, sz);
+    path.lineTo(-sx + r, sz);
+    path.quadraticCurveTo(-sx, sz, -sx, sz - r);
+    return path;
+  }
+
   function crearGeometriaMarcoReticula(THREE_INSTANCE, sizeX, sizeZ, thickness, radius) {
-    const outer = crearFormaRectRedondeada(THREE_INSTANCE, sizeX, sizeZ, radius);
+    const outer = crearFormaRectRedondeadaCCW(THREE_INSTANCE, sizeX, sizeZ, radius);
     const innerX = Math.max(0.02, sizeX - thickness * 2);
     const innerZ = Math.max(0.02, sizeZ - thickness * 2);
     const innerRadius = Math.max(0.001, radius - thickness);
-    outer.holes.push(crearFormaRectRedondeada(THREE_INSTANCE, innerX, innerZ, innerRadius));
+    outer.holes.push(crearFormaRectRedondeadaCW(THREE_INSTANCE, innerX, innerZ, innerRadius));
     return new THREE_INSTANCE.ShapeGeometry(outer);
   }
 
@@ -107,7 +125,7 @@
       }
     });
 
-    // v4.28: Componente de generación con detección estricta de vértices GLTF, altura dinámica (-H) y cinemática desacoplada (1200ms elevación / 2000ms 720° Quintic)
+    // v4.29: Componente de generación invisible con precompilación de shaders y cinemática (3000ms Escala / 4000ms Giro 1.5 vueltas)
     e.registerComponent({
       name: "dish-spawner",
       schema: { prefab: "eid" },
@@ -128,16 +146,17 @@
           // Rotación binaria base (0° o 180°)
           const baseRotY = Math.random() < 0.5 ? 0 : Math.PI;
 
-          // Posición temporal de seguridad antes del spawn
-          d.setLocalPosition({ x: targetX, y: targetY - 1.0, z: targetZ });
+          // Posición fija sobre la mesa en escala 0 (Invisible al ojo durante el enganche de shaders)
+          d.setLocalPosition({ x: targetX, y: targetY + 0.001, z: targetZ });
+          e.Scale.set(t, r, { x: 0.0001, y: 0.0001, z: 0.0001 });
           d.set(e.Quaternion, e.math.quat.yRadians(baseRotY));
 
-          const elevDuration = 1200;
-          const rotDuration = 2000;
-          const totalSpinAngle = -Math.PI * 4; // -720° (2 vueltas completas en sentido horario)
+          const scaleDuration = 3000;
+          const rotDuration = 4000;
+          const totalSpinAngle = -Math.PI * 3; // -540° (1.5 vueltas completas en sentido horario)
           let animationStarted = false;
 
-          const dispararCinematicaSpawn = (spawnStartY) => {
+          const dispararCinematicaSpawn = () => {
             if (animationStarted) return;
             animationStarted = true;
 
@@ -145,55 +164,55 @@
             const animarSpawnCompleto = () => {
               const elapsed = performance.now() - spawnStartTime;
 
-              // 1. Cinemática de Elevación (1200ms - Quintic Ease-Out)
-              const progressY = Math.min(1.0, elapsed / elevDuration);
-              const easeY = 1.0 - Math.pow(1.0 - progressY, 5);
-              const currentY = spawnStartY + ((targetY + 0.001 - spawnStartY) * easeY);
+              // 1. Cinemática de Escala (3000ms - Cubic Ease-Out)
+              const progressScale = Math.min(1.0, elapsed / scaleDuration);
+              const easeScale = 1.0 - Math.pow(1.0 - progressScale, 3);
+              const currentScaleVal = Math.max(0.0001, easeScale);
 
-              // 2. Cinemática de Rotación (2000ms - Quintic Ease-Out)
+              // 2. Cinemática de Rotación (4000ms - Quintic Ease-Out pronunciado)
               const progressRot = Math.min(1.0, elapsed / rotDuration);
               const easeRot = 1.0 - Math.pow(1.0 - progressRot, 5);
               const currentAngle = baseRotY + (totalSpinAngle * easeRot);
 
+              /* [BLOQUE DE ASCENSO PRESERVADO PARA RECUPERACIÓN FUTURA]
+              const progressY = Math.min(1.0, elapsed / 1200);
+              const easeY = 1.0 - Math.pow(1.0 - progressY, 5);
+              const currentY = spawnStartY + ((targetY + 0.001 - spawnStartY) * easeY);
               d.setLocalPosition({ x: targetX, y: currentY, z: targetZ });
+              */
+
+              e.Scale.set(t, r, { x: currentScaleVal, y: currentScaleVal, z: currentScaleVal });
               d.set(e.Quaternion, e.math.quat.yRadians(currentAngle));
 
               if (elapsed < rotDuration) {
                 requestAnimationFrame(animarSpawnCompleto);
               } else {
-                d.setLocalPosition({ x: targetX, y: targetY + 0.001, z: targetZ });
+                e.Scale.set(t, r, { x: 1.0, y: 1.0, z: 1.0 });
                 d.set(e.Quaternion, e.math.quat.yRadians(baseRotY + totalSpinAngle));
               }
             };
             requestAnimationFrame(animarSpawnCompleto);
           };
 
-          // Sondeo de malla con comprobación estricta de buffers cargados y cálculo de altura local (-H)
+          // Sondeo con detección real de vértices, inyección de shaders y precompilación previa al disparo
           const comprobarMallaLista = () => {
             if (animationStarted) return;
             let encontrada = false;
-            let minY = Infinity, maxY = -Infinity;
 
             if (t.three && t.three.scene) {
               t.three.scene.traverse((child) => {
                 if (child.isMesh && child.geometry && child.geometry.attributes && child.geometry.attributes.position && child.geometry.attributes.position.count > 0 && child.name !== "Ground" && child.name !== "Hider") {
-                  if (!child.geometry.boundingBox) child.geometry.computeBoundingBox();
-                  const bb = child.geometry.boundingBox;
-                  if (bb) {
-                    minY = Math.min(minY, bb.min.y);
-                    maxY = Math.max(maxY, bb.max.y);
-                    encontrada = true;
-                  }
+                  encontrada = true;
                 }
               });
             }
 
             if (encontrada) {
-              const modelHeight = Math.max(0.03, maxY - minY);
-              const spawnStartY = targetY - (modelHeight + 0.015);
-              d.setLocalPosition({ x: targetX, y: spawnStartY, z: targetZ });
-              d.set(e.Quaternion, e.math.quat.yRadians(baseRotY));
-              dispararCinematicaSpawn(spawnStartY);
+              // Inyectamos shaders y precompilamos en GPU mientras el plato está en escala 0
+              if (window.aplicarAjustesSceneViewer) {
+                window.aplicarAjustesSceneViewer(t.three.scene);
+              }
+              dispararCinematicaSpawn();
             } else {
               requestAnimationFrame(comprobarMallaLista);
             }
@@ -225,7 +244,7 @@
         bboxSizeX = DRAG_RETICLE_CONFIG.baseSize,
         bboxSizeZ = DRAG_RETICLE_CONFIG.baseSize;
 
-        // v4.28: Medición precisa del Bounding Box en espacio local adaptada a platos rectangulares y redondos
+        // v4.29: Medición precisa del Bounding Box aislando exclusivamente la malla del plato
         const actualizarBoundingBox = (THREE_INSTANCE) => {
           if (!t.three || !t.three.scene) return;
           let minX = Infinity, maxX = -Infinity;
@@ -233,15 +252,19 @@
           let hasGeom = false;
 
           t.three.scene.traverse((child) => {
-            if (child.isMesh && child.geometry && child.geometry.attributes && child.geometry.attributes.position && child.name !== "Ground" && child.name !== "Hider" && child !== reticleMesh) {
+            if (child.isMesh && child.geometry && child.geometry.attributes && child.geometry.attributes.position && child.name !== "Ground" && child.name !== "Hider" && child !== reticleMesh && (!child.material || child.material.type !== 'ShadowMaterial')) {
               if (!child.geometry.boundingBox) child.geometry.computeBoundingBox();
               const bb = child.geometry.boundingBox;
               if (bb) {
-                minX = Math.min(minX, bb.min.x);
-                maxX = Math.max(maxX, bb.max.x);
-                minZ = Math.min(minZ, bb.min.z);
-                maxZ = Math.max(maxZ, bb.max.z);
-                hasGeom = true;
+                const szX = bb.max.x - bb.min.x;
+                const szZ = bb.max.z - bb.min.z;
+                if (szX < 1.5 && szZ < 1.5) {
+                  minX = Math.min(minX, bb.min.x);
+                  maxX = Math.max(maxX, bb.max.x);
+                  minZ = Math.min(minZ, bb.min.z);
+                  maxZ = Math.max(maxZ, bb.max.z);
+                  hasGeom = true;
+                }
               }
             }
           });
@@ -252,7 +275,7 @@
           }
         };
 
-        // v4.28: Sincronización angular por cuaterniones y posicional continua de la retícula
+        // v4.29: Sincronización angular mediante cuaterniones combinados (qYaw x qPitch)
         const sincronizarTransformReticula = (ret, THREE_INSTANCE) => {
           if (!ret || !THREE_INSTANCE) return;
 
@@ -272,7 +295,7 @@
           ret.scale.set(currentScale, currentScale, currentScale);
         };
 
-        // v4.28: Generación de retícula adaptativa al tamaño del plato
+        // v4.29: Generación de retícula adaptativa y orientada
         const obtenerReticula = (THREE_INSTANCE, scene) => {
           if (reticleMesh) {
             sincronizarTransformReticula(reticleMesh, THREE_INSTANCE);
@@ -345,12 +368,6 @@
             planarZ = n.z;
             if (!i || !r) return;
 
-            try {
-              if (e.PositionAnimation && e.PositionAnimation.remove) {
-                e.PositionAnimation.remove(t, a);
-              }
-            } catch (err) {}
-
             const d = new r.Raycaster(),
             s = new r.Vector2(o.data.position.x * 2 - 1, 1 - o.data.position.y * 2),
             l = new r.Plane(new r.Vector3(0, 1, 0), -dragPlaneY),
@@ -399,23 +416,25 @@
           .listen(t.events.globalId, e.input.SCREEN_TOUCH_END, o => {
             activePointerIds.delete(o.data.pointerId);
             if (0 === activePointerIds.size) {
-              // v4.28: caída acelerada (940ms) asentándose en Y = 0 sin rebasarlo
+              // v4.29: caída acelerada (940ms) asentándose en Y = 0 sin rebasarlo
               if (isDragActive) {
                 isDragActive = !1;
                 if (reticleMesh) reticleMesh.visible = false;
                 const n = t.transform.getWorldPosition(a);
-                e.PositionAnimation.set(t, a, {
-                  duration: DRAG_RETICLE_CONFIG.bounceDuration,
-                  loop: !1,
-                  easeOut: !0,
-                  easingFunction: DRAG_RETICLE_CONFIG.bounceEasing,
-                  fromX: n.x,
-                  toX: n.x,
-                  fromY: n.y,
-                  toY: dragPlaneY,
-                  fromZ: n.z,
-                  toZ: n.z
-                });
+                if (e.PositionAnimation && e.PositionAnimation.set) {
+                  e.PositionAnimation.set(t, a, {
+                    duration: DRAG_RETICLE_CONFIG.bounceDuration,
+                    loop: !1,
+                    easeOut: !0,
+                    easingFunction: DRAG_RETICLE_CONFIG.bounceEasing,
+                    fromX: n.x,
+                    toX: n.x,
+                    fromY: n.y,
+                    toY: dragPlaneY,
+                    fromZ: n.z,
+                    toZ: n.z
+                  });
+                }
               }
 
               isModelTouchActive = !1,
@@ -456,7 +475,7 @@
               }
             }
 
-            // 2. ESCALA CON DEADZONE BLINDADO
+            // 2. ESCALA CON DEADZONE BLINDADO (vB1.03 Checkpoint)
             if (o.data.startSpread > 0 && o.data.spread > 0) {
               const spreadRatio = o.data.spread / o.data.startSpread;
               const spreadDeltaRatio = Math.abs(spreadRatio - 1.0);
@@ -756,7 +775,7 @@
           }
         },
 
-        // Plano Ocultador (Hider)
+        /* [HIDER COMENTADO MIENTRAS SE UTILIZA ANIMACIÓN DE ESCALA]
         "17af117a-efce-48dd-857e-e383a3649c7b": {
           "id": "17af117a-efce-48dd-857e-e383a3649c7b",
           "position": [0, -0.001, 0],
@@ -775,6 +794,7 @@
           "name": "Hider",
           "order": 7.322553197845954
         },
+        */
 
         // Entidad del Modelo 3D (El archivo .glb)
         "a02b4479-461e-40c2-ba91-0ccabbd1bd83": {
