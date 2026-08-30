@@ -1,4 +1,4 @@
-﻿// 9th Wall v4.27
+﻿// 9th Wall v4.28
 (() => {
   var e = {
     574() {
@@ -50,20 +50,20 @@
     scaleDeadzone: 0.085
   });
 
-  // v4.27: retícula adaptativa al Bounding Box local y rebote calibrado (940ms) estrictamente sobre Y >= 0
+  // v4.28: retícula adaptativa al Bounding Box local y rebote calibrado (940ms) estrictamente sobre Y >= 0
   const DRAG_RETICLE_CONFIG = Object.freeze({
     liftHeight: 0.05,
     liftSmoothingRate: 8.0,
     dragActivationThreshold: 0.012,
     baseSize: 0.272,
-    thickness: 0.02,
-    cornerRadius: 0.05,
+    thickness: 0.018,
+    cornerRadius: 0.04,
     color: 0x66ffff,
     bounceDuration: 940,
     bounceEasing: "Bounce"
   });
 
-  // v4.20: rectángulo con esquinas redondeadas adaptativo a dimensiones X y Z
+  // v4.28: rectángulo con esquinas redondeadas adaptativo a dimensiones X y Z
   function crearFormaRectRedondeada(THREE_INSTANCE, sizeX, sizeZ, radius) {
     const sx = sizeX / 2;
     const sz = sizeZ / 2;
@@ -107,7 +107,7 @@
       }
     });
 
-    // v4.27: Componente de generación reactivo con detección de carga GLTF nativa y cinemática (2000ms Quartic)
+    // v4.28: Componente de generación con detección estricta de vértices GLTF, altura dinámica (-H) y cinemática desacoplada (1200ms elevación / 2000ms 720° Quintic)
     e.registerComponent({
       name: "dish-spawner",
       schema: { prefab: "eid" },
@@ -128,32 +128,37 @@
           // Rotación binaria base (0° o 180°)
           const baseRotY = Math.random() < 0.5 ? 0 : Math.PI;
 
-          // Posición inicial protegida tras el Hider
-          d.setLocalPosition({ x: targetX, y: targetY - 0.50, z: targetZ });
+          // Posición temporal de seguridad antes del spawn
+          d.setLocalPosition({ x: targetX, y: targetY - 1.0, z: targetZ });
           d.set(e.Quaternion, e.math.quat.yRadians(baseRotY));
 
-          const spawnDuration = 2000;
-          const totalSpinAngle = -Math.PI * 2; // -360° horario
+          const elevDuration = 1200;
+          const rotDuration = 2000;
+          const totalSpinAngle = -Math.PI * 4; // -720° (2 vueltas completas en sentido horario)
           let animationStarted = false;
 
-          const dispararCinematicaSpawn = () => {
+          const dispararCinematicaSpawn = (spawnStartY) => {
             if (animationStarted) return;
             animationStarted = true;
 
             const spawnStartTime = performance.now();
             const animarSpawnCompleto = () => {
               const elapsed = performance.now() - spawnStartTime;
-              const progress = Math.min(1.0, elapsed / spawnDuration);
-              // Easing Quartic Ease-Out: 1 - (1 - t)^4
-              const ease = 1.0 - Math.pow(1.0 - progress, 4);
 
-              const currentY = (targetY - 0.50) + (0.501 * ease);
-              const currentAngle = baseRotY + (totalSpinAngle * ease);
+              // 1. Cinemática de Elevación (1200ms - Quintic Ease-Out)
+              const progressY = Math.min(1.0, elapsed / elevDuration);
+              const easeY = 1.0 - Math.pow(1.0 - progressY, 5);
+              const currentY = spawnStartY + ((targetY + 0.001 - spawnStartY) * easeY);
+
+              // 2. Cinemática de Rotación (2000ms - Quintic Ease-Out)
+              const progressRot = Math.min(1.0, elapsed / rotDuration);
+              const easeRot = 1.0 - Math.pow(1.0 - progressRot, 5);
+              const currentAngle = baseRotY + (totalSpinAngle * easeRot);
 
               d.setLocalPosition({ x: targetX, y: currentY, z: targetZ });
               d.set(e.Quaternion, e.math.quat.yRadians(currentAngle));
 
-              if (progress < 1.0) {
+              if (elapsed < rotDuration) {
                 requestAnimationFrame(animarSpawnCompleto);
               } else {
                 d.setLocalPosition({ x: targetX, y: targetY + 0.001, z: targetZ });
@@ -163,27 +168,32 @@
             requestAnimationFrame(animarSpawnCompleto);
           };
 
-          // 1. Escucha reactiva oficial del evento de motor GLTF_MODEL_LOADED
-          if (e.events && e.events.GLTF_MODEL_LOADED) {
-            const unlisten = t.events.addListener(t.events.globalId, e.events.GLTF_MODEL_LOADED, () => {
-              dispararCinematicaSpawn();
-              if (unlisten) unlisten();
-            });
-          }
-
-          // 2. Comprobación directa sobre la escena Three.js para modelos precargados o en caché
+          // Sondeo de malla con comprobación estricta de buffers cargados y cálculo de altura local (-H)
           const comprobarMallaLista = () => {
             if (animationStarted) return;
             let encontrada = false;
+            let minY = Infinity, maxY = -Infinity;
+
             if (t.three && t.three.scene) {
               t.three.scene.traverse((child) => {
-                if (child.isMesh && child.geometry && child.name !== "Ground" && child.name !== "Hider") {
-                  encontrada = true;
+                if (child.isMesh && child.geometry && child.geometry.attributes && child.geometry.attributes.position && child.geometry.attributes.position.count > 0 && child.name !== "Ground" && child.name !== "Hider") {
+                  if (!child.geometry.boundingBox) child.geometry.computeBoundingBox();
+                  const bb = child.geometry.boundingBox;
+                  if (bb) {
+                    minY = Math.min(minY, bb.min.y);
+                    maxY = Math.max(maxY, bb.max.y);
+                    encontrada = true;
+                  }
                 }
               });
             }
+
             if (encontrada) {
-              dispararCinematicaSpawn();
+              const modelHeight = Math.max(0.03, maxY - minY);
+              const spawnStartY = targetY - (modelHeight + 0.015);
+              d.setLocalPosition({ x: targetX, y: spawnStartY, z: targetZ });
+              d.set(e.Quaternion, e.math.quat.yRadians(baseRotY));
+              dispararCinematicaSpawn(spawnStartY);
             } else {
               requestAnimationFrame(comprobarMallaLista);
             }
@@ -215,41 +225,54 @@
         bboxSizeX = DRAG_RETICLE_CONFIG.baseSize,
         bboxSizeZ = DRAG_RETICLE_CONFIG.baseSize;
 
-        // v4.27: Medición precisa del Bounding Box en espacio local (invariante a la rotación del modelo)
+        // v4.28: Medición precisa del Bounding Box en espacio local adaptada a platos rectangulares y redondos
         const actualizarBoundingBox = (THREE_INSTANCE) => {
-          if (!t.three.scene) return;
-          const localBox = new THREE_INSTANCE.Box3();
+          if (!t.three || !t.three.scene) return;
+          let minX = Infinity, maxX = -Infinity;
+          let minZ = Infinity, maxZ = -Infinity;
           let hasGeom = false;
+
           t.three.scene.traverse((child) => {
-            if (child.isMesh && child.geometry && child.name !== "Ground" && child.name !== "Hider" && child !== reticleMesh) {
+            if (child.isMesh && child.geometry && child.geometry.attributes && child.geometry.attributes.position && child.name !== "Ground" && child.name !== "Hider" && child !== reticleMesh) {
               if (!child.geometry.boundingBox) child.geometry.computeBoundingBox();
-              localBox.union(child.geometry.boundingBox);
-              hasGeom = true;
+              const bb = child.geometry.boundingBox;
+              if (bb) {
+                minX = Math.min(minX, bb.min.x);
+                maxX = Math.max(maxX, bb.max.x);
+                minZ = Math.min(minZ, bb.min.z);
+                maxZ = Math.max(maxZ, bb.max.z);
+                hasGeom = true;
+              }
             }
           });
-          if (hasGeom) {
-            const size = new THREE_INSTANCE.Vector3();
-            localBox.getSize(size);
-            if (size.x > 0.05 && size.z > 0.05) {
-              bboxSizeX = size.x;
-              bboxSizeZ = size.z;
-            }
+
+          if (hasGeom && (maxX - minX > 0.05) && (maxZ - minZ > 0.05)) {
+            bboxSizeX = (maxX - minX) + 0.04;
+            bboxSizeZ = (maxZ - minZ) + 0.04;
           }
         };
 
-        // v4.27: Sincronización angular y posicional continua de la retícula
+        // v4.28: Sincronización angular por cuaterniones y posicional continua de la retícula
         const sincronizarTransformReticula = (ret, THREE_INSTANCE) => {
-          if (!ret) return;
-          const rotQuat = t.transform.getWorldRotation(a);
-          const q = new THREE_INSTANCE.Quaternion(rotQuat.x, rotQuat.y, rotQuat.z, rotQuat.w);
-          const euler = new THREE_INSTANCE.Euler().setFromQuaternion(q, 'YXZ');
+          if (!ret || !THREE_INSTANCE) return;
+
+          let yawAngle = 0;
+          if (e.Quaternion && e.Quaternion.has(t, a)) {
+            const qData = e.Quaternion.get(t, a);
+            const q = new THREE_INSTANCE.Quaternion(qData.x, qData.y, qData.z, qData.w);
+            const euler = new THREE_INSTANCE.Euler().setFromQuaternion(q, 'YXZ');
+            yawAngle = euler.y;
+          }
+
+          const qPitch = new THREE_INSTANCE.Quaternion().setFromAxisAngle(new THREE_INSTANCE.Vector3(1, 0, 0), -Math.PI / 2);
+          const qYaw = new THREE_INSTANCE.Quaternion().setFromAxisAngle(new THREE_INSTANCE.Vector3(0, 1, 0), yawAngle);
+          ret.quaternion.copy(qYaw).multiply(qPitch);
 
           ret.position.set(planarX, dragPlaneY + 0.002, planarZ);
-          ret.rotation.set(-Math.PI / 2, 0, euler.y);
           ret.scale.set(currentScale, currentScale, currentScale);
         };
 
-        // v4.27: retícula adaptativa al tamaño exacto de la caja envolvente
+        // v4.28: Generación de retícula adaptativa al tamaño del plato
         const obtenerReticula = (THREE_INSTANCE, scene) => {
           if (reticleMesh) {
             sincronizarTransformReticula(reticleMesh, THREE_INSTANCE);
@@ -376,7 +399,7 @@
           .listen(t.events.globalId, e.input.SCREEN_TOUCH_END, o => {
             activePointerIds.delete(o.data.pointerId);
             if (0 === activePointerIds.size) {
-              // v4.27: caída acelerada (940ms) asentándose en Y = 0 sin rebasarlo
+              // v4.28: caída acelerada (940ms) asentándose en Y = 0 sin rebasarlo
               if (isDragActive) {
                 isDragActive = !1;
                 if (reticleMesh) reticleMesh.visible = false;
