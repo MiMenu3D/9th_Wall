@@ -1,4 +1,4 @@
-<!-- 9th Wall v4.25 (Dual-Lobe GGX Specular / Consolidated Telemetry / Auto-Gain) -->
+<!-- 9th Wall v4.26 (Dual-Lobe GGX Specular / Consolidated Telemetry / Auto-Gain) -->
 <html>
 <head>
   <meta charset="UTF-8">
@@ -18,8 +18,8 @@
     style="position:fixed;top:10px;right:10px;z-index:1000000;background:rgba(0,0,0,0.9);color:#0f0;font-family:monospace;font-size:12px;padding:8px;border-radius:4px;cursor:pointer;line-height:1.3;border:1px solid #0f0;display:none;pointer-events:auto;">
     <div id="debugTitle">FPS: --</div>
     <div id="debugContent">
-      ar-world: v4.25<br>
-      bundle: v4.25<br>
+      ar-world: v4.26<br>
+      bundle: v4.26<br>
       <span id="envVerdictSpan" style="color:#0f0;">Entorno: ESPERANDO MESA...</span><br>
       <span id="telemetrySpan" style="color:#0f0;">P98: -- (/255) | Lum: -- (/255) | Cálido: --%</span><br>
       <span id="lightsCountSpan" style="color:#0f0;">Luces: 1</span><br>
@@ -190,12 +190,10 @@
 
     document.getElementById('envToggle').addEventListener('click', () => toggleEnv());
 
-    // v4.20: Forzamos arranque limpio por defecto
+    // v4.26: Gestión estricta de Modos UI (Arranque Clean por defecto)
     let currentUIMode = sessionStorage.getItem("ar_ui_mode");
-    if (!currentUIMode || currentUIMode !== "buttons" && currentUIMode !== "slam") {
+    if (!currentUIMode || (currentUIMode !== "buttons" && currentUIMode !== "slam")) {
       currentUIMode = "clean";
-      sessionStorage.setItem("ar_ui_mode", "clean");
-      sessionStorage.setItem("debug_features", "false");
     }
 
     const debugLogEl = document.getElementById('debugLog');
@@ -231,6 +229,9 @@
 
     aplicarVisibilidadModo(currentUIMode);
 
+    // Si arrancó en SLAM para una prueba puntual, reseteamos el almacenamiento para que el siguiente refresco sea Clean
+    sessionStorage.setItem("ar_ui_mode", "clean");
+
     if (secretTrigger) {
       secretTrigger.style.display = "block";
     }
@@ -250,7 +251,7 @@
       });
     }
 
-    // Receptor secreto Easter Egg permanente: 4 toques (<1000ms) conmuta en vivo sin recargas
+    // v4.26: Receptor secreto Easter Egg permanente (4 toques conmutan en vivo estrictamente entre clean y buttons)
     if (secretTrigger) {
       let secretTaps = [];
       const procesarToqueSecreto = () => {
@@ -261,18 +262,9 @@
           secretTaps = [];
           if (currentUIMode === "clean") {
             currentUIMode = "buttons";
-            sessionStorage.setItem("ar_ui_mode", "buttons");
-            sessionStorage.setItem("debug_features", "false");
             aplicarVisibilidadModo("buttons");
-          } else if (currentUIMode === "slam") {
-            currentUIMode = "clean";
-            sessionStorage.setItem("ar_ui_mode", "clean");
-            sessionStorage.setItem("debug_features", "false");
-            window.location.reload();
           } else {
             currentUIMode = "clean";
-            sessionStorage.setItem("ar_ui_mode", "clean");
-            sessionStorage.setItem("debug_features", "false");
             aplicarVisibilidadModo("clean");
           }
         }
@@ -293,7 +285,7 @@
             // v4.25: Doble Lóbulo GGX Físico (Núcleo 0.89x concentrado + Halo 0.38x amplio = 1.27x total) + Ruido UV estático
             if (!mat._specularHooked) {
               mat._specularHooked = true;
-              mat.customProgramCacheKey = () => 'v425_dual_lobe_ggx';
+              mat.customProgramCacheKey = () => 'v426_dual_lobe_ggx';
               mat.onBeforeCompile = (shader) => {
                 shader.fragmentShader = shader.fragmentShader.replace(
                   '#include <roughnessmap_fragment>',

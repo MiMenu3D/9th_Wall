@@ -1,4 +1,4 @@
-﻿// 9th Wall v4.25
+﻿// 9th Wall v4.26
 (() => {
   var e = {
     574() {
@@ -31,19 +31,16 @@
   },
   t = {};
 
-  // Forzamos arranque siempre limpio a menos que se use el disparador secreto
-  if (!sessionStorage.getItem("ar_ui_mode")) {
-    sessionStorage.setItem("ar_ui_mode", "clean");
-    sessionStorage.setItem("debug_features", "false");
-  }
-
-  // Leemos de forma nativa el estado del interruptor debug persistido en sessionStorage
+  // Leemos el estado del interruptor debug persistido de forma transitoria
   const IS_DEBUG = sessionStorage.getItem("debug_features") === "true";
 
   // Nube de puntos SLAM activa en Debug
   const DEBUG_VISUALS = Object.freeze({
     slamPointCloud: IS_DEBUG
   });
+
+  // Limpieza inmediata para garantizar que futuros refrescos arranquen siempre limpios
+  sessionStorage.setItem("debug_features", "false");
 
   // Controles del modelo: rotación desacoplada y escala con umbral blindado (Scene Viewer / Quick Look spec)
   const MODEL_GESTURES = Object.freeze({
@@ -53,7 +50,7 @@
     scaleDeadzone: 0.085
   });
 
-  // v4.25: retícula adaptativa al Bounding Box y rebote acelerado (940ms) estrictamente sobre Y >= 0
+  // v4.26: retícula adaptativa al Bounding Box local y rebote calibrado (940ms) estrictamente sobre Y >= 0
   const DRAG_RETICLE_CONFIG = Object.freeze({
     liftHeight: 0.05,
     liftSmoothingRate: 8.0,
@@ -62,7 +59,7 @@
     thickness: 0.02,
     cornerRadius: 0.05,
     color: 0x66ffff,
-    bounceDuration: 940, // v4.25: Acelerado a 940ms
+    bounceDuration: 940,
     bounceEasing: "Bounce"
   });
 
@@ -110,7 +107,7 @@
       }
     });
 
-    // Componente de generación única tras la calibración (con cinemática de spawn: ascenso -0.50m a 0m y giro 360° Cubic a 1s)
+    // v4.26: Componente de generación única con sondeo de carga de malla y cinemática majestuosa (2000ms Quartic)
     e.registerComponent({
       name: "dish-spawner",
       schema: { prefab: "eid" },
@@ -131,32 +128,57 @@
           // Rotación binaria base (0° o 180°)
           const baseRotY = Math.random() < 0.5 ? 0 : Math.PI;
 
-          // v4.25: Cinemática continua de Spawn a 60 FPS (Ascenso Y: -0.50m a 0.001m + Giro 360° horario en 1000ms Cubic)
-          // Uso de métodos nativos verificados de entidad ECS para evitar bloqueos
-          const spawnDuration = 1000;
-          const spawnStartTime = performance.now();
+          // Posición inicial protegida tras el Hider
+          d.setLocalPosition({ x: targetX, y: targetY - 0.50, z: targetZ });
+          d.set(e.Quaternion, e.math.quat.yRadians(baseRotY));
+
+          const spawnDuration = 2000;
           const totalSpinAngle = -Math.PI * 2; // -360° horario
 
-          const animarSpawnCompleto = () => {
-            const elapsed = performance.now() - spawnStartTime;
-            const progress = Math.min(1.0, elapsed / spawnDuration);
-            // Easing Cubic Ease-Out
-            const ease = 1.0 - Math.pow(1.0 - progress, 3);
+          // Sondeo: Esperar a que los nodos Mesh del modelo GLTF existan en el grafo de escena
+          const esperarCargaYMalla = () => {
+            let meshLoaded = false;
+            if (t.three.scene) {
+              const modelObj = t.three.scene.getObjectByName("Model");
+              if (modelObj) {
+                modelObj.traverse((child) => {
+                  if (child.isMesh && child.geometry) {
+                    meshLoaded = true;
+                  }
+                });
+              }
+            }
 
-            const currentY = (targetY - 0.50) + (0.501 * ease);
-            const currentAngle = baseRotY + (totalSpinAngle * ease);
+            if (meshLoaded) {
+              const spawnStartTime = performance.now();
 
-            d.setLocalPosition({ x: targetX, y: currentY, z: targetZ });
-            d.set(e.Quaternion, e.math.quat.yRadians(currentAngle));
+              const animarSpawnCompleto = () => {
+                const elapsed = performance.now() - spawnStartTime;
+                const progress = Math.min(1.0, elapsed / spawnDuration);
+                // Easing Quartic Ease-Out: 1 - (1 - t)^4
+                const ease = 1.0 - Math.pow(1.0 - progress, 4);
 
-            if (progress < 1.0) {
+                const currentY = (targetY - 0.50) + (0.501 * ease);
+                const currentAngle = baseRotY + (totalSpinAngle * ease);
+
+                d.setLocalPosition({ x: targetX, y: currentY, z: targetZ });
+                d.set(e.Quaternion, e.math.quat.yRadians(currentAngle));
+
+                if (progress < 1.0) {
+                  requestAnimationFrame(animarSpawnCompleto);
+                } else {
+                  d.setLocalPosition({ x: targetX, y: targetY + 0.001, z: targetZ });
+                  d.set(e.Quaternion, e.math.quat.yRadians(baseRotY + totalSpinAngle));
+                }
+              };
+
               requestAnimationFrame(animarSpawnCompleto);
             } else {
-              d.setLocalPosition({ x: targetX, y: targetY + 0.001, z: targetZ });
-              d.set(e.Quaternion, e.math.quat.yRadians(baseRotY + totalSpinAngle));
+              requestAnimationFrame(esperarCargaYMalla);
             }
           };
-          requestAnimationFrame(animarSpawnCompleto);
+
+          requestAnimationFrame(esperarCargaYMalla);
         });
       }
     });
@@ -183,25 +205,47 @@
         bboxSizeX = DRAG_RETICLE_CONFIG.baseSize,
         bboxSizeZ = DRAG_RETICLE_CONFIG.baseSize;
 
-        // v4.25: Medición precisa y limpia del Bounding Box del modelo activo
+        // v4.26: Medición precisa del Bounding Box en espacio local (invariante a la rotación del modelo)
         const actualizarBoundingBox = (THREE_INSTANCE) => {
           if (!t.three.scene) return;
           const modelObj = t.three.scene.getObjectByName("Model");
           if (modelObj) {
-            const box = new THREE_INSTANCE.Box3().setFromObject(modelObj);
-            const size = new THREE_INSTANCE.Vector3();
-            box.getSize(size);
-            if (size.x > 0.05 && size.z > 0.05) {
-              bboxSizeX = size.x;
-              bboxSizeZ = size.z;
+            const localBox = new THREE_INSTANCE.Box3();
+            let hasGeom = false;
+            modelObj.traverse((child) => {
+              if (child.isMesh && child.geometry) {
+                if (!child.geometry.boundingBox) child.geometry.computeBoundingBox();
+                localBox.union(child.geometry.boundingBox);
+                hasGeom = true;
+              }
+            });
+            if (hasGeom) {
+              const size = new THREE_INSTANCE.Vector3();
+              localBox.getSize(size);
+              if (size.x > 0.05 && size.z > 0.05) {
+                bboxSizeX = size.x;
+                bboxSizeZ = size.z;
+              }
             }
           }
         };
 
-        // v4.25: retícula adaptativa al tamaño exacto de la caja envolvente
+        // v4.26: Sincronización angular y posicional continua de la retícula
+        const sincronizarTransformReticula = (ret, THREE_INSTANCE) => {
+          if (!ret) return;
+          const rotQuat = t.transform.getWorldRotation(a);
+          const q = new THREE_INSTANCE.Quaternion(rotQuat.x, rotQuat.y, rotQuat.z, rotQuat.w);
+          const euler = new THREE_INSTANCE.Euler().setFromQuaternion(q, 'YXZ');
+
+          ret.position.set(planarX, dragPlaneY + 0.002, planarZ);
+          ret.rotation.set(-Math.PI / 2, 0, euler.y);
+          ret.scale.set(currentScale, currentScale, currentScale);
+        };
+
+        // v4.26: retícula adaptativa al tamaño exacto de la caja envolvente
         const obtenerReticula = (THREE_INSTANCE, scene) => {
           if (reticleMesh) {
-            reticleMesh.scale.set(currentScale, currentScale, currentScale);
+            sincronizarTransformReticula(reticleMesh, THREE_INSTANCE);
             return reticleMesh;
           }
           actualizarBoundingBox(THREE_INSTANCE);
@@ -221,8 +265,7 @@
             side: THREE_INSTANCE.DoubleSide
           });
           reticleMesh = new THREE_INSTANCE.Mesh(geometry, material);
-          reticleMesh.rotation.x = -Math.PI / 2;
-          reticleMesh.scale.set(currentScale, currentScale, currentScale);
+          sincronizarTransformReticula(reticleMesh, THREE_INSTANCE);
           reticleMesh.visible = false;
           reticleMesh.renderOrder = 0;
           scene.add(reticleMesh);
@@ -314,22 +357,19 @@
                 isDragActive = !0;
                 if (t.three.scene) {
                   const ret = obtenerReticula(i, t.three.scene);
-                  ret.rotation.z = 0;
-                  ret.scale.set(currentScale, currentScale, currentScale);
-                  ret.position.set(planarX, dragPlaneY + 0.002, planarZ);
+                  sincronizarTransformReticula(ret, i);
                   ret.visible = true;
                 }
               }
               if (reticleMesh) {
-                reticleMesh.position.set(planarX, dragPlaneY + 0.002, planarZ);
-                reticleMesh.scale.set(currentScale, currentScale, currentScale);
+                sincronizarTransformReticula(reticleMesh, i);
               }
             }
           })
           .listen(t.events.globalId, e.input.SCREEN_TOUCH_END, o => {
             activePointerIds.delete(o.data.pointerId);
             if (0 === activePointerIds.size) {
-              // v4.25: caída acelerada (940ms) asentándose en Y = 0 sin rebasarlo
+              // v4.26: caída acelerada (940ms) asentándose en Y = 0 sin rebasarlo
               if (isDragActive) {
                 isDragActive = !1;
                 if (reticleMesh) reticleMesh.visible = false;
@@ -367,8 +407,7 @@
             }
             if (t.three.scene && window.THREE) {
               const ret = obtenerReticula(window.THREE, t.three.scene);
-              ret.position.set(planarX, dragPlaneY + 0.002, planarZ);
-              ret.scale.set(currentScale, currentScale, currentScale);
+              sincronizarTransformReticula(ret, window.THREE);
               ret.visible = true;
             }
           })
@@ -382,11 +421,8 @@
 
               if (t.three.scene && window.THREE) {
                 const ret = obtenerReticula(window.THREE, t.three.scene);
-                const pos = t.transform.getWorldPosition(a);
-                ret.position.set(pos.x, dragPlaneY + 0.002, pos.z);
-                ret.scale.set(currentScale, currentScale, currentScale);
+                sincronizarTransformReticula(ret, window.THREE);
                 ret.visible = true;
-                ret.rotateZ(angleDelta);
               }
             }
 
@@ -409,7 +445,7 @@
 
                 if (t.three.scene && window.THREE) {
                   const ret = obtenerReticula(window.THREE, t.three.scene);
-                  ret.scale.set(currentScale, currentScale, currentScale);
+                  sincronizarTransformReticula(ret, window.THREE);
                 }
               }
             }
