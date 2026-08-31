@@ -1,4 +1,4 @@
-﻿// 9th Wall v4.36
+﻿// 9th Wall v4.37
 (() => {
   var e = {
     574() {
@@ -50,7 +50,7 @@
     scaleDeadzone: 0.085
   });
 
-  // v4.36: retícula centrada en el origen local, ajustada a dimensión real (+2cm) y fijada a Y=0 de suelo
+  // v4.37: retícula centrada en el origen local, ajustada a dimensión real (+2cm) y fijada a Y=0 de suelo
   const DRAG_RETICLE_CONFIG = Object.freeze({
     liftHeight: 0.05,
     liftSmoothingRate: 8.0,
@@ -63,39 +63,39 @@
     bounceEasing: "Bounce"
   });
 
-  // v4.36: Contorno exterior en sentido antihorario (CCW)
+  // v4.37: Contorno exterior en sentido antihorario (CCW) con vértice inicial alineado en (-sx + r, -sz)
   function crearFormaRectRedondeadaCCW(THREE_INSTANCE, sizeX, sizeZ, radius) {
     const sx = sizeX / 2;
     const sz = sizeZ / 2;
     const r = Math.min(radius, Math.min(sx, sz) * 0.5);
     const shape = new THREE_INSTANCE.Shape();
-    shape.moveTo(-sx, -sz + r);
-    shape.lineTo(-sx, sz - r);
-    shape.quadraticCurveTo(-sx, sz, -sx + r, sz);
-    shape.lineTo(sx - r, sz);
-    shape.quadraticCurveTo(sx, sz, sx, sz - r);
-    shape.lineTo(sx, -sz + r);
-    shape.quadraticCurveTo(sx, -sz, sx - r, -sz);
-    shape.lineTo(-sx + r, -sz);
-    shape.quadraticCurveTo(-sx, -sz, -sx, -sz + r);
+    shape.moveTo(-sx + r, -sz);
+    shape.lineTo(sx - r, -sz);
+    shape.quadraticCurveTo(sx, -sz, sx, -sz + r);
+    shape.lineTo(sx, sz - r);
+    shape.quadraticCurveTo(sx, sz, sx - r, sz);
+    shape.lineTo(-sx + r, sz);
+    shape.quadraticCurveTo(-sx, sz, -sx, sz - r);
+    shape.lineTo(-sx, -sz + r);
+    shape.quadraticCurveTo(-sx, -sz, -sx + r, -sz);
     return shape;
   }
 
-  // v4.36: Agujero interior en sentido horario (CW) para garantizar triangulación limpia sin aristas infinitas en X
+  // v4.37: Agujero interior en sentido horario (CW) con vértice inicial alineado en (-sx + r, -sz) para corte Earcut 100% simétrico
   function crearFormaRectRedondeadaCW(THREE_INSTANCE, sizeX, sizeZ, radius) {
     const sx = sizeX / 2;
     const sz = sizeZ / 2;
     const r = Math.min(radius, Math.min(sx, sz) * 0.5);
     const path = new THREE_INSTANCE.Path();
-    path.moveTo(-sx, sz - r);
-    path.lineTo(-sx, -sz + r);
-    path.quadraticCurveTo(-sx, -sz, -sx + r, -sz);
-    path.lineTo(sx - r, -sz);
-    path.quadraticCurveTo(sx, -sz, sx - r, -sz + r);
-    path.lineTo(sx, sz - r);
-    path.quadraticCurveTo(sx, sz, sx - r, sz);
-    path.lineTo(-sx + r, sz);
-    path.quadraticCurveTo(-sx, sz, -sx, sz - r);
+    path.moveTo(-sx + r, -sz);
+    path.quadraticCurveTo(-sx, -sz, -sx, -sz + r);
+    path.lineTo(-sx, sz - r);
+    path.quadraticCurveTo(-sx, sz, -sx + r, sz);
+    path.lineTo(sx - r, sz);
+    path.quadraticCurveTo(sx, sz, sx, sz - r);
+    path.lineTo(sx, -sz + r);
+    path.quadraticCurveTo(sx, -sz, sx - r, -sz);
+    path.lineTo(-sx + r, -sz);
     return path;
   }
 
@@ -125,7 +125,7 @@
       }
     });
 
-    // v4.36: Spawner con fundido suave de opacidad inicial (0 a 1500ms) y cinemática de escala/giro
+    // v4.37: Spawner con fundido suave, arranque sincronizado al primer frame real post-compilación
     e.registerComponent({
       name: "dish-spawner",
       schema: { prefab: "eid" },
@@ -153,7 +153,7 @@
 
           const scaleDuration = 3000;
           const rotDuration = 4000;
-          const opacityDuration = 1500; // Fundido de entrada transparente a opaco
+          const opacityDuration = 1500;
           const totalSpinAngle = -Math.PI * 3; // -540° (1.5 vueltas completas en sentido horario)
           let animationStarted = false;
 
@@ -164,12 +164,15 @@
             const spawnMaterials = [];
             if (t.three && t.three.scene) {
               t.three.scene.traverse((child) => {
-                if (child.isMesh && child.material && child.name !== "Ground" && child.name !== "Hider") {
+                // v4.37: Filtro estricto para no mutar nunca el ShadowMaterial del suelo
+                if (child.isMesh && child.material && child.material.type !== 'ShadowMaterial' && child.name !== "Ground" && child.name !== "Hider") {
                   const mats = Array.isArray(child.material) ? child.material : [child.material];
                   mats.forEach(m => {
-                    m.transparent = true;
-                    m.opacity = 0.0;
-                    spawnMaterials.push(m);
+                    if (m.type !== 'ShadowMaterial') {
+                      m.transparent = true;
+                      m.opacity = 0.0;
+                      spawnMaterials.push(m);
+                    }
                   });
                 }
               });
@@ -209,9 +212,13 @@
             const history = [];
             */
 
-            const spawnStartTime = performance.now();
+            // v4.37: Inicialización diferida del tiempo para no perder los primeros ms por compilación de GPU
+            let spawnStartTime = null;
 
             const animarSpawnCompleto = () => {
+              if (spawnStartTime === null) {
+                spawnStartTime = performance.now();
+              }
               const elapsed = performance.now() - spawnStartTime;
 
               // 1. Cinemática de Escala (3000ms - Cubic Ease-Out)
@@ -265,7 +272,11 @@
                 */
               }
             };
-            requestAnimationFrame(animarSpawnCompleto);
+
+            // Ejecución tras doble rAF para asegurar que la GPU ya tiene listos los shaders y texturas
+            requestAnimationFrame(() => {
+              requestAnimationFrame(animarSpawnCompleto);
+            });
           };
 
           // Sondeo directo: asegura la aplicación de shaders y arranca la cinemática sin bloqueos
@@ -275,7 +286,7 @@
 
             if (t.three && t.three.scene) {
               t.three.scene.traverse((child) => {
-                if (child.isMesh && child.geometry && child.geometry.attributes && child.geometry.attributes.position && child.geometry.attributes.position.count > 0 && child.name !== "Ground" && child.name !== "Hider") {
+                if (child.isMesh && child.geometry && child.geometry.attributes && child.geometry.attributes.position && child.geometry.attributes.position.count > 0 && child.name !== "Ground" && child.name !== "Hider" && (!child.material || child.material.type !== 'ShadowMaterial')) {
                   encontrada = true;
                 }
               });
@@ -301,7 +312,7 @@
         let isTwoFingerGesture = !1,
         isModelTouchActive = !1,
         dragPointerId = null,
-        dragPlaneY = 0,
+        dragPlaneY = 0.001,
         dragOffsetX = 0,
         dragOffsetZ = 0,
         activePointerIds = new Set(),
@@ -319,7 +330,7 @@
         reticleLocalCenterX = 0,
         reticleLocalCenterZ = 0;
 
-        // v4.36: Medición exacta del Bounding Box local y su centro geométrico en espacio de la raíz
+        // v4.37: Medición desacoplada al estilo model-viewer evaluando la jerarquía completa en reposo
         const actualizarBoundingBox = (THREE_INSTANCE) => {
           if (!t.three || !t.three.scene) return;
 
@@ -336,41 +347,38 @@
 
           if (!modelRoot) return;
 
+          // Guardamos el estado instantáneo para no perturbar la animación
+          const origScale = modelRoot.scale.clone();
+          const origQuat = modelRoot.quaternion.clone();
+          const origPos = modelRoot.position.clone();
+
+          modelRoot.scale.set(1, 1, 1);
+          modelRoot.quaternion.set(0, 0, 0, 1);
+          modelRoot.position.set(0, 0, 0);
           modelRoot.updateMatrixWorld(true);
-          const invRootMatrix = modelRoot.matrixWorld.clone().invert();
-          const unifiedBox = new THREE_INSTANCE.Box3();
-          let hasGeom = false;
 
-          modelRoot.traverse((child) => {
-            if (child.isMesh && child.geometry && child.name !== "Ground" && child.name !== "Hider" && child !== reticleMesh && (!child.material || child.material.type !== 'ShadowMaterial')) {
-              if (!child.geometry.boundingBox) child.geometry.computeBoundingBox();
-              if (child.geometry.boundingBox) {
-                const meshBox = child.geometry.boundingBox.clone();
-                const relMatrix = child.matrixWorld.clone().premultiply(invRootMatrix);
-                meshBox.applyMatrix4(relMatrix);
-                unifiedBox.union(meshBox);
-                hasGeom = true;
-              }
-            }
-          });
+          const unifiedBox = new THREE_INSTANCE.Box3().setFromObject(modelRoot);
 
-          if (hasGeom) {
-            const sz = new THREE_INSTANCE.Vector3();
-            const ctr = new THREE_INSTANCE.Vector3();
-            unifiedBox.getSize(sz);
-            unifiedBox.getCenter(ctr);
+          // Restauramos inmediatamente las transformaciones originales
+          modelRoot.scale.copy(origScale);
+          modelRoot.quaternion.copy(origQuat);
+          modelRoot.position.copy(origPos);
+          modelRoot.updateMatrixWorld(true);
 
-            if (sz.x > 0.05 && sz.z > 0.05 && sz.x < 2.5 && sz.z < 2.5) {
-              // v4.36: Dimensión real ajustada (+2cm de holgura exacta) y guardado del centroide local
-              bboxSizeX = sz.x + 0.02;
-              bboxSizeZ = sz.z + 0.02;
-              reticleLocalCenterX = ctr.x;
-              reticleLocalCenterZ = ctr.z;
-            }
+          const sz = new THREE_INSTANCE.Vector3();
+          const ctr = new THREE_INSTANCE.Vector3();
+          unifiedBox.getSize(sz);
+          unifiedBox.getCenter(ctr);
+
+          if (sz.x > 0.05 && sz.z > 0.05 && sz.x < 2.5 && sz.z < 2.5) {
+            bboxSizeX = sz.x + 0.02;
+            bboxSizeZ = sz.z + 0.02;
+            reticleLocalCenterX = ctr.x;
+            reticleLocalCenterZ = ctr.z;
           }
         };
 
-        // v4.36: Sincronización angular con posición Y anclada estrictamente a la altura 0 del suelo (+0.001)
+        // v4.37: Sincronización angular con posición Y anclada estrictamente a la altura 0 del suelo (+0.0015)
         const sincronizarTransformReticula = (ret, THREE_INSTANCE) => {
           if (!ret || !THREE_INSTANCE) return;
 
@@ -389,12 +397,12 @@
           // Proyectamos el centroide local según la rotación actual para que la retícula quede perfectamente centrada
           const offsetRotated = new THREE_INSTANCE.Vector3(reticleLocalCenterX * currentScale, 0, reticleLocalCenterZ * currentScale).applyAxisAngle(new THREE_INSTANCE.Vector3(0, 1, 0), yawAngle);
 
-          // Anclaje estricto en el plano de la mesa (dragPlaneY + 0.001), inmune a elevaciones del plato
-          ret.position.set(planarX + offsetRotated.x, dragPlaneY + 0.001, planarZ + offsetRotated.z);
+          // Anclaje estricto en el plano de la mesa (fijo a 0.0015 absoluto), inmune a elevaciones del plato o lecturas dinámicas
+          ret.position.set(planarX + offsetRotated.x, 0.0015, planarZ + offsetRotated.z);
           ret.scale.set(currentScale, currentScale, currentScale);
         };
 
-        // v4.36: Generación de retícula adaptativa y centrada
+        // v4.37: Generación de retícula adaptativa y centrada
         const obtenerReticula = (THREE_INSTANCE, scene) => {
           if (reticleMesh) {
             sincronizarTransformReticula(reticleMesh, THREE_INSTANCE);
@@ -412,7 +420,7 @@
             color: DRAG_RETICLE_CONFIG.color,
             transparent: true,
             opacity: 0.85,
-            depthTest: true,
+            depthTest: false,
             depthWrite: false,
             side: THREE_INSTANCE.DoubleSide
           });
@@ -460,11 +468,18 @@
             isModelTouchActive = !0,
             dragPointerId = o.data.pointerId,
             activePointerIds.add(o.data.pointerId),
-            dragPlaneY = n.y,
+            dragPlaneY = 0.001, // v4.37: Fijado estrictamente al plano base de reposo para evitar acumular alturas
             dragOffsetX = 0,
             dragOffsetZ = 0,
             planarX = n.x,
             planarZ = n.z;
+
+            try {
+              if (e.PositionAnimation && e.PositionAnimation.remove) {
+                e.PositionAnimation.remove(t, a);
+              }
+            } catch (err) {}
+
             if (!i || !r) return;
 
             const d = new r.Raycaster(),
@@ -515,7 +530,7 @@
           .listen(t.events.globalId, e.input.SCREEN_TOUCH_END, o => {
             activePointerIds.delete(o.data.pointerId);
             if (0 === activePointerIds.size) {
-              // v4.36: caída acelerada (940ms) asentándose en Y = 0 sin rebasarlo
+              // v4.37: caída acelerada (940ms) asentándose en Y = 0 sin rebasarlo
               if (isDragActive) {
                 isDragActive = !1;
                 if (reticleMesh) reticleMesh.visible = false;
@@ -852,7 +867,7 @@
           "material": {
             "type": "shadow",
             "color": "#000000",
-            "opacity": 0.5
+            "opacity": 0.40
           },
           "parentId": "84028e73-ee70-412d-b8d4-c09bf07c655c",
           "components": {
