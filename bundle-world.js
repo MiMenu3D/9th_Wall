@@ -1,4 +1,4 @@
-﻿// 9th Wall v4.35
+﻿// 9th Wall v4.36
 (() => {
   var e = {
     574() {
@@ -50,12 +50,12 @@
     scaleDeadzone: 0.085
   });
 
-  // v4.35: retícula adaptativa al Bounding Box local con aristas blindadas y rebote calibrado (940ms)
+  // v4.36: retícula centrada en el origen local, ajustada a dimensión real (+2cm) y fijada a Y=0 de suelo
   const DRAG_RETICLE_CONFIG = Object.freeze({
     liftHeight: 0.05,
     liftSmoothingRate: 8.0,
     dragActivationThreshold: 0.012,
-    baseSize: 0.235,
+    baseSize: 0.260,
     thickness: 0.016,
     cornerRadius: 0.035,
     color: 0x66ffff,
@@ -63,7 +63,7 @@
     bounceEasing: "Bounce"
   });
 
-  // v4.35: Contorno exterior en sentido antihorario (CCW)
+  // v4.36: Contorno exterior en sentido antihorario (CCW)
   function crearFormaRectRedondeadaCCW(THREE_INSTANCE, sizeX, sizeZ, radius) {
     const sx = sizeX / 2;
     const sz = sizeZ / 2;
@@ -81,7 +81,7 @@
     return shape;
   }
 
-  // v4.35: Agujero interior en sentido horario (CW) para garantizar triangulación limpia sin aristas infinitas en X
+  // v4.36: Agujero interior en sentido horario (CW) para garantizar triangulación limpia sin aristas infinitas en X
   function crearFormaRectRedondeadaCW(THREE_INSTANCE, sizeX, sizeZ, radius) {
     const sx = sizeX / 2;
     const sz = sizeZ / 2;
@@ -91,7 +91,7 @@
     path.lineTo(-sx, -sz + r);
     path.quadraticCurveTo(-sx, -sz, -sx + r, -sz);
     path.lineTo(sx - r, -sz);
-    path.quadraticCurveTo(sx, -sz, sx, -sz + r);
+    path.quadraticCurveTo(sx, -sz, sx - r, -sz + r);
     path.lineTo(sx, sz - r);
     path.quadraticCurveTo(sx, sz, sx - r, sz);
     path.lineTo(-sx + r, sz);
@@ -125,7 +125,7 @@
       }
     });
 
-    // v4.35: Componente de generación con cinemática continua y Falso Motion Blur por buffer temporal de fotogramas
+    // v4.36: Spawner con fundido suave de opacidad inicial (0 a 1500ms) y cinemática de escala/giro
     e.registerComponent({
       name: "dish-spawner",
       schema: { prefab: "eid" },
@@ -153,6 +153,7 @@
 
           const scaleDuration = 3000;
           const rotDuration = 4000;
+          const opacityDuration = 1500; // Fundido de entrada transparente a opaco
           const totalSpinAngle = -Math.PI * 3; // -540° (1.5 vueltas completas en sentido horario)
           let animationStarted = false;
 
@@ -160,26 +161,34 @@
             if (animationStarted) return;
             animationStarted = true;
 
-            const THREE_INSTANCE = window.THREE;
+            const spawnMaterials = [];
+            if (t.three && t.three.scene) {
+              t.three.scene.traverse((child) => {
+                if (child.isMesh && child.material && child.name !== "Ground" && child.name !== "Hider") {
+                  const mats = Array.isArray(child.material) ? child.material : [child.material];
+                  mats.forEach(m => {
+                    m.transparent = true;
+                    m.opacity = 0.0;
+                    spawnMaterials.push(m);
+                  });
+                }
+              });
+            }
 
-            // Instanciación aislada de los 3 clones temporales de Motion Blur en la escena (50%, 35%, 18%)
+            /* [BLOQUE GHOSTS MOTION BLUR PRESERVADO PARA FUTURA RECUPERACIÓN]
+            const ghostOpacities = [0.50, 0.35, 0.18];
+            const ghosts = [];
             let modelThreeObj = null;
             if (t.three && t.three.scene) {
               t.three.scene.traverse((child) => {
                 if (!modelThreeObj && child.isMesh && child.geometry && child.name !== "Ground" && child.name !== "Hider" && (!child.material || child.material.type !== 'ShadowMaterial')) {
                   let curr = child;
-                  while (curr.parent && curr.parent !== t.three.scene) {
-                    curr = curr.parent;
-                  }
+                  while (curr.parent && curr.parent !== t.three.scene) { curr = curr.parent; }
                   modelThreeObj = curr;
                 }
               });
             }
-
-            const ghostOpacities = [0.50, 0.35, 0.18];
-            const ghosts = [];
-
-            if (modelThreeObj && t.three && t.three.scene && THREE_INSTANCE) {
+            if (modelThreeObj && t.three && t.three.scene && window.THREE) {
               for (let g = 0; g < 3; g++) {
                 const ghost = modelThreeObj.clone(true);
                 ghost.traverse((node) => {
@@ -197,9 +206,9 @@
                 ghosts.push(ghost);
               }
             }
-
             const history = [];
-            const blurLimitDuration = rotDuration * 0.75; // Activo durante los primeros 3/4 de la animación (3000ms)
+            */
+
             const spawnStartTime = performance.now();
 
             const animarSpawnCompleto = () => {
@@ -215,47 +224,51 @@
               const easeRot = 1.0 - Math.pow(1.0 - progressRot, 5);
               const currentAngle = baseRotY + (totalSpinAngle * easeRot);
 
+              // 3. Fundido de Opacidad Suave (1500ms)
+              const progressOpacity = Math.min(1.0, elapsed / opacityDuration);
+              spawnMaterials.forEach(m => {
+                m.opacity = progressOpacity;
+              });
+
               e.Scale.set(t, r, { x: currentScaleVal, y: currentScaleVal, z: currentScaleVal });
               d.set(e.Quaternion, e.math.quat.yRadians(currentAngle));
 
-              // Alimentamos la cola FIFO histórica de transformaciones
+              /* [ACTUALIZACIÓN HISTÓRICA GHOSTS PRESERVADA]
               history.unshift({ rotY: currentAngle, scaleVal: currentScaleVal });
               if (history.length > 10) history.pop();
-
-              if (elapsed < blurLimitDuration && THREE_INSTANCE) {
+              if (elapsed < (rotDuration * 0.75) && window.THREE) {
                 for (let g = 0; g < ghosts.length; g++) {
-                  const frameLag = g + 1; // 1 frame, 2 frames y 3 frames de desfase temporal
+                  const frameLag = g + 1;
                   if (history[frameLag]) {
                     ghosts[g].visible = true;
                     ghosts[g].position.set(targetX, targetY + 0.001, targetZ);
                     ghosts[g].scale.set(history[frameLag].scaleVal, history[frameLag].scaleVal, history[frameLag].scaleVal);
-                    ghosts[g].quaternion.setFromAxisAngle(new THREE_INSTANCE.Vector3(0, 1, 0), history[frameLag].rotY);
+                    ghosts[g].quaternion.setFromAxisAngle(new window.THREE.Vector3(0, 1, 0), history[frameLag].rotY);
                   }
                 }
               } else {
-                for (let g = 0; g < ghosts.length; g++) {
-                  if (ghosts[g]) ghosts[g].visible = false;
-                }
+                for (let g = 0; g < ghosts.length; g++) { if (ghosts[g]) ghosts[g].visible = false; }
               }
+              */
 
               if (elapsed < rotDuration) {
                 requestAnimationFrame(animarSpawnCompleto);
               } else {
                 e.Scale.set(t, r, { x: 1.0, y: 1.0, z: 1.0 });
                 d.set(e.Quaternion, e.math.quat.yRadians(baseRotY + totalSpinAngle));
+                spawnMaterials.forEach(m => { m.opacity = 1.0; });
 
-                // Destrucción limpia de los clones fantasma al terminar la cinemática
+                /* [LIMPIEZA DE GHOSTS PRESERVADA]
                 for (let g = 0; g < ghosts.length; g++) {
-                  if (ghosts[g] && ghosts[g].parent) {
-                    ghosts[g].parent.remove(ghosts[g]);
-                  }
+                  if (ghosts[g] && ghosts[g].parent) { ghosts[g].parent.remove(ghosts[g]); }
                 }
+                */
               }
             };
             requestAnimationFrame(animarSpawnCompleto);
           };
 
-          // Sondeo directo de malla lista
+          // Sondeo directo: asegura la aplicación de shaders y arranca la cinemática sin bloqueos
           const comprobarMallaLista = () => {
             if (animationStarted) return;
             let encontrada = false;
@@ -302,9 +315,11 @@
         planarZ = 0,
         lastLiftFrameTime = performance.now(),
         bboxSizeX = DRAG_RETICLE_CONFIG.baseSize,
-        bboxSizeZ = DRAG_RETICLE_CONFIG.baseSize;
+        bboxSizeZ = DRAG_RETICLE_CONFIG.baseSize,
+        reticleLocalCenterX = 0,
+        reticleLocalCenterZ = 0;
 
-        // v4.35: Medición precisa del Bounding Box en el espacio local relativo a la raíz del modelo (invRootMatrix)
+        // v4.36: Medición exacta del Bounding Box local y su centro geométrico en espacio de la raíz
         const actualizarBoundingBox = (THREE_INSTANCE) => {
           if (!t.three || !t.three.scene) return;
 
@@ -331,7 +346,6 @@
               if (!child.geometry.boundingBox) child.geometry.computeBoundingBox();
               if (child.geometry.boundingBox) {
                 const meshBox = child.geometry.boundingBox.clone();
-                // Proyección de la submalla al espacio local relativo de la raíz del modelo
                 const relMatrix = child.matrixWorld.clone().premultiply(invRootMatrix);
                 meshBox.applyMatrix4(relMatrix);
                 unifiedBox.union(meshBox);
@@ -342,16 +356,21 @@
 
           if (hasGeom) {
             const sz = new THREE_INSTANCE.Vector3();
+            const ctr = new THREE_INSTANCE.Vector3();
             unifiedBox.getSize(sz);
+            unifiedBox.getCenter(ctr);
+
             if (sz.x > 0.05 && sz.z > 0.05 && sz.x < 2.5 && sz.z < 2.5) {
-              // v4.35: Ajuste perimétrico adaptativo según la dimensión real del plato (redondo u ovalado/rectangular)
-              bboxSizeX = Math.max(0.12, sz.x - 0.02);
-              bboxSizeZ = Math.max(0.12, sz.z - 0.02);
+              // v4.36: Dimensión real ajustada (+2cm de holgura exacta) y guardado del centroide local
+              bboxSizeX = sz.x + 0.02;
+              bboxSizeZ = sz.z + 0.02;
+              reticleLocalCenterX = ctr.x;
+              reticleLocalCenterZ = ctr.z;
             }
           }
         };
 
-        // v4.35: Sincronización angular mediante cuaterniones combinados (qYaw x qPitch)
+        // v4.36: Sincronización angular con posición Y anclada estrictamente a la altura 0 del suelo (+0.001)
         const sincronizarTransformReticula = (ret, THREE_INSTANCE) => {
           if (!ret || !THREE_INSTANCE) return;
 
@@ -367,11 +386,15 @@
           const qYaw = new THREE_INSTANCE.Quaternion().setFromAxisAngle(new THREE_INSTANCE.Vector3(0, 1, 0), yawAngle);
           ret.quaternion.copy(qYaw).multiply(qPitch);
 
-          ret.position.set(planarX, dragPlaneY + 0.002, planarZ);
+          // Proyectamos el centroide local según la rotación actual para que la retícula quede perfectamente centrada
+          const offsetRotated = new THREE_INSTANCE.Vector3(reticleLocalCenterX * currentScale, 0, reticleLocalCenterZ * currentScale).applyAxisAngle(new THREE_INSTANCE.Vector3(0, 1, 0), yawAngle);
+
+          // Anclaje estricto en el plano de la mesa (dragPlaneY + 0.001), inmune a elevaciones del plato
+          ret.position.set(planarX + offsetRotated.x, dragPlaneY + 0.001, planarZ + offsetRotated.z);
           ret.scale.set(currentScale, currentScale, currentScale);
         };
 
-        // v4.35: Generación de retícula adaptativa y orientada
+        // v4.36: Generación de retícula adaptativa y centrada
         const obtenerReticula = (THREE_INSTANCE, scene) => {
           if (reticleMesh) {
             sincronizarTransformReticula(reticleMesh, THREE_INSTANCE);
@@ -492,7 +515,7 @@
           .listen(t.events.globalId, e.input.SCREEN_TOUCH_END, o => {
             activePointerIds.delete(o.data.pointerId);
             if (0 === activePointerIds.size) {
-              // v4.35: caída acelerada (940ms) asentándose en Y = 0 sin rebasarlo
+              // v4.36: caída acelerada (940ms) asentándose en Y = 0 sin rebasarlo
               if (isDragActive) {
                 isDragActive = !1;
                 if (reticleMesh) reticleMesh.visible = false;
