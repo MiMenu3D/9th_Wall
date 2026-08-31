@@ -1,4 +1,4 @@
-﻿// 9th Wall v4.37
+﻿// 9th Wall v4.38
 (() => {
   var e = {
     574() {
@@ -50,7 +50,7 @@
     scaleDeadzone: 0.085
   });
 
-  // v4.37: retícula centrada en el origen local, ajustada a dimensión real (+2cm) y fijada a Y=0 de suelo
+  // v4.38: retícula centrada en el origen local, ajustada a dimensión real (+2cm) y fijada a Y=0 de suelo
   const DRAG_RETICLE_CONFIG = Object.freeze({
     liftHeight: 0.05,
     liftSmoothingRate: 8.0,
@@ -63,7 +63,7 @@
     bounceEasing: "Bounce"
   });
 
-  // v4.37: Contorno exterior en sentido antihorario (CCW) con vértice inicial alineado en (-sx + r, -sz)
+  // v4.38: Contorno exterior en sentido antihorario (CCW) con vértice inicial alineado en (-sx + r, -sz)
   function crearFormaRectRedondeadaCCW(THREE_INSTANCE, sizeX, sizeZ, radius) {
     const sx = sizeX / 2;
     const sz = sizeZ / 2;
@@ -81,7 +81,7 @@
     return shape;
   }
 
-  // v4.37: Agujero interior en sentido horario (CW) con vértice inicial alineado en (-sx + r, -sz) para corte Earcut 100% simétrico
+  // v4.38: Agujero interior en sentido horario (CW) con vértice inicial alineado en (-sx + r, -sz) para corte Earcut 100% simétrico
   function crearFormaRectRedondeadaCW(THREE_INSTANCE, sizeX, sizeZ, radius) {
     const sx = sizeX / 2;
     const sz = sizeZ / 2;
@@ -125,7 +125,7 @@
       }
     });
 
-    // v4.37: Spawner con fundido suave, arranque sincronizado al primer frame real post-compilación
+    // v4.38: Spawner con fundido suave y sincronización diferida al primer frame real de render
     e.registerComponent({
       name: "dish-spawner",
       schema: { prefab: "eid" },
@@ -164,7 +164,7 @@
             const spawnMaterials = [];
             if (t.three && t.three.scene) {
               t.three.scene.traverse((child) => {
-                // v4.37: Filtro estricto para no mutar nunca el ShadowMaterial del suelo
+                // v4.38: Filtro estricto para no mutar nunca el ShadowMaterial del suelo
                 if (child.isMesh && child.material && child.material.type !== 'ShadowMaterial' && child.name !== "Ground" && child.name !== "Hider") {
                   const mats = Array.isArray(child.material) ? child.material : [child.material];
                   mats.forEach(m => {
@@ -212,7 +212,7 @@
             const history = [];
             */
 
-            // v4.37: Inicialización diferida del tiempo para no perder los primeros ms por compilación de GPU
+            // v4.38: Inicialización diferida del tiempo para no perder los primeros ms por compilación de GPU
             let spawnStartTime = null;
 
             const animarSpawnCompleto = () => {
@@ -330,7 +330,7 @@
         reticleLocalCenterX = 0,
         reticleLocalCenterZ = 0;
 
-        // v4.37: Medición desacoplada al estilo model-viewer evaluando la jerarquía completa en reposo
+        // v4.38: Medición desacoplada al estilo model-viewer evaluando la jerarquía completa en reposo
         const actualizarBoundingBox = (THREE_INSTANCE) => {
           if (!t.three || !t.three.scene) return;
 
@@ -378,7 +378,7 @@
           }
         };
 
-        // v4.37: Sincronización angular con posición Y anclada estrictamente a la altura 0 del suelo (+0.0015)
+        // v4.38: Sincronización angular con posición Y anclada estrictamente a la altura 0 del suelo (+0.0015)
         const sincronizarTransformReticula = (ret, THREE_INSTANCE) => {
           if (!ret || !THREE_INSTANCE) return;
 
@@ -402,7 +402,7 @@
           ret.scale.set(currentScale, currentScale, currentScale);
         };
 
-        // v4.37: Generación de retícula adaptativa y centrada
+        // v4.38: Generación de retícula adaptativa y centrada
         const obtenerReticula = (THREE_INSTANCE, scene) => {
           if (reticleMesh) {
             sincronizarTransformReticula(reticleMesh, THREE_INSTANCE);
@@ -468,7 +468,7 @@
             isModelTouchActive = !0,
             dragPointerId = o.data.pointerId,
             activePointerIds.add(o.data.pointerId),
-            dragPlaneY = 0.001, // v4.37: Fijado estrictamente al plano base de reposo para evitar acumular alturas
+            dragPlaneY = 0.001, // v4.38: Fijado estrictamente al plano base de reposo para evitar acumular alturas
             dragOffsetX = 0,
             dragOffsetZ = 0,
             planarX = n.x,
@@ -530,7 +530,7 @@
           .listen(t.events.globalId, e.input.SCREEN_TOUCH_END, o => {
             activePointerIds.delete(o.data.pointerId);
             if (0 === activePointerIds.size) {
-              // v4.37: caída acelerada (940ms) asentándose en Y = 0 sin rebasarlo
+              // v4.38: caída acelerada (940ms) asentándose en Y = 0 sin rebasarlo
               if (isDragActive) {
                 isDragActive = !1;
                 if (reticleMesh) reticleMesh.visible = false;
