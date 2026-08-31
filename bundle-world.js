@@ -1,4 +1,4 @@
-﻿// 9th Wall v4.29
+﻿// 9th Wall v4.33
 (() => {
   var e = {
     574() {
@@ -50,20 +50,20 @@
     scaleDeadzone: 0.085
   });
 
-  // v4.29: retícula adaptativa al Bounding Box local con aristas blindadas y rebote calibrado (940ms)
+  // v4.33: retícula adaptativa al Bounding Box local con aristas blindadas y rebote calibrado (940ms)
   const DRAG_RETICLE_CONFIG = Object.freeze({
     liftHeight: 0.05,
     liftSmoothingRate: 8.0,
     dragActivationThreshold: 0.012,
-    baseSize: 0.272,
-    thickness: 0.018,
-    cornerRadius: 0.04,
+    baseSize: 0.235,
+    thickness: 0.016,
+    cornerRadius: 0.035,
     color: 0x66ffff,
     bounceDuration: 940,
     bounceEasing: "Bounce"
   });
 
-  // v4.29: Contorno exterior en sentido antihorario (CCW)
+  // v4.33: Contorno exterior en sentido antihorario (CCW)
   function crearFormaRectRedondeadaCCW(THREE_INSTANCE, sizeX, sizeZ, radius) {
     const sx = sizeX / 2;
     const sz = sizeZ / 2;
@@ -81,7 +81,7 @@
     return shape;
   }
 
-  // v4.29: Agujero interior en sentido horario (CW) para garantizar triangulación limpia sin aristas infinitas en X
+  // v4.33: Agujero interior en sentido horario (CW) para garantizar triangulación limpia sin aristas infinitas en X
   function crearFormaRectRedondeadaCW(THREE_INSTANCE, sizeX, sizeZ, radius) {
     const sx = sizeX / 2;
     const sz = sizeZ / 2;
@@ -125,7 +125,7 @@
       }
     });
 
-    // v4.29: Componente de generación invisible con precompilación de shaders y cinemática (3000ms Escala / 4000ms Giro 1.5 vueltas)
+    // v4.33: Componente de generación sincronizado a verificación de recursos GPU + Falso Motion Blur temporal por buffer
     e.registerComponent({
       name: "dish-spawner",
       schema: { prefab: "eid" },
@@ -146,7 +146,7 @@
           // Rotación binaria base (0° o 180°)
           const baseRotY = Math.random() < 0.5 ? 0 : Math.PI;
 
-          // Posición fija sobre la mesa en escala 0 (Invisible al ojo durante el enganche de shaders)
+          // Posición fija sobre la mesa en escala 0 (esperando rasterización real de GPU)
           d.setLocalPosition({ x: targetX, y: targetY + 0.001, z: targetZ });
           e.Scale.set(t, r, { x: 0.0001, y: 0.0001, z: 0.0001 });
           d.set(e.Quaternion, e.math.quat.yRadians(baseRotY));
@@ -160,7 +160,48 @@
             if (animationStarted) return;
             animationStarted = true;
 
+            const THREE_INSTANCE = window.THREE;
+
+            // Instanciación de los 3 clones temporales de Motion Blur (50%, 35%, 18%)
+            let modelThreeObj = null;
+            if (t.three && t.three.scene) {
+              t.three.scene.traverse((child) => {
+                if (!modelThreeObj && child.isMesh && child.name !== "Ground" && child.name !== "Hider" && (!child.material || child.material.type !== 'ShadowMaterial')) {
+                  let curr = child;
+                  while (curr.parent && curr.parent !== t.three.scene) {
+                    curr = curr.parent;
+                  }
+                  modelThreeObj = curr;
+                }
+              });
+            }
+
+            const ghostOpacities = [0.50, 0.35, 0.18];
+            const ghosts = [];
+
+            if (modelThreeObj && modelThreeObj.parent && THREE_INSTANCE) {
+              for (let g = 0; g < 3; g++) {
+                const ghost = modelThreeObj.clone(true);
+                ghost.traverse((node) => {
+                  if (node.isMesh && node.material) {
+                    const srcMat = Array.isArray(node.material) ? node.material[0] : node.material;
+                    const ghostMat = srcMat.clone();
+                    ghostMat.transparent = true;
+                    ghostMat.opacity = ghostOpacities[g];
+                    ghostMat.depthWrite = false;
+                    node.material = ghostMat;
+                  }
+                });
+                ghost.visible = false;
+                modelThreeObj.parent.add(ghost);
+                ghosts.push(ghost);
+              }
+            }
+
+            const history = [];
+            const blurLimitDuration = rotDuration * 0.75; // Primeros 3/4 de la animación (3000ms)
             const spawnStartTime = performance.now();
+
             const animarSpawnCompleto = () => {
               const elapsed = performance.now() - spawnStartTime;
 
@@ -174,50 +215,90 @@
               const easeRot = 1.0 - Math.pow(1.0 - progressRot, 5);
               const currentAngle = baseRotY + (totalSpinAngle * easeRot);
 
-              /* [BLOQUE DE ASCENSO PRESERVADO PARA RECUPERACIÓN FUTURA]
-              const progressY = Math.min(1.0, elapsed / 1200);
-              const easeY = 1.0 - Math.pow(1.0 - progressY, 5);
-              const currentY = spawnStartY + ((targetY + 0.001 - spawnStartY) * easeY);
-              d.setLocalPosition({ x: targetX, y: currentY, z: targetZ });
-              */
-
               e.Scale.set(t, r, { x: currentScaleVal, y: currentScaleVal, z: currentScaleVal });
               d.set(e.Quaternion, e.math.quat.yRadians(currentAngle));
+
+              // Guardamos en buffer FIFO histórico para alimentar el Motion Blur
+              history.unshift({ rotY: currentAngle, scaleVal: currentScaleVal });
+              if (history.length > 10) history.pop();
+
+              if (elapsed < blurLimitDuration && THREE_INSTANCE) {
+                for (let g = 0; g < ghosts.length; g++) {
+                  const frameLag = g + 1; // 1 frame, 2 frames y 3 frames de retardo
+                  if (history[frameLag]) {
+                    ghosts[g].visible = true;
+                    ghosts[g].position.set(targetX, targetY + 0.001, targetZ);
+                    ghosts[g].scale.set(history[frameLag].scaleVal, history[frameLag].scaleVal, history[frameLag].scaleVal);
+                    ghosts[g].quaternion.setFromAxisAngle(new THREE_INSTANCE.Vector3(0, 1, 0), history[frameLag].rotY);
+                  }
+                }
+              } else {
+                for (let g = 0; g < ghosts.length; g++) {
+                  if (ghosts[g]) ghosts[g].visible = false;
+                }
+              }
 
               if (elapsed < rotDuration) {
                 requestAnimationFrame(animarSpawnCompleto);
               } else {
                 e.Scale.set(t, r, { x: 1.0, y: 1.0, z: 1.0 });
                 d.set(e.Quaternion, e.math.quat.yRadians(baseRotY + totalSpinAngle));
+
+                // Destrucción limpia de los clones fantasma al finalizar la animación
+                for (let g = 0; g < ghosts.length; g++) {
+                  if (ghosts[g] && ghosts[g].parent) {
+                    ghosts[g].parent.remove(ghosts[g]);
+                  }
+                }
               }
             };
             requestAnimationFrame(animarSpawnCompleto);
           };
 
-          // Sondeo con detección real de vértices, inyección de shaders y precompilación previa al disparo
-          const comprobarMallaLista = () => {
+          // Sondeo determinista de completitud de recursos (geometría + texturas listas)
+          const comprobarRecursosCompletos = () => {
             if (animationStarted) return;
-            let encontrada = false;
+            const meshList = [];
+            let allReady = false;
 
             if (t.three && t.three.scene) {
               t.three.scene.traverse((child) => {
-                if (child.isMesh && child.geometry && child.geometry.attributes && child.geometry.attributes.position && child.geometry.attributes.position.count > 0 && child.name !== "Ground" && child.name !== "Hider") {
-                  encontrada = true;
+                if (child.isMesh && child.geometry && child.name !== "Ground" && child.name !== "Hider" && (!child.material || child.material.type !== 'ShadowMaterial')) {
+                  meshList.push(child);
                 }
               });
             }
 
-            if (encontrada) {
-              // Inyectamos shaders y precompilamos en GPU mientras el plato está en escala 0
+            if (meshList.length > 0) {
+              let ready = true;
+              for (let m of meshList) {
+                if (!m.geometry.attributes || !m.geometry.attributes.position || m.geometry.attributes.position.count === 0) {
+                  ready = false;
+                  break;
+                }
+                if (m.material) {
+                  const mats = Array.isArray(m.material) ? m.material : [m.material];
+                  for (let mat of mats) {
+                    if (mat.map && mat.map.image && mat.map.image.complete === false) {
+                      ready = false;
+                      break;
+                    }
+                  }
+                }
+              }
+              allReady = ready;
+            }
+
+            if (allReady) {
               if (window.aplicarAjustesSceneViewer) {
                 window.aplicarAjustesSceneViewer(t.three.scene);
               }
               dispararCinematicaSpawn();
             } else {
-              requestAnimationFrame(comprobarMallaLista);
+              requestAnimationFrame(comprobarRecursosCompletos);
             }
           };
-          requestAnimationFrame(comprobarMallaLista);
+          requestAnimationFrame(comprobarRecursosCompletos);
         });
       }
     });
@@ -244,38 +325,54 @@
         bboxSizeX = DRAG_RETICLE_CONFIG.baseSize,
         bboxSizeZ = DRAG_RETICLE_CONFIG.baseSize;
 
-        // v4.29: Medición precisa del Bounding Box aislando exclusivamente la malla del plato
+        // v4.33: Medición precisa del Bounding Box en el espacio local relativo a la raíz del modelo (invRootMatrix)
         const actualizarBoundingBox = (THREE_INSTANCE) => {
           if (!t.three || !t.three.scene) return;
-          let minX = Infinity, maxX = -Infinity;
-          let minZ = Infinity, maxZ = -Infinity;
+
+          let modelRoot = null;
+          t.three.scene.traverse((child) => {
+            if (!modelRoot && child.isMesh && child.geometry && child.name !== "Ground" && child.name !== "Hider" && child !== reticleMesh && (!child.material || child.material.type !== 'ShadowMaterial')) {
+              let curr = child;
+              while (curr.parent && curr.parent !== t.three.scene) {
+                curr = curr.parent;
+              }
+              modelRoot = curr;
+            }
+          });
+
+          if (!modelRoot) return;
+
+          modelRoot.updateMatrixWorld(true);
+          const invRootMatrix = modelRoot.matrixWorld.clone().invert();
+          const unifiedBox = new THREE_INSTANCE.Box3();
           let hasGeom = false;
 
-          t.three.scene.traverse((child) => {
-            if (child.isMesh && child.geometry && child.geometry.attributes && child.geometry.attributes.position && child.name !== "Ground" && child.name !== "Hider" && child !== reticleMesh && (!child.material || child.material.type !== 'ShadowMaterial')) {
+          modelRoot.traverse((child) => {
+            if (child.isMesh && child.geometry && child.name !== "Ground" && child.name !== "Hider" && child !== reticleMesh && (!child.material || child.material.type !== 'ShadowMaterial')) {
               if (!child.geometry.boundingBox) child.geometry.computeBoundingBox();
-              const bb = child.geometry.boundingBox;
-              if (bb) {
-                const szX = bb.max.x - bb.min.x;
-                const szZ = bb.max.z - bb.min.z;
-                if (szX < 1.5 && szZ < 1.5) {
-                  minX = Math.min(minX, bb.min.x);
-                  maxX = Math.max(maxX, bb.max.x);
-                  minZ = Math.min(minZ, bb.min.z);
-                  maxZ = Math.max(maxZ, bb.max.z);
-                  hasGeom = true;
-                }
+              if (child.geometry.boundingBox) {
+                const meshBox = child.geometry.boundingBox.clone();
+                // Proyección de la submalla al espacio local relativo de la raíz del modelo
+                const relMatrix = child.matrixWorld.clone().premultiply(invRootMatrix);
+                meshBox.applyMatrix4(relMatrix);
+                unifiedBox.union(meshBox);
+                hasGeom = true;
               }
             }
           });
 
-          if (hasGeom && (maxX - minX > 0.05) && (maxZ - minZ > 0.05)) {
-            bboxSizeX = (maxX - minX) + 0.04;
-            bboxSizeZ = (maxZ - minZ) + 0.04;
+          if (hasGeom) {
+            const sz = new THREE_INSTANCE.Vector3();
+            unifiedBox.getSize(sz);
+            if (sz.x > 0.05 && sz.z > 0.05 && sz.x < 2.5 && sz.z < 2.5) {
+              // v4.33: Ajuste perimétrico adaptativo según la dimensión real del plato (redondo u ovalado/rectangular)
+              bboxSizeX = Math.max(0.12, sz.x - 0.02);
+              bboxSizeZ = Math.max(0.12, sz.z - 0.02);
+            }
           }
         };
 
-        // v4.29: Sincronización angular mediante cuaterniones combinados (qYaw x qPitch)
+        // v4.33: Sincronización angular mediante cuaterniones combinados (qYaw x qPitch)
         const sincronizarTransformReticula = (ret, THREE_INSTANCE) => {
           if (!ret || !THREE_INSTANCE) return;
 
@@ -295,7 +392,7 @@
           ret.scale.set(currentScale, currentScale, currentScale);
         };
 
-        // v4.29: Generación de retícula adaptativa y orientada
+        // v4.33: Generación de retícula adaptativa y orientada
         const obtenerReticula = (THREE_INSTANCE, scene) => {
           if (reticleMesh) {
             sincronizarTransformReticula(reticleMesh, THREE_INSTANCE);
@@ -416,7 +513,7 @@
           .listen(t.events.globalId, e.input.SCREEN_TOUCH_END, o => {
             activePointerIds.delete(o.data.pointerId);
             if (0 === activePointerIds.size) {
-              // v4.29: caída acelerada (940ms) asentándose en Y = 0 sin rebasarlo
+              // v4.33: caída acelerada (940ms) asentándose en Y = 0 sin rebasarlo
               if (isDragActive) {
                 isDragActive = !1;
                 if (reticleMesh) reticleMesh.visible = false;
@@ -774,27 +871,6 @@
             "receiveShadow": true
           }
         },
-
-        /* [HIDER COMENTADO MIENTRAS SE UTILIZA ANIMACIÓN DE ESCALA]
-        "17af117a-efce-48dd-857e-e383a3649c7b": {
-          "id": "17af117a-efce-48dd-857e-e383a3649c7b",
-          "position": [0, -0.001, 0],
-          "rotation": [-0.707106799999999, 0, 0, 0.7071067623730954],
-          "scale": [2, 2, 2],
-          "geometry": {
-            "type": "plane",
-            "width": 1,
-            "height": 1
-          },
-          "material": {
-            "type": "hider"
-          },
-          "parentId": "84028e73-ee70-412d-b8d4-c09bf07c655c",
-          "components": {},
-          "name": "Hider",
-          "order": 7.322553197845954
-        },
-        */
 
         // Entidad del Modelo 3D (El archivo .glb)
         "a02b4479-461e-40c2-ba91-0ccabbd1bd83": {
