@@ -1,4 +1,4 @@
-﻿// 9th Wall v4.39
+﻿// 9th Wall v4.40
 (() => {
   var e = {
     574() {
@@ -50,7 +50,7 @@
     scaleDeadzone: 0.085
   });
 
-  // v4.39: retícula centrada en el origen local, ajustada a dimensión real (+2cm) y fijada a Y=0 de suelo
+  // v4.40: retícula centrada en la huella de la base, ajustada a dimensión real (+3cm) y fijada a Y=0 de suelo
   const DRAG_RETICLE_CONFIG = Object.freeze({
     liftHeight: 0.05,
     liftSmoothingRate: 8.0,
@@ -63,7 +63,7 @@
     bounceEasing: "Bounce"
   });
 
-  // v4.39: Contorno exterior en sentido antihorario (CCW) con vértice inicial alineado en (-sx + r, -sz)
+  // v4.40: Contorno exterior en sentido antihorario (CCW) con vértice inicial alineado en (-sx + r, -sz)
   function crearFormaRectRedondeadaCCW(THREE_INSTANCE, sizeX, sizeZ, radius) {
     const sx = sizeX / 2;
     const sz = sizeZ / 2;
@@ -81,7 +81,7 @@
     return shape;
   }
 
-  // v4.39: Agujero interior en sentido horario (CW) con vértice inicial alineado en (-sx + r, -sz) para corte Earcut 100% simétrico
+  // v4.40: Agujero interior en sentido horario (CW) con vértice inicial alineado en (-sx + r, -sz) para corte Earcut 100% simétrico
   function crearFormaRectRedondeadaCW(THREE_INSTANCE, sizeX, sizeZ, radius) {
     const sx = sizeX / 2;
     const sz = sizeZ / 2;
@@ -125,7 +125,7 @@
       }
     });
 
-    // v4.39: Spawner calibrado (Opacidad lineal 1s sincronizada con sombra AO, Escala Quad-Out 2s, Giro Quintic-Out 3s)
+    // v4.40: Spawner con sombra instantánea en t=0 (feedback inmediato), opacidad rápida (800ms Quad-Out), Escala (2000ms Quad-Out) y Giro (3000ms Quintic-Out)
     e.registerComponent({
       name: "dish-spawner",
       schema: { prefab: "eid" },
@@ -151,9 +151,9 @@
           e.Scale.set(t, r, { x: 0.001, y: 0.001, z: 0.001 });
           d.set(e.Quaternion, e.math.quat.yRadians(baseRotY));
 
-          const scaleDuration = 2000;    // v4.39: 2000ms Escala (EaseOut Quadratic)
-          const rotDuration = 3000;      // v4.39: 3000ms Rotación total (EaseOut Quintic)
-          const opacityDuration = 1000;  // v4.39: 1000ms Opacidad Lineal
+          const scaleDuration = 2000;    // v4.40: 2000ms Escala (EaseOut Quadratic)
+          const rotDuration = 3000;      // v4.40: 3000ms Rotación total (EaseOut Quintic)
+          const opacityDuration = 800;   // v4.40: 800ms Opacidad rápida con presencia inmediata
           const totalSpinAngle = -Math.PI * 3; // -540° (1.5 vueltas completas en sentido horario)
           let animationStarted = false;
 
@@ -162,14 +162,13 @@
             animationStarted = true;
 
             const spawnMaterials = [];
-            let shadowMeshMat = null;
 
             if (t.three && t.three.scene) {
               t.three.scene.traverse((child) => {
                 if (child.isMesh && child.material) {
                   if (child.material.type === 'ShadowMaterial' || child.name === "Ground") {
-                    shadowMeshMat = child.material;
-                    shadowMeshMat.opacity = 0.0;
+                    // v4.40: Sombra AO activa de inmediato al 0.40 para dar feedback visual instantáneo en el suelo
+                    child.material.opacity = 0.40;
                   } else if (child.name !== "Ground" && child.name !== "Hider") {
                     const mats = Array.isArray(child.material) ? child.material : [child.material];
                     mats.forEach(m => {
@@ -218,13 +217,10 @@
             const history = [];
             */
 
-            // v4.39: Inicialización diferida del tiempo para no perder los primeros ms por compilación de GPU
-            let spawnStartTime = null;
+            // v4.40: Arranque instantáneo directo sin rAFs anidados
+            let spawnStartTime = performance.now();
 
             const animarSpawnCompleto = () => {
-              if (spawnStartTime === null) {
-                spawnStartTime = performance.now();
-              }
               const elapsed = performance.now() - spawnStartTime;
 
               // 1. Cinemática de Escala (2000ms - Quadratic Ease-Out)
@@ -237,15 +233,12 @@
               const easeRot = 1.0 - Math.pow(1.0 - progressRot, 5);
               const currentAngle = baseRotY + (totalSpinAngle * easeRot);
 
-              // 3. Fundido de Opacidad Lineal (1000ms) sincronizado con sombra AO
+              // 3. Fundido de Opacidad Rápido (800ms - Presencia visual temprana)
               const progressOpacity = Math.min(1.0, elapsed / opacityDuration);
+              const easeOpacity = 1.0 - Math.pow(1.0 - progressOpacity, 2);
               spawnMaterials.forEach(m => {
-                m.opacity = progressOpacity;
+                m.opacity = easeOpacity;
               });
-
-              if (shadowMeshMat) {
-                shadowMeshMat.opacity = progressOpacity * 0.40;
-              }
 
               e.Scale.set(t, r, { x: currentScaleVal, y: currentScaleVal, z: currentScaleVal });
               d.set(e.Quaternion, e.math.quat.yRadians(currentAngle));
@@ -274,7 +267,6 @@
                 e.Scale.set(t, r, { x: 1.0, y: 1.0, z: 1.0 });
                 d.set(e.Quaternion, e.math.quat.yRadians(baseRotY + totalSpinAngle));
                 spawnMaterials.forEach(m => { m.opacity = 1.0; });
-                if (shadowMeshMat) shadowMeshMat.opacity = 0.40;
 
                 /* [LIMPIEZA DE GHOSTS PRESERVADA]
                 for (let g = 0; g < ghosts.length; g++) {
@@ -283,11 +275,7 @@
                 */
               }
             };
-
-            // Ejecución tras doble rAF para asegurar que la GPU ya tiene listos los shaders y texturas
-            requestAnimationFrame(() => {
-              requestAnimationFrame(animarSpawnCompleto);
-            });
+            requestAnimationFrame(animarSpawnCompleto);
           };
 
           // Sondeo directo: asegura la aplicación de shaders y arranca la cinemática sin bloqueos
@@ -340,9 +328,9 @@
         bboxSizeZ = DRAG_RETICLE_CONFIG.baseSize,
         reticleLocalCenterX = 0,
         reticleLocalCenterZ = 0,
-        isRoundOrOval = true; // v4.39: Flag de auto-detección geométrica
+        isRoundOrOval = true; // v4.40: Discriminador geométrico automático
 
-        // v4.39: Medición desacoplada con detector automático de geometría redonda/ovalada vs angular
+        // v4.40: Medición desacoplada anclada a la huella de la base inferior (soluciona hamburguesa sobre pizarra)
         const actualizarBoundingBox = (THREE_INSTANCE) => {
           if (!t.three || !t.three.scene) return;
 
@@ -371,19 +359,43 @@
 
           const unifiedBox = new THREE_INSTANCE.Box3().setFromObject(modelRoot);
 
+          // Búsqueda específica de la submalla base (la pieza inferior apoyada en el suelo, p. ej. la pizarra)
+          let baseMesh = null;
+          let lowestY = Infinity;
+          modelRoot.traverse((child) => {
+            if (child.isMesh && child.geometry && child.name !== "Ground" && child.name !== "Hider" && (!child.material || child.material.type !== 'ShadowMaterial')) {
+              const bBox = new THREE_INSTANCE.Box3().setFromObject(child);
+              if (bBox.min.y < lowestY) {
+                lowestY = bBox.min.y;
+                baseMesh = child;
+              }
+            }
+          });
+
           const sz = new THREE_INSTANCE.Vector3();
           const ctr = new THREE_INSTANCE.Vector3();
           unifiedBox.getSize(sz);
-          unifiedBox.getCenter(ctr);
+
+          if (baseMesh) {
+            const baseBox = new THREE_INSTANCE.Box3().setFromObject(baseMesh);
+            baseBox.getCenter(ctr); // Centrado en la base real, no en la comida situada encima
+            const baseSz = new THREE_INSTANCE.Vector3();
+            baseBox.getSize(baseSz);
+            sz.x = Math.max(sz.x, baseSz.x);
+            sz.z = Math.max(sz.z, baseSz.z);
+          } else {
+            unifiedBox.getCenter(ctr);
+          }
 
           if (sz.x > 0.05 && sz.z > 0.05 && sz.x < 2.5 && sz.z < 2.5) {
-            bboxSizeX = sz.x + 0.02;
-            bboxSizeZ = sz.z + 0.02;
+            // v4.40: Holgura perimétrica exacta (+3cm) para enmarcar platos alargados y rectangulares holgadamente
+            bboxSizeX = sz.x + 0.035;
+            bboxSizeZ = sz.z + 0.035;
             reticleLocalCenterX = ctr.x;
             reticleLocalCenterZ = ctr.z;
           }
 
-          // v4.39: Detección matemática automática de geometría circular/ovalada por varianza radial
+          // v4.40: Detección matemática de geometría circular/ovalada frente a rectangular/cuadrada
           let sumR = 0, sumR2 = 0, vCount = 0;
           modelRoot.traverse((child) => {
             if (child.isMesh && child.geometry && child.geometry.attributes && child.geometry.attributes.position && child.name !== "Ground" && child.name !== "Hider") {
@@ -415,7 +427,7 @@
           modelRoot.updateMatrixWorld(true);
         };
 
-        // v4.39: Sincronización angular con posición Y anclada estrictamente a la altura 0 del suelo (+0.0015)
+        // v4.40: Sincronización angular con posición Y anclada estrictamente a la altura 0 del suelo (+0.0015)
         const sincronizarTransformReticula = (ret, THREE_INSTANCE) => {
           if (!ret || !THREE_INSTANCE) return;
 
@@ -439,7 +451,7 @@
           ret.scale.set(currentScale, currentScale, currentScale);
         };
 
-        // v4.39: Generación de retícula con depthTest activo, polygonOffset y renderOrder protegido frente a Hider
+        // v4.40: Generación de retícula con depthTest activo, polygonOffset y renderOrder protegido frente a Hider
         const obtenerReticula = (THREE_INSTANCE, scene) => {
           if (reticleMesh) {
             sincronizarTransformReticula(reticleMesh, THREE_INSTANCE);
@@ -576,13 +588,17 @@
                 const n = t.transform.getWorldPosition(a);
                 const rInstance = window.THREE;
 
-                if (isRoundOrOval && rInstance) {
-                  // v4.39: Bamboleo Euler físico (1200ms) para platos circulares u ovalados
-                  const wobbleDuration = 1200;
+                if (rInstance) {
+                  // v4.40: Caída estrictamente horizontal en el aire (0 a 220ms) y bamboleo físico tras el impacto
+                  const wobbleDuration = isRoundOrOval ? 1800 : 900; // 1.8s para redondos/ovalados, 0.9s para rectangulares
                   const wobbleStartTime = performance.now();
                   const startY = n.y;
-                  const initialTilt = 0.080; // ~4.5 grados
+                  const dropTimeMs = 220; // Caída vertical rápida sin inclinaciones en el aire
+
+                  // Parámetros de bamboleo desacoplados
+                  const initialTilt = isRoundOrOval ? 0.110 : 0.045; // ~6.3° en redondos, ~2.5° en bandejas
                   const randomPhase = Math.random() * Math.PI * 2;
+                  const totalYawSpin = isRoundOrOval ? (0.26 * (Math.random() < 0.5 ? 1 : -1)) : 0.0; // ~15° de giro natural en Y
 
                   let currentRotY = 0;
                   if (e.Quaternion && e.Quaternion.has(t, a)) {
@@ -592,59 +608,48 @@
                     currentRotY = eulerInit.y;
                   }
 
-                  const animarBamboleo = () => {
+                  const animarCaidaYBamboleo = () => {
                     const wElapsed = performance.now() - wobbleStartTime;
                     const wProgress = Math.min(1.0, wElapsed / wobbleDuration);
 
-                    // Fase 1: Caída gravitacional en Y (primeros 250ms)
-                    const dropProgress = Math.min(1.0, wElapsed / 250);
-                    const dropEase = dropProgress * dropProgress;
+                    // 1. Caída vertical pura en Y (sin ninguna inclinación en el aire)
+                    const dropProgress = Math.min(1.0, wElapsed / dropTimeMs);
+                    const dropEase = dropProgress * dropProgress; // Aceleración de gravedad
                     const currentY = rInstance.MathUtils.lerp(startY, dragPlaneY, dropEase);
 
-                    // Fase 2: Bamboleo Euler rotacional amortiguado (250 a 1200ms)
-                    const settleTime = Math.max(0, (wElapsed - 180) / 1000);
-                    const decay = Math.exp(-4.5 * settleTime);
-                    const freq = 20.0 + (settleTime * 14.0);
-                    const tiltAmount = initialTilt * decay * Math.cos(freq * settleTime);
+                    // 2. Inclinación física y bamboleo ÚNICAMENTE a partir del contacto con la mesa (wElapsed >= dropTimeMs)
+                    let tiltX = 0, tiltZ = 0, naturalY = currentRotY;
 
-                    const wobbleDir = randomPhase + (settleTime * 10.0);
-                    const tiltX = Math.cos(wobbleDir) * tiltAmount;
-                    const tiltZ = Math.sin(wobbleDir) * tiltAmount;
-                    const naturalY = currentRotY + (0.04 * (1.0 - decay));
+                    if (wElapsed >= dropTimeMs) {
+                      const settleTime = (wElapsed - dropTimeMs) / 1000.0; // Tiempo en segundos tras tocar el suelo
+                      const decayRate = isRoundOrOval ? 3.8 : 6.5;
+                      const decay = Math.exp(-decayRate * settleTime);
+                      const freq = isRoundOrOval ? (18.0 + settleTime * 12.0) : 24.0;
+                      const tiltAmount = initialTilt * decay * Math.cos(freq * settleTime);
 
-                    const qWobble = new rInstance.Quaternion().setFromEuler(new rInstance.Euler(tiltX, naturalY, tiltZ, 'YXZ'));
+                      const wobbleDir = randomPhase + (settleTime * (isRoundOrOval ? 9.0 : 4.0));
+                      tiltX = Math.cos(wobbleDir) * tiltAmount;
+                      tiltZ = Math.sin(wobbleDir) * tiltAmount;
+                      naturalY = currentRotY + (totalYawSpin * (1.0 - decay));
+                    }
+
+                    const qFrame = new rInstance.Quaternion().setFromEuler(new rInstance.Euler(tiltX, naturalY, tiltZ, 'YXZ'));
                     if (e.Quaternion && e.Quaternion.set) {
-                      e.Quaternion.set(t, a, { x: qWobble.x, y: qWobble.y, z: qWobble.z, w: qWobble.w });
+                      e.Quaternion.set(t, a, { x: qFrame.x, y: qFrame.y, z: qFrame.z, w: qFrame.w });
                     }
                     t.transform.setWorldPosition(a, { x: n.x, y: currentY, z: n.z });
 
                     if (wProgress < 1.0) {
-                      requestAnimationFrame(animarBamboleo);
+                      requestAnimationFrame(animarCaidaYBamboleo);
                     } else {
                       t.transform.setWorldPosition(a, { x: n.x, y: dragPlaneY, z: n.z });
-                      const qEnd = new rInstance.Quaternion().setFromAxisAngle(new rInstance.Vector3(0, 1, 0), naturalY);
+                      const qFinal = new rInstance.Quaternion().setFromAxisAngle(new rInstance.Vector3(0, 1, 0), naturalY);
                       if (e.Quaternion && e.Quaternion.set) {
-                        e.Quaternion.set(t, a, { x: qEnd.x, y: qEnd.y, z: qEnd.z, w: qEnd.w });
+                        e.Quaternion.set(t, a, { x: qFinal.x, y: qFinal.y, z: qFinal.z, w: qFinal.w });
                       }
                     }
                   };
-                  requestAnimationFrame(animarBamboleo);
-                } else {
-                  // Caída Bounce estándar para bandejas o platos rectangulares/cuadrados
-                  if (e.PositionAnimation && e.PositionAnimation.set) {
-                    e.PositionAnimation.set(t, a, {
-                      duration: DRAG_RETICLE_CONFIG.bounceDuration,
-                      loop: !1,
-                      easeOut: !0,
-                      easingFunction: DRAG_RETICLE_CONFIG.bounceEasing,
-                      fromX: n.x,
-                      toX: n.x,
-                      fromY: n.y,
-                      toY: dragPlaneY,
-                      fromZ: n.z,
-                      toZ: n.z
-                    });
-                  }
+                  requestAnimationFrame(animarCaidaYBamboleo);
                 }
               }
 
