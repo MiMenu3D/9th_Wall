@@ -1,4 +1,4 @@
-﻿// 9th Wall v4.40
+﻿// 9th Wall v4.41
 (() => {
   var e = {
     574() {
@@ -50,7 +50,7 @@
     scaleDeadzone: 0.085
   });
 
-  // v4.40: retícula centrada en la huella de la base, ajustada a dimensión real (+3cm) y fijada a Y=0 de suelo
+  // v4.41: retícula centrada en la huella de contacto inferior, ajustada a dimensión real (+3.5cm) y fijada a Y=0 de suelo
   const DRAG_RETICLE_CONFIG = Object.freeze({
     liftHeight: 0.05,
     liftSmoothingRate: 8.0,
@@ -63,7 +63,7 @@
     bounceEasing: "Bounce"
   });
 
-  // v4.40: Contorno exterior en sentido antihorario (CCW) con vértice inicial alineado en (-sx + r, -sz)
+  // v4.41: Contorno exterior en sentido antihorario (CCW) con vértice inicial alineado en (-sx + r, -sz)
   function crearFormaRectRedondeadaCCW(THREE_INSTANCE, sizeX, sizeZ, radius) {
     const sx = sizeX / 2;
     const sz = sizeZ / 2;
@@ -81,7 +81,7 @@
     return shape;
   }
 
-  // v4.40: Agujero interior en sentido horario (CW) con vértice inicial alineado en (-sx + r, -sz) para corte Earcut 100% simétrico
+  // v4.41: Agujero interior en sentido horario (CW) con vértice inicial alineado en (-sx + r, -sz) para corte Earcut 100% simétrico
   function crearFormaRectRedondeadaCW(THREE_INSTANCE, sizeX, sizeZ, radius) {
     const sx = sizeX / 2;
     const sz = sizeZ / 2;
@@ -125,7 +125,7 @@
       }
     });
 
-    // v4.40: Spawner con sombra instantánea en t=0 (feedback inmediato), opacidad rápida (800ms Quad-Out), Escala (2000ms Quad-Out) y Giro (3000ms Quintic-Out)
+    // v4.41: Spawner con sombra instantánea en t=0 (feedback inmediato), opacidad rápida (800ms Quad-Out), Escala (2000ms Quad-Out) y Giro (3000ms Quintic-Out)
     e.registerComponent({
       name: "dish-spawner",
       schema: { prefab: "eid" },
@@ -151,9 +151,9 @@
           e.Scale.set(t, r, { x: 0.001, y: 0.001, z: 0.001 });
           d.set(e.Quaternion, e.math.quat.yRadians(baseRotY));
 
-          const scaleDuration = 2000;    // v4.40: 2000ms Escala (EaseOut Quadratic)
-          const rotDuration = 3000;      // v4.40: 3000ms Rotación total (EaseOut Quintic)
-          const opacityDuration = 800;   // v4.40: 800ms Opacidad rápida con presencia inmediata
+          const scaleDuration = 2000;    // v4.41: 2000ms Escala (EaseOut Quadratic)
+          const rotDuration = 3000;      // v4.41: 3000ms Rotación total (EaseOut Quintic)
+          const opacityDuration = 800;   // v4.41: 800ms Opacidad rápida con presencia inmediata
           const totalSpinAngle = -Math.PI * 3; // -540° (1.5 vueltas completas en sentido horario)
           let animationStarted = false;
 
@@ -167,7 +167,7 @@
               t.three.scene.traverse((child) => {
                 if (child.isMesh && child.material) {
                   if (child.material.type === 'ShadowMaterial' || child.name === "Ground") {
-                    // v4.40: Sombra AO activa de inmediato al 0.40 para dar feedback visual instantáneo en el suelo
+                    // v4.41: Sombra AO activa de inmediato al 0.40 para dar feedback visual instantáneo en el suelo
                     child.material.opacity = 0.40;
                   } else if (child.name !== "Ground" && child.name !== "Hider") {
                     const mats = Array.isArray(child.material) ? child.material : [child.material];
@@ -217,7 +217,7 @@
             const history = [];
             */
 
-            // v4.40: Arranque instantáneo directo sin rAFs anidados
+            // v4.41: Arranque instantáneo directo sin bloqueos síncronos de GPU
             let spawnStartTime = performance.now();
 
             const animarSpawnCompleto = () => {
@@ -328,9 +328,10 @@
         bboxSizeZ = DRAG_RETICLE_CONFIG.baseSize,
         reticleLocalCenterX = 0,
         reticleLocalCenterZ = 0,
-        isRoundOrOval = true; // v4.40: Discriminador geométrico automático
+        dishBaseRadius = 0.13,
+        isRoundOrOval = true; // v4.41: Discriminador geométrico automático
 
-        // v4.40: Medición desacoplada anclada a la huella de la base inferior (soluciona hamburguesa sobre pizarra)
+        // v4.41: Medición desacoplada calculando el centroide de la huella de contacto inferior
         const actualizarBoundingBox = (THREE_INSTANCE) => {
           if (!t.three || !t.three.scene) return;
 
@@ -359,66 +360,63 @@
 
           const unifiedBox = new THREE_INSTANCE.Box3().setFromObject(modelRoot);
 
-          // Búsqueda específica de la submalla base (la pieza inferior apoyada en el suelo, p. ej. la pizarra)
-          let baseMesh = null;
-          let lowestY = Infinity;
+          // v4.41: Muestreo de la huella de contacto inferior (vértices inferiores) para centrado exacto
+          let sumFootX = 0, sumFootZ = 0, footCount = 0;
+          let minFootX = Infinity, maxFootX = -Infinity, minFootZ = Infinity, maxFootZ = -Infinity;
+
+          const invRoot = modelRoot.matrixWorld.clone().invert();
+
           modelRoot.traverse((child) => {
-            if (child.isMesh && child.geometry && child.name !== "Ground" && child.name !== "Hider" && (!child.material || child.material.type !== 'ShadowMaterial')) {
-              const bBox = new THREE_INSTANCE.Box3().setFromObject(child);
-              if (bBox.min.y < lowestY) {
-                lowestY = bBox.min.y;
-                baseMesh = child;
-              }
-            }
-          });
-
-          const sz = new THREE_INSTANCE.Vector3();
-          const ctr = new THREE_INSTANCE.Vector3();
-          unifiedBox.getSize(sz);
-
-          if (baseMesh) {
-            const baseBox = new THREE_INSTANCE.Box3().setFromObject(baseMesh);
-            baseBox.getCenter(ctr); // Centrado en la base real, no en la comida situada encima
-            const baseSz = new THREE_INSTANCE.Vector3();
-            baseBox.getSize(baseSz);
-            sz.x = Math.max(sz.x, baseSz.x);
-            sz.z = Math.max(sz.z, baseSz.z);
-          } else {
-            unifiedBox.getCenter(ctr);
-          }
-
-          if (sz.x > 0.05 && sz.z > 0.05 && sz.x < 2.5 && sz.z < 2.5) {
-            // v4.40: Holgura perimétrica exacta (+3cm) para enmarcar platos alargados y rectangulares holgadamente
-            bboxSizeX = sz.x + 0.035;
-            bboxSizeZ = sz.z + 0.035;
-            reticleLocalCenterX = ctr.x;
-            reticleLocalCenterZ = ctr.z;
-          }
-
-          // v4.40: Detección matemática de geometría circular/ovalada frente a rectangular/cuadrada
-          let sumR = 0, sumR2 = 0, vCount = 0;
-          modelRoot.traverse((child) => {
-            if (child.isMesh && child.geometry && child.geometry.attributes && child.geometry.attributes.position && child.name !== "Ground" && child.name !== "Hider") {
+            if (child.isMesh && child.geometry && child.geometry.attributes && child.geometry.attributes.position && child.name !== "Ground" && child.name !== "Hider" && (!child.material || child.material.type !== 'ShadowMaterial')) {
               const posAttr = child.geometry.attributes.position;
-              const step = Math.max(1, Math.floor(posAttr.count / 80));
-              for (let idx = 0; idx < posAttr.count; idx += step) {
-                const vx = posAttr.getX(idx), vz = posAttr.getZ(idx);
-                const rDist = Math.hypot(vx - reticleLocalCenterX, vz - reticleLocalCenterZ);
-                if (rDist > 0.04) {
-                  sumR += rDist;
-                  sumR2 += rDist * rDist;
-                  vCount++;
+              const relMatrix = child.matrixWorld.clone().premultiply(invRoot);
+              const vTemp = new THREE_INSTANCE.Vector3();
+
+              // Calculamos la cota mínima de esta submalla
+              let localMinY = Infinity;
+              for (let i = 0; i < posAttr.count; i += Math.max(1, Math.floor(posAttr.count / 40))) {
+                vTemp.fromBufferAttribute(posAttr, i).applyMatrix4(relMatrix);
+                if (vTemp.y < localMinY) localMinY = vTemp.y;
+              }
+
+              // Promediamos los vértices que componen la base de apoyo
+              for (let i = 0; i < posAttr.count; i += Math.max(1, Math.floor(posAttr.count / 100))) {
+                vTemp.fromBufferAttribute(posAttr, i).applyMatrix4(relMatrix);
+                if (vTemp.y <= (localMinY + 0.025)) {
+                  sumFootX += vTemp.x;
+                  sumFootZ += vTemp.z;
+                  if (vTemp.x < minFootX) minFootX = vTemp.x;
+                  if (vTemp.x > maxFootX) maxFootX = vTemp.x;
+                  if (vTemp.z < minFootZ) minFootZ = vTemp.z;
+                  if (vTemp.z > maxFootZ) maxFootZ = vTemp.z;
+                  footCount++;
                 }
               }
             }
           });
 
-          if (vCount > 10) {
-            const meanR = sumR / vCount;
-            const varianceR = (sumR2 / vCount) - (meanR * meanR);
-            const stdDevRatio = Math.sqrt(Math.max(0, varianceR)) / (meanR || 1);
-            isRoundOrOval = (stdDevRatio < 0.22);
+          const sz = new THREE_INSTANCE.Vector3();
+          unifiedBox.getSize(sz);
+
+          if (footCount > 10 && (maxFootX - minFootX) > 0.05 && (maxFootZ - minFootZ) > 0.05) {
+            reticleLocalCenterX = sumFootX / footCount;
+            reticleLocalCenterZ = sumFootZ / footCount;
+            bboxSizeX = Math.max(sz.x, (maxFootX - minFootX)) + 0.035;
+            bboxSizeZ = Math.max(sz.z, (maxFootZ - minFootZ)) + 0.035;
+          } else {
+            const ctr = new THREE_INSTANCE.Vector3();
+            unifiedBox.getCenter(ctr);
+            reticleLocalCenterX = ctr.x;
+            reticleLocalCenterZ = ctr.z;
+            bboxSizeX = sz.x + 0.035;
+            bboxSizeZ = sz.z + 0.035;
           }
+
+          dishBaseRadius = Math.max(bboxSizeX, bboxSizeZ) * 0.50;
+
+          // v4.41: Detección estricta de formas redondas/ovaladas vs rectangulares por ratio de aspecto de huella
+          const aspectRatio = Math.max(bboxSizeX, bboxSizeZ) / Math.min(bboxSizeX, bboxSizeZ);
+          isRoundOrOval = (aspectRatio < 1.18);
 
           // Restauramos inmediatamente las transformaciones originales
           modelRoot.scale.copy(origScale);
@@ -427,7 +425,7 @@
           modelRoot.updateMatrixWorld(true);
         };
 
-        // v4.40: Sincronización angular con posición Y anclada estrictamente a la altura 0 del suelo (+0.0015)
+        // v4.41: Sincronización angular con posición Y anclada estrictamente a la altura 0 del suelo (+0.0015)
         const sincronizarTransformReticula = (ret, THREE_INSTANCE) => {
           if (!ret || !THREE_INSTANCE) return;
 
@@ -451,7 +449,7 @@
           ret.scale.set(currentScale, currentScale, currentScale);
         };
 
-        // v4.40: Generación de retícula con depthTest activo, polygonOffset y renderOrder protegido frente a Hider
+        // v4.41: Generación de retícula con depthTest activo, polygonOffset y renderOrder protegido frente a Hider
         const obtenerReticula = (THREE_INSTANCE, scene) => {
           if (reticleMesh) {
             sincronizarTransformReticula(reticleMesh, THREE_INSTANCE);
@@ -589,16 +587,15 @@
                 const rInstance = window.THREE;
 
                 if (rInstance) {
-                  // v4.40: Caída estrictamente horizontal en el aire (0 a 220ms) y bamboleo físico tras el impacto
-                  const wobbleDuration = isRoundOrOval ? 1800 : 900; // 1.8s para redondos/ovalados, 0.9s para rectangulares
+                  // v4.41: Caída vertical en Y sin inclinación en el aire y bamboleo desacoplado con compensación anti-Hider
+                  const wobbleDuration = isRoundOrOval ? 1800 : 1000; // 1.8s en redondos, 1.0s en pizarra rectangular
                   const wobbleStartTime = performance.now();
                   const startY = n.y;
-                  const dropTimeMs = 220; // Caída vertical rápida sin inclinaciones en el aire
+                  const dropTimeMs = 220; // Caída vertical limpia
 
-                  // Parámetros de bamboleo desacoplados
-                  const initialTilt = isRoundOrOval ? 0.110 : 0.045; // ~6.3° en redondos, ~2.5° en bandejas
+                  const initialTilt = isRoundOrOval ? 0.115 : 0.055; // ~6.6° en redondos, ~3.1° en pizarra
                   const randomPhase = Math.random() * Math.PI * 2;
-                  const totalYawSpin = isRoundOrOval ? (0.26 * (Math.random() < 0.5 ? 1 : -1)) : 0.0; // ~15° de giro natural en Y
+                  const totalYawSpin = isRoundOrOval ? (0.26 * (Math.random() < 0.5 ? 1 : -1)) : 0.0; // ~15° giro Y en redondos
 
                   let currentRotY = 0;
                   if (e.Quaternion && e.Quaternion.has(t, a)) {
@@ -612,25 +609,30 @@
                     const wElapsed = performance.now() - wobbleStartTime;
                     const wProgress = Math.min(1.0, wElapsed / wobbleDuration);
 
-                    // 1. Caída vertical pura en Y (sin ninguna inclinación en el aire)
+                    // 1. Caída vertical pura en Y (sin inclinación en el aire)
                     const dropProgress = Math.min(1.0, wElapsed / dropTimeMs);
-                    const dropEase = dropProgress * dropProgress; // Aceleración de gravedad
-                    const currentY = rInstance.MathUtils.lerp(startY, dragPlaneY, dropEase);
+                    const dropEase = dropProgress * dropProgress;
+                    let currentY = rInstance.MathUtils.lerp(startY, dragPlaneY, dropEase);
 
-                    // 2. Inclinación física y bamboleo ÚNICAMENTE a partir del contacto con la mesa (wElapsed >= dropTimeMs)
+                    // 2. Inclinación física a partir del contacto con la mesa con elevación anti-Hider
                     let tiltX = 0, tiltZ = 0, naturalY = currentRotY;
 
                     if (wElapsed >= dropTimeMs) {
-                      const settleTime = (wElapsed - dropTimeMs) / 1000.0; // Tiempo en segundos tras tocar el suelo
-                      const decayRate = isRoundOrOval ? 3.8 : 6.5;
+                      const settleTime = (wElapsed - dropTimeMs) / 1000.0;
+                      const decayRate = isRoundOrOval ? 3.6 : 5.5;
                       const decay = Math.exp(-decayRate * settleTime);
-                      const freq = isRoundOrOval ? (18.0 + settleTime * 12.0) : 24.0;
+                      const freq = isRoundOrOval ? (18.0 + settleTime * 12.0) : 22.0;
                       const tiltAmount = initialTilt * decay * Math.cos(freq * settleTime);
 
                       const wobbleDir = randomPhase + (settleTime * (isRoundOrOval ? 9.0 : 4.0));
                       tiltX = Math.cos(wobbleDir) * tiltAmount;
                       tiltZ = Math.sin(wobbleDir) * tiltAmount;
                       naturalY = currentRotY + (totalYawSpin * (1.0 - decay));
+
+                      // v4.41: Compensación de altura dinámica para que la base nunca baje de Y=0 ni penetre el Hider
+                      const tiltMagnitude = Math.hypot(tiltX, tiltZ);
+                      const heightCompensation = dishBaseRadius * Math.sin(tiltMagnitude);
+                      currentY = dragPlaneY + heightCompensation;
                     }
 
                     const qFrame = new rInstance.Quaternion().setFromEuler(new rInstance.Euler(tiltX, naturalY, tiltZ, 'YXZ'));
