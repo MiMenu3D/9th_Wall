@@ -1,4 +1,4 @@
-﻿// 9th Wall v4.50
+﻿// 9th Wall v4.51
 (() => {
   var e = {
     574() {
@@ -149,7 +149,7 @@
       }
     });
 
-    // v4.50: Spawner con sombra instantánea en t=0, restauración de opacidad/depthWrite y Falso Motion Blur (Ghosts)
+    // v4.51: Spawner blindado con sombra instantánea en t=0 y restauración estricta de opacidad/depthWrite
     e.registerComponent({
       name: "dish-spawner",
       schema: { prefab: "eid" },
@@ -206,39 +206,6 @@
               });
             }
 
-            // v4.50: Reactivación del Falso Motion Blur (Ghosts desfasados)
-            const ghostOpacities = [0.50, 0.35, 0.18];
-            const ghosts = [];
-            let modelThreeObj = null;
-            if (t.three && t.three.scene) {
-              t.three.scene.traverse((child) => {
-                if (!modelThreeObj && child.isMesh && child.geometry && child.name !== "Ground" && child.name !== "Hider" && (!child.material || child.material.type !== 'ShadowMaterial')) {
-                  let curr = child;
-                  while (curr.parent && curr.parent !== t.three.scene) { curr = curr.parent; }
-                  modelThreeObj = curr;
-                }
-              });
-            }
-            if (modelThreeObj && t.three && t.three.scene && window.THREE) {
-              for (let g = 0; g < 3; g++) {
-                const ghost = modelThreeObj.clone(true);
-                ghost.traverse((node) => {
-                  if (node.isMesh && node.material) {
-                    const srcMat = Array.isArray(node.material) ? node.material[0] : node.material;
-                    const ghostMat = srcMat.clone();
-                    ghostMat.transparent = true;
-                    ghostMat.opacity = ghostOpacities[g];
-                    ghostMat.depthWrite = false;
-                    node.material = ghostMat;
-                  }
-                });
-                ghost.visible = false;
-                t.three.scene.add(ghost);
-                ghosts.push(ghost);
-              }
-            }
-            const history = [];
-
             let spawnStartTime = performance.now();
 
             const animarSpawnCompleto = () => {
@@ -264,23 +231,6 @@
               e.Scale.set(t, r, { x: currentScaleVal, y: currentScaleVal, z: currentScaleVal });
               d.set(e.Quaternion, e.math.quat.yRadians(currentAngle));
 
-              // v4.50: Actualización histórica de los fantasmas de Motion Blur
-              history.unshift({ rotY: currentAngle, scaleVal: currentScaleVal });
-              if (history.length > 10) history.pop();
-              if (elapsed < (rotDuration * 0.75) && window.THREE) {
-                for (let g = 0; g < ghosts.length; g++) {
-                  const frameLag = g + 1;
-                  if (history[frameLag]) {
-                    ghosts[g].visible = true;
-                    ghosts[g].position.set(targetX, targetY + 0.001, targetZ);
-                    ghosts[g].scale.set(history[frameLag].scaleVal, history[frameLag].scaleVal, history[frameLag].scaleVal);
-                    ghosts[g].quaternion.setFromAxisAngle(new window.THREE.Vector3(0, 1, 0), history[frameLag].rotY);
-                  }
-                }
-              } else {
-                for (let g = 0; g < ghosts.length; g++) { if (ghosts[g]) ghosts[g].visible = false; }
-              }
-
               if (elapsed < rotDuration) {
                 requestAnimationFrame(animarSpawnCompleto);
               } else {
@@ -292,11 +242,6 @@
                   m.depthWrite = true;
                   m.needsUpdate = true;
                 });
-
-                // v4.50: Limpieza total de fantasmas al terminar
-                for (let g = 0; g < ghosts.length; g++) {
-                  if (ghosts[g] && ghosts[g].parent) { ghosts[g].parent.remove(ghosts[g]); }
-                }
               }
             };
             requestAnimationFrame(animarSpawnCompleto);
