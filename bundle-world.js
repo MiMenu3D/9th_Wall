@@ -1,4 +1,4 @@
-﻿// 9th Wall v4.42
+﻿// 9th Wall v4.43
 (() => {
   var e = {
     574() {
@@ -50,7 +50,7 @@
     scaleDeadzone: 0.085
   });
 
-  // v4.42: retícula centrada en la huella de contacto inferior, ajustada a dimensión real (+3.5cm) y fijada a Y=0 de suelo
+  // v4.43: retícula adaptativa en tiempo real, dimensionada según el modelo real y fijada a Y=0 de suelo
   const DRAG_RETICLE_CONFIG = Object.freeze({
     liftHeight: 0.05,
     liftSmoothingRate: 8.0,
@@ -63,49 +63,73 @@
     bounceEasing: "Bounce"
   });
 
-  // v4.42: Contorno exterior en sentido antihorario (CCW: Derecha -> Arriba -> Izquierda -> Abajo)
-  function crearFormaRectRedondeadaCCW(THREE_INSTANCE, sizeX, sizeZ, radius) {
-    const sx = sizeX / 2;
-    const sz = sizeZ / 2;
-    const r = Math.min(radius, Math.min(sx, sz) * 0.5);
-    const shape = new THREE_INSTANCE.Shape();
-    shape.moveTo(-sx + r, -sz);
-    shape.lineTo(sx - r, -sz);
-    shape.quadraticCurveTo(sx, -sz, sx, -sz + r);
-    shape.lineTo(sx, sz - r);
-    shape.quadraticCurveTo(sx, sz, sx - r, sz);
-    shape.lineTo(-sx + r, sz);
-    shape.quadraticCurveTo(-sx, sz, -sx, sz - r);
-    shape.lineTo(-sx, -sz + r);
-    shape.quadraticCurveTo(-sx, -sz, -sx + r, -sz);
-    return shape;
-  }
-
-  // v4.42: Agujero interior estrictamente horario (CW: Arriba-Izquierda -> Derecha -> Abajo -> Izquierda -> Arriba)
-  function crearFormaRectRedondeadaCW(THREE_INSTANCE, sizeX, sizeZ, radius) {
-    const sx = sizeX / 2;
-    const sz = sizeZ / 2;
-    const r = Math.min(radius, Math.min(sx, sz) * 0.5);
-    const path = new THREE_INSTANCE.Path();
-    path.moveTo(-sx + r, sz);
-    path.lineTo(sx - r, sz);
-    path.quadraticCurveTo(sx, sz, sx, sz - r);
-    path.lineTo(sx, -sz + r);
-    path.quadraticCurveTo(sx, -sz, sx - r, -sz);
-    path.lineTo(-sx + r, -sz);
-    path.quadraticCurveTo(-sx, -sz, -sx, -sz + r);
-    path.lineTo(-sx, sz - r);
-    path.quadraticCurveTo(-sx, sz, -sx + r, sz);
-    return path;
-  }
-
+  // v4.43: Generación geométrica analítica determinista de marco plano (BufferGeometry directa sin booleanas ni Earcut)
   function crearGeometriaMarcoReticula(THREE_INSTANCE, sizeX, sizeZ, thickness, radius) {
-    const outer = crearFormaRectRedondeadaCCW(THREE_INSTANCE, sizeX, sizeZ, radius);
-    const innerX = Math.max(0.02, sizeX - thickness * 2);
-    const innerZ = Math.max(0.02, sizeZ - thickness * 2);
-    const innerRadius = Math.max(0.001, radius - thickness);
-    outer.holes.push(crearFormaRectRedondeadaCW(THREE_INSTANCE, innerX, innerZ, innerRadius));
-    return new THREE_INSTANCE.ShapeGeometry(outer);
+    const sx = sizeX / 2;
+    const sz = sizeZ / 2;
+    const r = Math.min(radius, Math.min(sx, sz) * 0.45);
+    const inSx = Math.max(0.01, sx - thickness);
+    const inSz = Math.max(0.01, sz - thickness);
+    const inR = Math.max(0.001, r - thickness);
+
+    const segmentsPerCorner = 8;
+    const outerPts = [];
+    const innerPts = [];
+
+    const cornersOuter = [
+      { cx: sx - r, cz: -sz + r, startAngle: -Math.PI / 2, endAngle: 0 },
+      { cx: sx - r, cz: sz - r, startAngle: 0, endAngle: Math.PI / 2 },
+      { cx: -sx + r, cz: sz - r, startAngle: Math.PI / 2, endAngle: Math.PI },
+      { cx: -sx + r, cz: -sz + r, startAngle: Math.PI, endAngle: (3 * Math.PI) / 2 }
+    ];
+
+    const cornersInner = [
+      { cx: inSx - inR, cz: -inSz + inR, startAngle: -Math.PI / 2, endAngle: 0 },
+      { cx: inSx - inR, cz: inSz - inR, startAngle: 0, endAngle: Math.PI / 2 },
+      { cx: -inSx + inR, cz: inSz - inR, startAngle: Math.PI / 2, endAngle: Math.PI },
+      { cx: -inSx + inR, cz: -inSz + inR, startAngle: Math.PI, endAngle: (3 * Math.PI) / 2 }
+    ];
+
+    for (let c = 0; c < 4; c++) {
+      const co = cornersOuter[c];
+      const ci = cornersInner[c];
+      for (let i = 0; i <= segmentsPerCorner; i++) {
+        if (i === 0 && c > 0) continue;
+        const tVal = i / segmentsPerCorner;
+        const angle = co.startAngle + tVal * (co.endAngle - co.startAngle);
+        outerPts.push(co.cx + Math.cos(angle) * r, co.cz + Math.sin(angle) * r);
+        innerPts.push(ci.cx + Math.cos(angle) * inR, ci.cz + Math.sin(angle) * inR);
+      }
+    }
+
+    const count = outerPts.length / 2;
+    const positions = new Float32Array(count * 2 * 3);
+    const indices = [];
+
+    for (let i = 0; i < count; i++) {
+      positions[i * 6 + 0] = outerPts[i * 2 + 0];
+      positions[i * 6 + 1] = outerPts[i * 2 + 1];
+      positions[i * 6 + 2] = 0;
+
+      positions[i * 6 + 3] = innerPts[i * 2 + 0];
+      positions[i * 6 + 4] = innerPts[i * 2 + 1];
+      positions[i * 6 + 5] = 0;
+
+      const next = (i + 1) % count;
+      const oCurr = i * 2;
+      const iCurr = i * 2 + 1;
+      const oNext = next * 2;
+      const iNext = next * 2 + 1;
+
+      indices.push(oCurr, oNext, iNext);
+      indices.push(oCurr, iNext, iCurr);
+    }
+
+    const geom = new THREE_INSTANCE.BufferGeometry();
+    geom.setAttribute('position', new THREE_INSTANCE.BufferAttribute(positions, 3));
+    geom.setIndex(indices);
+    geom.computeVertexNormals();
+    return geom;
   }
 
   function a(o) {
@@ -125,7 +149,7 @@
       }
     });
 
-    // v4.42: Spawner con sombra instantánea en t=0 y restauración estricta de opacidad/depthWrite para erradicar el clipping
+    // v4.43: Spawner con sombra instantánea en t=0 y restauración estricta de opacidad/depthWrite
     e.registerComponent({
       name: "dish-spawner",
       schema: { prefab: "eid" },
@@ -151,9 +175,9 @@
           e.Scale.set(t, r, { x: 0.001, y: 0.001, z: 0.001 });
           d.set(e.Quaternion, e.math.quat.yRadians(baseRotY));
 
-          const scaleDuration = 2000;    // v4.42: 2000ms Escala (EaseOut Quadratic)
-          const rotDuration = 3000;      // v4.42: 3000ms Rotación total (EaseOut Quintic)
-          const opacityDuration = 800;   // v4.42: 800ms Opacidad rápida con presencia inmediata
+          const scaleDuration = 2000;    // v4.43: 2000ms Escala (EaseOut Quadratic)
+          const rotDuration = 3000;      // v4.43: 3000ms Rotación total (EaseOut Quintic)
+          const opacityDuration = 800;   // v4.43: 800ms Opacidad rápida con presencia inmediata
           const totalSpinAngle = -Math.PI * 3; // -540° (1.5 vueltas completas en sentido horario)
           let animationStarted = false;
 
@@ -264,7 +288,6 @@
               } else {
                 e.Scale.set(t, r, { x: 1.0, y: 1.0, z: 1.0 });
                 d.set(e.Quaternion, e.math.quat.yRadians(baseRotY + totalSpinAngle));
-                // v4.42: Desactivación estricta de transparencia para restaurar Z-Buffer opaco y eliminar clipping transparente
                 spawnMaterials.forEach(m => {
                   m.opacity = 1.0;
                   m.transparent = false;
@@ -331,10 +354,9 @@
         bboxSizeX = DRAG_RETICLE_CONFIG.baseSize,
         bboxSizeZ = DRAG_RETICLE_CONFIG.baseSize,
         reticleLocalCenterX = 0,
-        reticleLocalCenterZ = 0,
-        dishBaseRadius = 0.13;
+        reticleLocalCenterZ = 0;
 
-        // v4.42: Medición desacoplada calculando el centroide de la huella de contacto inferior
+        // v4.43: Medición desacoplada limpia del Bounding Box en espacio local estilo model-viewer
         const actualizarBoundingBox = (THREE_INSTANCE) => {
           if (!t.three || !t.three.scene) return;
 
@@ -363,56 +385,17 @@
 
           const unifiedBox = new THREE_INSTANCE.Box3().setFromObject(modelRoot);
 
-          let sumFootX = 0, sumFootZ = 0, footCount = 0;
-          let minFootX = Infinity, maxFootX = -Infinity, minFootZ = Infinity, maxFootZ = -Infinity;
-
-          const invRoot = modelRoot.matrixWorld.clone().invert();
-
-          modelRoot.traverse((child) => {
-            if (child.isMesh && child.geometry && child.geometry.attributes && child.geometry.attributes.position && child.name !== "Ground" && child.name !== "Hider" && (!child.material || child.material.type !== 'ShadowMaterial')) {
-              const posAttr = child.geometry.attributes.position;
-              const relMatrix = child.matrixWorld.clone().premultiply(invRoot);
-              const vTemp = new THREE_INSTANCE.Vector3();
-
-              let localMinY = Infinity;
-              for (let i = 0; i < posAttr.count; i += Math.max(1, Math.floor(posAttr.count / 40))) {
-                vTemp.fromBufferAttribute(posAttr, i).applyMatrix4(relMatrix);
-                if (vTemp.y < localMinY) localMinY = vTemp.y;
-              }
-
-              for (let i = 0; i < posAttr.count; i += Math.max(1, Math.floor(posAttr.count / 100))) {
-                vTemp.fromBufferAttribute(posAttr, i).applyMatrix4(relMatrix);
-                if (vTemp.y <= (localMinY + 0.025)) {
-                  sumFootX += vTemp.x;
-                  sumFootZ += vTemp.z;
-                  if (vTemp.x < minFootX) minFootX = vTemp.x;
-                  if (vTemp.x > maxFootX) maxFootX = vTemp.x;
-                  if (vTemp.z < minFootZ) minFootZ = vTemp.z;
-                  if (vTemp.z > maxFootZ) maxFootZ = vTemp.z;
-                  footCount++;
-                }
-              }
-            }
-          });
-
           const sz = new THREE_INSTANCE.Vector3();
+          const ctr = new THREE_INSTANCE.Vector3();
           unifiedBox.getSize(sz);
+          unifiedBox.getCenter(ctr);
 
-          if (footCount > 10 && (maxFootX - minFootX) > 0.05 && (maxFootZ - minFootZ) > 0.05) {
-            reticleLocalCenterX = sumFootX / footCount;
-            reticleLocalCenterZ = sumFootZ / footCount;
-            bboxSizeX = Math.max(sz.x, (maxFootX - minFootX)) + 0.035;
-            bboxSizeZ = Math.max(sz.z, (maxFootZ - minFootZ)) + 0.035;
-          } else {
-            const ctr = new THREE_INSTANCE.Vector3();
-            unifiedBox.getCenter(ctr);
-            reticleLocalCenterX = ctr.x;
-            reticleLocalCenterZ = ctr.z;
+          if (sz.x > 0.05 && sz.z > 0.05 && sz.x < 2.5 && sz.z < 2.5) {
             bboxSizeX = sz.x + 0.035;
             bboxSizeZ = sz.z + 0.035;
+            reticleLocalCenterX = ctr.x;
+            reticleLocalCenterZ = ctr.z;
           }
-
-          dishBaseRadius = Math.max(bboxSizeX, bboxSizeZ) * 0.50;
 
           // Restauramos inmediatamente las transformaciones originales
           modelRoot.scale.copy(origScale);
@@ -421,7 +404,7 @@
           modelRoot.updateMatrixWorld(true);
         };
 
-        // v4.42: Sincronización angular con posición Y anclada estrictamente a la altura 0 del suelo (+0.0015)
+        // v4.43: Sincronización 3D en vivo: anclaje a Y=0 de suelo heredando la posición y rotación Y del plato
         const sincronizarTransformReticula = (ret, THREE_INSTANCE) => {
           if (!ret || !THREE_INSTANCE) return;
 
@@ -437,15 +420,13 @@
           const qYaw = new THREE_INSTANCE.Quaternion().setFromAxisAngle(new THREE_INSTANCE.Vector3(0, 1, 0), yawAngle);
           ret.quaternion.copy(qYaw).multiply(qPitch);
 
-          // Proyectamos el centroide local según la rotación actual para que la retícula quede perfectamente centrada
           const offsetRotated = new THREE_INSTANCE.Vector3(reticleLocalCenterX * currentScale, 0, reticleLocalCenterZ * currentScale).applyAxisAngle(new THREE_INSTANCE.Vector3(0, 1, 0), yawAngle);
 
-          // Anclaje estricto en el plano de la mesa (fijo a 0.0015 absoluto), inmune a elevaciones del plato o lecturas dinámicas
           ret.position.set(planarX + offsetRotated.x, 0.0015, planarZ + offsetRotated.z);
           ret.scale.set(currentScale, currentScale, currentScale);
         };
 
-        // v4.42: Generación de retícula con profundidad validada, polygonOffset y renderOrder protegido frente a Hider
+        // v4.43: Obtención de retícula robusta adaptada al tamaño del modelo
         const obtenerReticula = (THREE_INSTANCE, scene) => {
           if (reticleMesh) {
             sincronizarTransformReticula(reticleMesh, THREE_INSTANCE);
@@ -583,15 +564,15 @@
                 const rInstance = window.THREE;
 
                 if (rInstance) {
-                  // v4.42: Cinemática de caída vertical y bamboleo físico unificada para todos los modelos
+                  // v4.43: Caída vertical y bamboleo físico con elevación de seguridad de 8mm (+0.008) anti-clipping
                   const wobbleDuration = 1200;
                   const wobbleStartTime = performance.now();
                   const startY = n.y;
                   const dropTimeMs = 200; // Caída vertical pura
 
-                  const initialTilt = 0.085; // ~4.8° de inclinación
+                  const initialTilt = 0.080; // ~4.5° de inclinación
                   const randomPhase = Math.random() * Math.PI * 2;
-                  const totalYawSpin = 0.18 * (Math.random() < 0.5 ? 1 : -1); // ~10° giro suave en Y
+                  const totalYawSpin = 0.16 * (Math.random() < 0.5 ? 1 : -1);
 
                   let currentRotY = 0;
                   if (e.Quaternion && e.Quaternion.has(t, a)) {
@@ -605,12 +586,12 @@
                     const wElapsed = performance.now() - wobbleStartTime;
                     const wProgress = Math.min(1.0, wElapsed / wobbleDuration);
 
-                    // 1. Caída vertical pura en Y (sin inclinación en el aire)
+                    // 1. Caída vertical pura en Y
                     const dropProgress = Math.min(1.0, wElapsed / dropTimeMs);
                     const dropEase = dropProgress * dropProgress;
                     let currentY = rInstance.MathUtils.lerp(startY, dragPlaneY, dropEase);
 
-                    // 2. Inclinación física a partir del contacto con la mesa con elevación anti-Hider
+                    // 2. Inclinación física y bamboleo amortiguado con elevación de 8mm que decae a 0
                     let tiltX = 0, tiltZ = 0, naturalY = currentRotY;
 
                     if (wElapsed >= dropTimeMs) {
@@ -624,10 +605,9 @@
                       tiltZ = Math.sin(wobbleDir) * tiltAmount;
                       naturalY = currentRotY + (totalYawSpin * (1.0 - decay));
 
-                      // v4.42: Compensación de altura dinámica para que la base nunca penetre el suelo ni el Hider
-                      const tiltMagnitude = Math.hypot(tiltX, tiltZ);
-                      const heightCompensation = dishBaseRadius * Math.sin(tiltMagnitude);
-                      currentY = dragPlaneY + heightCompensation;
+                      // Elevación de seguridad (+8mm) que decae suavemente con el bamboleo hasta posarse a ras
+                      const liftOffset = 0.008 * decay;
+                      currentY = dragPlaneY + liftOffset;
                     }
 
                     const qFrame = new rInstance.Quaternion().setFromEuler(new rInstance.Euler(tiltX, naturalY, tiltZ, 'YXZ'));
