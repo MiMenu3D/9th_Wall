@@ -1,4 +1,4 @@
-﻿// 9th Wall v4.43
+﻿// 9th Wall v4.44
 (() => {
   var e = {
     574() {
@@ -50,7 +50,7 @@
     scaleDeadzone: 0.085
   });
 
-  // v4.43: retícula adaptativa en tiempo real, dimensionada según el modelo real y fijada a Y=0 de suelo
+  // v4.44: retícula adaptativa al Bounding Box unificado multimalla y fijada a Y=0 de suelo
   const DRAG_RETICLE_CONFIG = Object.freeze({
     liftHeight: 0.05,
     liftSmoothingRate: 8.0,
@@ -63,7 +63,7 @@
     bounceEasing: "Bounce"
   });
 
-  // v4.43: Generación geométrica analítica determinista de marco plano (BufferGeometry directa sin booleanas ni Earcut)
+  // v4.44: Generación geométrica analítica determinista de marco plano (BufferGeometry directa sin booleanas ni Earcut)
   function crearGeometriaMarcoReticula(THREE_INSTANCE, sizeX, sizeZ, thickness, radius) {
     const sx = sizeX / 2;
     const sz = sizeZ / 2;
@@ -149,7 +149,7 @@
       }
     });
 
-    // v4.43: Spawner con sombra instantánea en t=0 y restauración estricta de opacidad/depthWrite
+    // v4.44: Spawner con sombra instantánea en t=0 y restauración estricta de opacidad/depthWrite
     e.registerComponent({
       name: "dish-spawner",
       schema: { prefab: "eid" },
@@ -175,9 +175,9 @@
           e.Scale.set(t, r, { x: 0.001, y: 0.001, z: 0.001 });
           d.set(e.Quaternion, e.math.quat.yRadians(baseRotY));
 
-          const scaleDuration = 2000;    // v4.43: 2000ms Escala (EaseOut Quadratic)
-          const rotDuration = 3000;      // v4.43: 3000ms Rotación total (EaseOut Quintic)
-          const opacityDuration = 800;   // v4.43: 800ms Opacidad rápida con presencia inmediata
+          const scaleDuration = 2000;    // v4.44: 2000ms Escala (EaseOut Quadratic)
+          const rotDuration = 3000;      // v4.44: 3000ms Rotación total (EaseOut Quintic)
+          const opacityDuration = 800;   // v4.44: 800ms Opacidad rápida con presencia inmediata
           const totalSpinAngle = -Math.PI * 3; // -540° (1.5 vueltas completas en sentido horario)
           let animationStarted = false;
 
@@ -354,9 +354,10 @@
         bboxSizeX = DRAG_RETICLE_CONFIG.baseSize,
         bboxSizeZ = DRAG_RETICLE_CONFIG.baseSize,
         reticleLocalCenterX = 0,
-        reticleLocalCenterZ = 0;
+        reticleLocalCenterZ = 0,
+        dishBaseRadius = 0.13;
 
-        // v4.43: Medición desacoplada limpia del Bounding Box en espacio local estilo model-viewer
+        // v4.44: Medición exacta del Bounding Box unificado proyectando las 8 esquinas de cada submalla al espacio raíz (model-viewer spec)
         const actualizarBoundingBox = (THREE_INSTANCE) => {
           if (!t.three || !t.three.scene) return;
 
@@ -373,38 +374,60 @@
 
           if (!modelRoot) return;
 
-          // Guardamos el estado instantáneo para no perturbar la animación
-          const origScale = modelRoot.scale.clone();
-          const origQuat = modelRoot.quaternion.clone();
-          const origPos = modelRoot.position.clone();
-
-          modelRoot.scale.set(1, 1, 1);
-          modelRoot.quaternion.set(0, 0, 0, 1);
-          modelRoot.position.set(0, 0, 0);
           modelRoot.updateMatrixWorld(true);
+          const invRootMatrix = modelRoot.matrixWorld.clone().invert();
+          const unifiedBox = new THREE_INSTANCE.Box3();
+          let hasGeom = false;
+          const cornerTemp = new THREE_INSTANCE.Vector3();
 
-          const unifiedBox = new THREE_INSTANCE.Box3().setFromObject(modelRoot);
+          modelRoot.traverse((child) => {
+            if (child.isMesh && child.geometry && child.name !== "Ground" && child.name !== "Hider" && child !== reticleMesh && (!child.material || child.material.type !== 'ShadowMaterial')) {
+              if (!child.geometry.boundingBox) child.geometry.computeBoundingBox();
+              const bb = child.geometry.boundingBox;
+              if (bb) {
+                child.updateMatrixWorld(true);
+                const relMatrix = child.matrixWorld.clone().premultiply(invRootMatrix);
 
-          const sz = new THREE_INSTANCE.Vector3();
-          const ctr = new THREE_INSTANCE.Vector3();
-          unifiedBox.getSize(sz);
-          unifiedBox.getCenter(ctr);
+                const min = bb.min;
+                const max = bb.max;
+                const corners = [
+                  min.x, min.y, min.z,
+                  min.x, min.y, max.z,
+                  min.x, max.y, min.z,
+                  min.x, max.y, max.z,
+                  max.x, min.y, min.z,
+                  max.x, min.y, max.z,
+                  max.x, max.y, min.z,
+                  max.x, max.y, max.z
+                ];
 
-          if (sz.x > 0.05 && sz.z > 0.05 && sz.x < 2.5 && sz.z < 2.5) {
-            bboxSizeX = sz.x + 0.035;
-            bboxSizeZ = sz.z + 0.035;
-            reticleLocalCenterX = ctr.x;
-            reticleLocalCenterZ = ctr.z;
+                for (let k = 0; k < 8; k++) {
+                  cornerTemp.set(corners[k * 3], corners[k * 3 + 1], corners[k * 3 + 2]).applyMatrix4(relMatrix);
+                  unifiedBox.expandByPoint(cornerTemp);
+                }
+                hasGeom = true;
+              }
+            }
+          });
+
+          if (hasGeom) {
+            const sz = new THREE_INSTANCE.Vector3();
+            const ctr = new THREE_INSTANCE.Vector3();
+            unifiedBox.getSize(sz);
+            unifiedBox.getCenter(ctr);
+
+            if (sz.x > 0.05 && sz.z > 0.05 && sz.x < 2.5 && sz.z < 2.5) {
+              bboxSizeX = sz.x + 0.035;
+              bboxSizeZ = sz.z + 0.035;
+              reticleLocalCenterX = ctr.x;
+              reticleLocalCenterZ = ctr.z;
+            }
           }
 
-          // Restauramos inmediatamente las transformaciones originales
-          modelRoot.scale.copy(origScale);
-          modelRoot.quaternion.copy(origQuat);
-          modelRoot.position.copy(origPos);
-          modelRoot.updateMatrixWorld(true);
+          dishBaseRadius = Math.max(bboxSizeX, bboxSizeZ) * 0.50;
         };
 
-        // v4.43: Sincronización 3D en vivo: anclaje a Y=0 de suelo heredando la posición y rotación Y del plato
+        // v4.44: Sincronización 3D en vivo: anclaje a Y=0 de suelo heredando la posición y rotación Y del plato
         const sincronizarTransformReticula = (ret, THREE_INSTANCE) => {
           if (!ret || !THREE_INSTANCE) return;
 
@@ -426,7 +449,7 @@
           ret.scale.set(currentScale, currentScale, currentScale);
         };
 
-        // v4.43: Obtención de retícula robusta adaptada al tamaño del modelo
+        // v4.44: Obtención de retícula robusta adaptada al tamaño del modelo
         const obtenerReticula = (THREE_INSTANCE, scene) => {
           if (reticleMesh) {
             sincronizarTransformReticula(reticleMesh, THREE_INSTANCE);
@@ -564,7 +587,7 @@
                 const rInstance = window.THREE;
 
                 if (rInstance) {
-                  // v4.43: Caída vertical y bamboleo físico con elevación de seguridad de 8mm (+0.008) anti-clipping
+                  // v4.44: Caída vertical y bamboleo físico con elevación de seguridad de 8mm (+0.008) anti-clipping
                   const wobbleDuration = 1200;
                   const wobbleStartTime = performance.now();
                   const startY = n.y;
