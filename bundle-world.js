@@ -1,4 +1,4 @@
-﻿// 9th Wall v4.46
+﻿// 9th Wall v4.47
 (() => {
   var e = {
     574() {
@@ -50,7 +50,7 @@
     scaleDeadzone: 0.085
   });
 
-  // v4.46: retícula adaptativa en vivo al Bounding Box universal por muestreo de vértices
+  // v4.47: retícula adaptativa ceñida a dimensión real (+1.2cm holgura) y fijada a Y=0 de suelo
   const DRAG_RETICLE_CONFIG = Object.freeze({
     liftHeight: 0.05,
     liftSmoothingRate: 8.0,
@@ -63,7 +63,7 @@
     bounceEasing: "Bounce"
   });
 
-  // v4.46: Generación geométrica analítica determinista de marco plano (BufferGeometry directa sin booleanas ni Earcut)
+  // v4.47: Generación geométrica analítica determinista de marco plano (BufferGeometry directa sin booleanas ni Earcut)
   function crearGeometriaMarcoReticula(THREE_INSTANCE, sizeX, sizeZ, thickness, radius) {
     const sx = sizeX / 2;
     const sz = sizeZ / 2;
@@ -149,7 +149,7 @@
       }
     });
 
-    // v4.46: Spawner con sombra instantánea en t=0 y restauración estricta de opacidad/depthWrite
+    // v4.47: Spawner con sombra instantánea en t=0 y restauración estricta de opacidad/depthWrite
     e.registerComponent({
       name: "dish-spawner",
       schema: { prefab: "eid" },
@@ -175,9 +175,9 @@
           e.Scale.set(t, r, { x: 0.001, y: 0.001, z: 0.001 });
           d.set(e.Quaternion, e.math.quat.yRadians(baseRotY));
 
-          const scaleDuration = 2000;    // v4.46: 2000ms Escala (EaseOut Quadratic)
-          const rotDuration = 3000;      // v4.46: 3000ms Rotación total (EaseOut Quintic)
-          const opacityDuration = 800;   // v4.46: 800ms Opacidad rápida con presencia inmediata
+          const scaleDuration = 2000;    // v4.47: 2000ms Escala (EaseOut Quadratic)
+          const rotDuration = 3000;      // v4.47: 3000ms Rotación total (EaseOut Quintic)
+          const opacityDuration = 800;   // v4.47: 800ms Opacidad rápida con presencia inmediata
           const totalSpinAngle = -Math.PI * 3; // -540° (1.5 vueltas completas en sentido horario)
           let animationStarted = false;
 
@@ -357,7 +357,7 @@
         reticleLocalCenterZ = 0,
         dishBaseRadius = 0.13;
 
-        // v4.46: Medición exacta por muestreo directo de vértices proyectados a espacio local tras updateMatrixWorld
+        // v4.47: Medición exacta por muestreo de vértices al inicio del gesto (holgura calibrada a +1.2cm)
         const actualizarBoundingBox = (THREE_INSTANCE) => {
           if (!t.three || !t.three.scene) return;
 
@@ -419,8 +419,9 @@
             unifiedBox.getCenter(ctr);
 
             if (sz.x > 0.05 && sz.z > 0.05 && sz.x < 2.5 && sz.z < 2.5) {
-              bboxSizeX = sz.x + 0.035;
-              bboxSizeZ = sz.z + 0.035;
+              // v4.47: Ajuste ceñido exacto (+1.2cm holgura periférica real)
+              bboxSizeX = sz.x + 0.012;
+              bboxSizeZ = sz.z + 0.012;
               reticleLocalCenterX = ctr.x;
               reticleLocalCenterZ = ctr.z;
             }
@@ -444,7 +445,7 @@
           dishBaseRadius = Math.max(bboxSizeX, bboxSizeZ) * 0.50;
         };
 
-        // v4.46: Sincronización 3D en vivo: anclaje a Y=0 de suelo heredando la posición y rotación Y del plato
+        // v4.47: Sincronización ultraligera 60 FPS en GPU (posición Y=0, escala dinámica y rotación en vivo)
         const sincronizarTransformReticula = (ret, THREE_INSTANCE) => {
           if (!ret || !THREE_INSTANCE) return;
 
@@ -466,14 +467,13 @@
           ret.scale.set(currentScale, currentScale, currentScale);
         };
 
-        // v4.46: Regeneración dinámica de retícula garantizando medidas frescas en cada toque
+        // v4.47: Obtención con caché estable: creación única por gesto y actualización por matrices continuas
         const obtenerReticula = (THREE_INSTANCE, scene) => {
-          actualizarBoundingBox(THREE_INSTANCE);
           if (reticleMesh) {
-            scene.remove(reticleMesh);
-            if (reticleMesh.geometry) reticleMesh.geometry.dispose();
-            reticleMesh = null;
+            sincronizarTransformReticula(reticleMesh, THREE_INSTANCE);
+            return reticleMesh;
           }
+          actualizarBoundingBox(THREE_INSTANCE);
           const geometry = crearGeometriaMarcoReticula(
             THREE_INSTANCE,
             bboxSizeX,
@@ -528,6 +528,13 @@
             if (isModelTouchActive) {
               activePointerIds.add(o.data.pointerId);
               return;
+            }
+
+            // v4.47: Invalidación limpia al inicio del toque para recalcular medidas frescas sin impacto durante el arrastre
+            if (reticleMesh && t.three && t.three.scene) {
+              t.three.scene.remove(reticleMesh);
+              if (reticleMesh.geometry) reticleMesh.geometry.dispose();
+              reticleMesh = null;
             }
 
             const n = t.transform.getWorldPosition(a),
@@ -605,7 +612,7 @@
                 const rInstance = window.THREE;
 
                 if (rInstance) {
-                  // v4.46: Caída vertical y bamboleo físico con elevación de seguridad de 8mm (+0.008) anti-clipping
+                  // v4.47: Caída vertical y bamboleo físico con elevación de seguridad de 8mm (+0.008) anti-clipping
                   const wobbleDuration = 1200;
                   const wobbleStartTime = performance.now();
                   const startY = n.y;
@@ -702,10 +709,9 @@
               const angleDelta = o.data.positionChange.x * MODEL_GESTURES.rotationSensitivity;
               t.transform.rotateSelf(a, e.math.quat.yRadians(angleDelta));
 
-              if (t.three.scene && window.THREE) {
-                const ret = obtenerReticula(window.THREE, t.three.scene);
-                sincronizarTransformReticula(ret, window.THREE);
-                ret.visible = true;
+              if (reticleMesh && window.THREE) {
+                sincronizarTransformReticula(reticleMesh, window.THREE);
+                reticleMesh.visible = true;
               }
             }
 
@@ -726,9 +732,9 @@
 
                 e.Scale.set(t, a, { x: currentScale, y: currentScale, z: currentScale });
 
-                if (t.three.scene && window.THREE) {
-                  const ret = obtenerReticula(window.THREE, t.three.scene);
-                  sincronizarTransformReticula(ret, window.THREE);
+                if (reticleMesh && window.THREE) {
+                  sincronizarTransformReticula(reticleMesh, window.THREE);
+                  reticleMesh.visible = true;
                 }
               }
             }
