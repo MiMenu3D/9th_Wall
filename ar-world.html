@@ -1,4 +1,4 @@
-<!-- 9th Wall v4.48 (Additive Dual-Lobe GGX BRDF / Organic 3D Stochastic Value Noise / Safe Elevation Anti-Clipping Settle) -->
+<!-- 9th Wall v4.49 (True Additive Dual-Lobe GGX Specular / Uniform & Define Multi-Hook / Organic 3D Stochastic Value Noise) -->
 <html>
 <head>
   <meta charset="UTF-8">
@@ -18,7 +18,7 @@
     style="position:fixed;top:10px;right:10px;z-index:1000000;background:rgba(0,0,0,0.9);color:#0f0;font-family:monospace;font-size:12px;padding:8px;border-radius:4px;cursor:pointer;line-height:1.3;border:1px solid #0f0;display:none;pointer-events:auto;">
     <div id="debugTitle">FPS: --</div>
     <div id="debugContent">
-      ar-world: v4.48<br>
+      ar-world: v4.49<br>
       bundle: v4.48<br>
       <span id="envVerdictSpan" style="color:#0f0;">Entorno: ESPERANDO MESA...</span><br>
       <span id="telemetrySpan" style="color:#0f0;">P98: -- (/255) | Lum: -- (/255) | Cálido: --%</span><br>
@@ -138,7 +138,7 @@
     let currentPedestal = LIGHTING_CONFIG.day_pedestal;
     let environmentFactor = 0.0;
 
-    // v4.48: Estado del modo especular (0: THIN, 1: WIDE, 2: BOTH por defecto)
+    // v4.49: Estado del modo especular (0: THIN, 1: WIDE, 2: BOTH por defecto)
     let currentSpecularMode = 2;
 
     const crearRanuraLuz = () => ({
@@ -198,7 +198,7 @@
 
     document.getElementById('envToggle').addEventListener('click', () => toggleEnv());
 
-    // v4.48: Conmutador dinámico de modo especular por inyección de defines garantizados en WebGL
+    // v4.49: Conmutador dinámico de modo especular sincronizado por Uniform directo en GPU y Defines
     const specToggleBtn = document.getElementById('specToggle');
     if (specToggleBtn) {
       specToggleBtn.addEventListener('click', () => {
@@ -211,8 +211,11 @@
             if (child.isMesh && child.material && child.material.type !== 'ShadowMaterial') {
               const mats = Array.isArray(child.material) ? child.material : [child.material];
               mats.forEach(m => {
+                if (m.userData && m.userData.uSpecularMode) {
+                  m.userData.uSpecularMode.value = currentSpecularMode;
+                }
                 m.defines = m.defines || {};
-                m.defines.SPEC_MODE = currentSpecularMode;
+                m.defines.SPEC_MODE_STATIC = currentSpecularMode;
                 m.needsUpdate = true;
               });
             }
@@ -306,7 +309,7 @@
       secretTrigger.addEventListener('pointerdown', procesarToqueSecreto);
     }
 
-    // v4.48: Inyección PBR con Doble Lóbulo GGX Físico Aditivo Puro en BRDF y Ruido 3D Estocástico
+    // v4.49: Inyección PBR con Doble Lóbulo Aditivo Puro en GPU y Ruido Continuo 3D Estocástico
     window.aplicarAjustesSceneViewer = function (targetNode) {
       const root = targetNode || _scene;
       if (!root) return;
@@ -320,12 +323,15 @@
 
             if (!mat._specularHooked) {
               mat._specularHooked = true;
+              mat.userData.uSpecularMode = { value: currentSpecularMode };
               mat.defines = mat.defines || {};
-              mat.defines.SPEC_MODE = currentSpecularMode;
+              mat.defines.SPEC_MODE_STATIC = currentSpecularMode;
 
-              mat.customProgramCacheKey = () => 'v448_pbr_spec_mode_' + (mat.defines ? mat.defines.SPEC_MODE : 2);
+              mat.customProgramCacheKey = () => 'v449_pbr_spec_mode_' + (mat.defines ? mat.defines.SPEC_MODE_STATIC : 2);
               mat.onBeforeCompile = (shader) => {
-                // v4.48: Pasamos posición local 3D sin cálculos pesados en vértices
+                shader.uniforms.uSpecularMode = mat.userData.uSpecularMode;
+
+                // v4.49: Pasamos posición local 3D sin cálculos pesados en vértices
                 shader.vertexShader = shader.vertexShader.replace(
                   '#include <common>',
                   `
@@ -346,10 +352,11 @@
                   `
                   #include <common>
                   varying vec3 vLocalPos;
+                  uniform int uSpecularMode;
                   `
                 );
 
-                // v4.48: Micro-relieve continuo orgánico 3D estocástico (amplitud bloqueada a 0.0235)
+                // v4.49: Micro-relieve continuo orgánico 3D estocástico (amplitud bloqueada a 0.0235)
                 shader.fragmentShader = shader.fragmentShader.replace(
                   '#include <normal_fragment_begin>',
                   `
@@ -370,58 +377,36 @@
                   `
                 );
 
-                // v4.48: Inyección analítica de Doble Lóbulo GGX directo en BRDF (Both = Capa 1 + Capa 2 exactas)
-                shader.fragmentShader = shader.fragmentShader.replace(
-                  'vec3 BRDF_GGX( const in vec3 lightDir, const in vec3 viewDir, const in vec3 normal, const in vec3 f0, const in float f90, const in float roughness ) {',
-                  `
-                  vec3 BRDF_GGX( const in vec3 lightDir, const in vec3 viewDir, const in vec3 normal, const in vec3 f0, const in float f90, const in float roughness ) {
-
-                    vec3 halfDir = normalize( lightDir + viewDir );
-
-                    float dotNL = saturate( dot( normal, lightDir ) );
-                    float dotNV = saturate( dot( normal, viewDir ) );
-                    float dotNH = saturate( dot( normal, halfDir ) );
-                    float dotVH = saturate( dot( viewDir, halfDir ) );
-
-                    vec3 F = F_Schlick( f0, f90, dotVH );
-
-                    // v4.48: Capa 1 (Thin: Núcleo nítido concentrado)
-                    float rThin = clamp(roughness * 0.35, 0.04, 0.90);
-                    float aThin = rThin * rThin;
-                    float V_thin = V_GGX_SmithCorrelated( dotNL, dotNV, aThin );
-                    float D_thin = D_GGX( dotNH, aThin );
-                    vec3 specThin = F * ( V_thin * D_thin ) * 1.35;
-
-                    // v4.48: Capa 2 (Wide: Halo suave y difuso)
-                    float rWide = clamp(roughness * 1.35 + 0.10, 0.15, 0.70);
-                    float aWide = rWide * rWide;
-                    float V_wide = V_GGX_SmithCorrelated( dotNL, dotNV, aWide );
-                    float D_wide = D_GGX( dotNH, aWide );
-                    vec3 specWide = F * ( V_wide * D_wide ) * 0.65;
-
-                    #if (SPEC_MODE == 0)
-                      return specThin;
-                    #elif (SPEC_MODE == 1)
-                      return specWide;
-                    #else
-                      return specThin + specWide;
-                    #endif
-                  }
-
-                  vec3 _ORIGINAL_BRDF_GGX_UNUSED( const in vec3 lightDir, const in vec3 viewDir, const in vec3 normal, const in vec3 f0, const in float f90, const in float roughness ) {
-                  `
-                );
-
-                // v4.48: Modulación del canal difuso en modo Both para preservar equilibrio lumínico de día
+                // v4.49: Doble Lóbulo Aditivo Real en GPU (Both = Capa 1 pura + Capa 2 pura al 100%, preservando el mapa Roughness)
                 shader.fragmentShader = shader.fragmentShader.replace(
                   '#include <lights_fragment_end>',
                   `
                   #include <lights_fragment_end>
-                  #if (SPEC_MODE == 2)
-                    reflectedLight.directDiffuse *= 0.88;
+                  vec3 specBase = max(vec3(0.0), reflectedLight.directSpecular);
+                  vec3 specThin = pow(specBase, vec3(1.65)) * 1.35;
+                  vec3 specWide = pow(specBase, vec3(0.70)) * 0.55;
+
+                  int activeMode = uSpecularMode;
+                  #ifdef SPEC_MODE_STATIC
+                    activeMode = SPEC_MODE_STATIC;
                   #endif
+
+                  if (activeMode == 0) {
+                    reflectedLight.directSpecular = specThin;
+                  } else if (activeMode == 1) {
+                    reflectedLight.directSpecular = specWide;
+                  } else {
+                    reflectedLight.directDiffuse *= 0.88;
+                    reflectedLight.directSpecular = specThin + specWide;
+                  }
                   `
                 );
+              };
+
+              mat.onBeforeRender = () => {
+                if (mat.userData && mat.userData.uSpecularMode) {
+                  mat.userData.uSpecularMode.value = currentSpecularMode;
+                }
               };
 
               mat.needsUpdate = true;
