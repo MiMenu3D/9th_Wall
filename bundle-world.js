@@ -1,4 +1,4 @@
-﻿// 9th Wall v4.52
+﻿// 9th Wall v4.53
 (() => {
   var e = {
     574() {
@@ -50,7 +50,7 @@
     scaleDeadzone: 0.085
   });
 
-  // v4.52: retícula adaptativa ceñida a dimensión real (+1.2cm holgura) y fijada a Y=0 de suelo
+  // v4.53: retícula adaptativa ceñida a dimensión real (+1.2cm holgura) y fijada a Y=0 de suelo
   const DRAG_RETICLE_CONFIG = Object.freeze({
     liftHeight: 0.05,
     liftSmoothingRate: 8.0,
@@ -140,7 +140,7 @@
     a(574);
     const e = window.ecs;
 
-    // v4.52: Spawner blindado con sombra instantánea en t=0 y restauración estricta de opacidad/depthWrite
+    // v4.53: Spawner blindado con sombra instantánea en t=0 y restauración estricta de opacidad/depthWrite
     e.registerComponent({
       name: "dish-spawner",
       schema: { prefab: "eid" },
@@ -175,6 +175,11 @@
           const dispararCinematicaSpawn = () => {
             if (animationStarted) return;
             animationStarted = true;
+
+            // v4.53: Notificación de inicio de animación para el cronómetro Post-Listo
+            if (window.notificarSpawnIniciado) {
+              window.notificarSpawnIniciado();
+            }
 
             const spawnMaterials = [];
 
@@ -290,7 +295,7 @@
         reticleLocalCenterZ = 0,
         bboxCalculated = false;
 
-        // v4.52: Medición de dimensiones por muestreo de vértices cacheada tras el primer cálculo (+1.2cm holgura)
+        // v4.53: Medición de dimensiones por muestreo de vértices cacheada tras el primer cálculo (+1.2cm holgura)
         const actualizarBoundingBox = (THREE_INSTANCE) => {
           if (bboxCalculated || !t.three || !t.three.scene) return;
 
@@ -347,7 +352,7 @@
             unifiedBox.getCenter(ctr);
 
             if (sz.x > 0.05 && sz.z > 0.05 && sz.x < 2.5 && sz.z < 2.5) {
-              // v4.52: Ajuste ceñido exacto (+1.2cm holgura periférica real)
+              // v4.53: Ajuste ceñido exacto (+1.2cm holgura periférica real)
               bboxSizeX = sz.x + 0.012;
               bboxSizeZ = sz.z + 0.012;
               reticleLocalCenterX = ctr.x;
@@ -357,7 +362,7 @@
           }
         };
 
-        // v4.52: Sincronización ultraligera 60 FPS en GPU (posición Y=0, escala dinámica y rotación en vivo)
+        // v4.53: Sincronización ultraligera 60 FPS en GPU (posición Y=0, escala dinámica y rotación en vivo)
         const sincronizarTransformReticula = (ret, THREE_INSTANCE) => {
           if (!ret || !THREE_INSTANCE) return;
 
@@ -379,7 +384,7 @@
           ret.scale.set(currentScale, currentScale, currentScale);
         };
 
-        // v4.52: Obtención con caché estable: creación única por gesto y actualización por matrices continuas
+        // v4.53: Obtención con caché estable: creación única por gesto y actualización por matrices continuas
         const obtenerReticula = (THREE_INSTANCE, scene) => {
           if (reticleMesh) {
             sincronizarTransformReticula(reticleMesh, THREE_INSTANCE);
@@ -442,7 +447,7 @@
               return;
             }
 
-            // v4.52: Invalidación limpia al inicio del toque para recalcular medidas frescas sin impacto durante el arrastre
+            // v4.53: Invalidación limpia al inicio del toque para recalcular medidas frescas sin impacto durante el arrastre
             if (reticleMesh && t.three && t.three.scene) {
               t.three.scene.remove(reticleMesh);
               if (reticleMesh.geometry) reticleMesh.geometry.dispose();
@@ -518,7 +523,7 @@
                 const rInstance = window.THREE;
 
                 if (rInstance) {
-                  // v4.52: Caída vertical y bamboleo físico con elevación de seguridad de 8mm (+0.008) anti-clipping
+                  // v4.53: Caída vertical y bamboleo físico con elevación de seguridad de 8mm (+0.008) anti-clipping
                   const wobbleDuration = 1200;
                   const wobbleStartTime = performance.now();
                   const startY = n.y;
