@@ -2,9 +2,13 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-<title>Over Success04-Copilot 3.11</title>
-<!-- version 3.11 -->
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="screen-orientation" content="portrait">
+<link rel="manifest" href="data:application/manifest+json,%7B%22orientation%22%3A%22portrait%22%7D">
+<title>Google AI Studio 4.54</title>
+<!-- version 4.54 -->
 
 <script type="module" src="https://unpkg.com/@google/model-viewer/dist/model-viewer.min.js"></script>
 
@@ -67,6 +71,7 @@ model-viewer {
   background: rgba(255,255,255,0.9);
   border-radius: 12px;
   border: none;
+  cursor: pointer;
 }
 
 .button {
@@ -76,9 +81,8 @@ model-viewer {
   border-radius: 30px;
   font-size: 16px;
   border: none;
+  cursor: pointer;
 }
-
-
 </style>
 </head>
 
@@ -87,7 +91,7 @@ model-viewer {
 <div id="mvContainer"></div>
 
 <div id="startScreen">
-  <div id="prueba">Over Success04-Copilot 3.11</div>
+  <div id="prueba">Over Success04-Copilot 4.54</div>
   <div id="label">Plato 01</div>
 
   <div class="arrowContainer">
@@ -98,8 +102,21 @@ model-viewer {
   <button class="button" onclick="startAR()">Ver en tu mesa</button>
 </div>
 
-
 <script src="menu.js"></script>
+<script>
+  // Bloqueo de orientación nativo activado al primer gesto del usuario
+  const bloquearOrientacionVertical = () => {
+    try {
+      if (screen.orientation && screen.orientation.lock) {
+        screen.orientation.lock('portrait-primary').catch(() => {
+          screen.orientation.lock('portrait').catch(() => {});
+        });
+      }
+    } catch (e) {}
+  };
+
+  document.addEventListener('pointerdown', bloquearOrientacionVertical, { once: true });
+  document.addEventListener('touchstart', bloquearOrientacionVertical, { once: true });
+</script>
 </body>
 </html>
-
