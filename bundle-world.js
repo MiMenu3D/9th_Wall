@@ -1,4 +1,4 @@
-﻿// 9th Wall v4.53
+﻿// 9th Wall v4.51x
 (() => {
   var e = {
     574() {
@@ -50,7 +50,7 @@
     scaleDeadzone: 0.085
   });
 
-  // v4.53: retícula adaptativa ceñida a dimensión real (+1.2cm holgura) y fijada a Y=0 de suelo
+  // v4.47: retícula adaptativa ceñida a dimensión real (+1.2cm holgura) y fijada a Y=0 de suelo
   const DRAG_RETICLE_CONFIG = Object.freeze({
     liftHeight: 0.05,
     liftSmoothingRate: 8.0,
@@ -58,7 +58,9 @@
     baseSize: 0.260,
     thickness: 0.016,
     cornerRadius: 0.035,
-    color: 0x66ffff
+    color: 0x66ffff,
+    bounceDuration: 940,
+    bounceEasing: "Bounce"
   });
 
   // v4.47: Generación geométrica analítica determinista de marco plano (BufferGeometry directa sin booleanas ni Earcut)
@@ -139,8 +141,15 @@
     "use strict";
     a(574);
     const e = window.ecs;
+    e.registerComponent({
+      name: "hide-on-ready",
+      stateMachine: ({ world: t, eid: a, defineState: o }) => {
+        o("initial").initial().onEvent(e.events.REALITY_READY, "ready", { target: t.events.globalId }),
+        o("ready").onEnter(() => { e.Disabled.reset(t, a) })
+      }
+    });
 
-    // v4.53: Spawner blindado con sombra instantánea en t=0 y restauración estricta de opacidad/depthWrite
+    // v4.51: Spawner blindado con sombra instantánea en t=0 y restauración estricta de opacidad/depthWrite
     e.registerComponent({
       name: "dish-spawner",
       schema: { prefab: "eid" },
@@ -175,8 +184,6 @@
           const dispararCinematicaSpawn = () => {
             if (animationStarted) return;
             animationStarted = true;
-
-            // v4.53: Notificación de inicio de animación para el cronómetro Post-Listo
             if (window.notificarSpawnIniciado) {
               window.notificarSpawnIniciado();
             }
@@ -293,11 +300,11 @@
         bboxSizeZ = DRAG_RETICLE_CONFIG.baseSize,
         reticleLocalCenterX = 0,
         reticleLocalCenterZ = 0,
-        bboxCalculated = false;
+        dishBaseRadius = 0.13;
 
-        // v4.53: Medición de dimensiones por muestreo de vértices cacheada tras el primer cálculo (+1.2cm holgura)
+        // v4.47: Medición exacta por muestreo de vértices al inicio del gesto (holgura calibrada a +1.2cm)
         const actualizarBoundingBox = (THREE_INSTANCE) => {
-          if (bboxCalculated || !t.three || !t.three.scene) return;
+          if (!t.three || !t.three.scene) return;
 
           t.three.scene.updateMatrixWorld(true);
 
@@ -352,17 +359,18 @@
             unifiedBox.getCenter(ctr);
 
             if (sz.x > 0.05 && sz.z > 0.05 && sz.x < 2.5 && sz.z < 2.5) {
-              // v4.53: Ajuste ceñido exacto (+1.2cm holgura periférica real)
+              // v4.47: Ajuste ceñido exacto (+1.2cm holgura periférica real)
               bboxSizeX = sz.x + 0.012;
               bboxSizeZ = sz.z + 0.012;
               reticleLocalCenterX = ctr.x;
               reticleLocalCenterZ = ctr.z;
-              bboxCalculated = true;
             }
           }
+
+          dishBaseRadius = Math.max(bboxSizeX, bboxSizeZ) * 0.50;
         };
 
-        // v4.53: Sincronización ultraligera 60 FPS en GPU (posición Y=0, escala dinámica y rotación en vivo)
+        // v4.47: Sincronización ultraligera 60 FPS en GPU (posición Y=0, escala dinámica y rotación en vivo)
         const sincronizarTransformReticula = (ret, THREE_INSTANCE) => {
           if (!ret || !THREE_INSTANCE) return;
 
@@ -384,7 +392,7 @@
           ret.scale.set(currentScale, currentScale, currentScale);
         };
 
-        // v4.53: Obtención con caché estable: creación única por gesto y actualización por matrices continuas
+        // v4.47: Obtención con caché estable: creación única por gesto y actualización por matrices continuas
         const obtenerReticula = (THREE_INSTANCE, scene) => {
           if (reticleMesh) {
             sincronizarTransformReticula(reticleMesh, THREE_INSTANCE);
@@ -447,7 +455,7 @@
               return;
             }
 
-            // v4.53: Invalidación limpia al inicio del toque para recalcular medidas frescas sin impacto durante el arrastre
+            // v4.47: Invalidación limpia al inicio del toque para recalcular medidas frescas sin impacto durante el arrastre
             if (reticleMesh && t.three && t.three.scene) {
               t.three.scene.remove(reticleMesh);
               if (reticleMesh.geometry) reticleMesh.geometry.dispose();
@@ -465,6 +473,12 @@
             dragOffsetZ = 0,
             planarX = n.x,
             planarZ = n.z;
+
+            try {
+              if (e.PositionAnimation && e.PositionAnimation.remove) {
+                e.PositionAnimation.remove(t, a);
+              }
+            } catch (err) {}
 
             if (!i || !r) return;
 
@@ -523,7 +537,7 @@
                 const rInstance = window.THREE;
 
                 if (rInstance) {
-                  // v4.53: Caída vertical y bamboleo físico con elevación de seguridad de 8mm (+0.008) anti-clipping
+                  // v4.47: Caída vertical y bamboleo físico con elevación de seguridad de 8mm (+0.008) anti-clipping
                   const wobbleDuration = 1200;
                   const wobbleStartTime = performance.now();
                   const startY = n.y;
@@ -829,6 +843,65 @@
             }
           },
           "order": 2.1029089692509704
+        },
+
+        // Pantalla de Carga (Overlay negro)
+        "c7231d72-b7a3-44ea-b5f5-bb9ea9572ed9": {
+          "id": "c7231d72-b7a3-44ea-b5f5-bb9ea9572ed9",
+          "position": [0, 10.938518268367439, -2.5468804365107705],
+          "rotation": [0, 0, 0, 1],
+          "scale": [1, 1, 1],
+          "geometry": null,
+          "material": null,
+          "parentId": "84028e73-ee70-412d-b8d4-c09bf07c655c",
+          "components": {
+            "f31ef85b-8c9e-41ca-817f-a53bb7000a2d": {
+              "id": "f31ef85b-8c9e-41ca-817f-a53bb7000a2d",
+              "name": "hide-on-ready",
+              "parameters": {}
+            }
+          },
+          "ui": {
+            "flexDirection": "row",
+            "width": "100%",
+            "height": "100%",
+            "type": "overlay",
+            "background": "#000000",
+            "backgroundOpacity": 1,
+            "alignItems": "center",
+            "justifyContent": "center",
+            "stackingOrder": 100
+          },
+          "name": "Loading Screen",
+          "order": 16.570036688545937
+        },
+
+        // Texto "Camera Loading"
+        "2f4186f0-5825-4b3c-868a-24bc7945a328": {
+          "id": "2f4186f0-5825-4b3c-868a-24bc7945a328",
+          "position": [0, 0, 0],
+          "rotation": [0, 0, 0, 1],
+          "scale": [1, 1, 1],
+          "geometry": null,
+          "material": null,
+          "parentId": "c7231d72-b7a3-44ea-b5f5-bb9ea9572ed9",
+          "components": {},
+          "ui": {
+            "width": 200,
+            "height": 200,
+            "text": "Camera Loading",
+            "color": "#ffffff",
+            "fontSize": 24,
+            "type": "3d",
+            "font": {
+              "type": "font",
+              "font": "Roboto"
+            },
+            "textAlign": "center",
+            "verticalTextAlign": "center"
+          },
+          "name": "Text",
+          "order": 1.9632252822400198
         },
 
         // Plano del suelo (Ground) con colocador único automático
