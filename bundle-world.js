@@ -1,4 +1,4 @@
-﻿// 9th Wall v4.51x
+﻿// 9th Wall v4.54
 (() => {
   var e = {
     574() {
@@ -50,7 +50,7 @@
     scaleDeadzone: 0.085
   });
 
-  // v4.47: retícula adaptativa ceñida a dimensión real (+1.2cm holgura) y fijada a Y=0 de suelo
+  // v4.54: retícula adaptativa ceñida a dimensión real (+1.2cm holgura) y fijada a Y=0 de suelo
   const DRAG_RETICLE_CONFIG = Object.freeze({
     liftHeight: 0.05,
     liftSmoothingRate: 8.0,
@@ -58,9 +58,7 @@
     baseSize: 0.260,
     thickness: 0.016,
     cornerRadius: 0.035,
-    color: 0x66ffff,
-    bounceDuration: 940,
-    bounceEasing: "Bounce"
+    color: 0x66ffff
   });
 
   // v4.47: Generación geométrica analítica determinista de marco plano (BufferGeometry directa sin booleanas ni Earcut)
@@ -141,139 +139,238 @@
     "use strict";
     a(574);
     const e = window.ecs;
-    e.registerComponent({
-      name: "hide-on-ready",
-      stateMachine: ({ world: t, eid: a, defineState: o }) => {
-        o("initial").initial().onEvent(e.events.REALITY_READY, "ready", { target: t.events.globalId }),
-        o("ready").onEnter(() => { e.Disabled.reset(t, a) })
-      }
-    });
 
-    // v4.51: Spawner blindado con sombra instantánea en t=0 y restauración estricta de opacidad/depthWrite
+    // v4.54: Spawner con soporte de animación de hundimiento, reemplazo en caliente y destrucción profunda de VRAM
     e.registerComponent({
       name: "dish-spawner",
       schema: { prefab: "eid" },
       stateMachine: ({ world: t, eid: a, schemaAttribute: schemaAttr, defineState: i }) => {
         let isPlaced = false;
-        i("initial").initial().listen(t.events.globalId, "auto-place-dish", ev => {
-          if (isPlaced) return;
-          if (!ev.data || !ev.data.worldPosition) return;
-          isPlaced = true;
-          const prefabEid = schemaAttr.get(a).prefab;
-          const r = t.createEntity(prefabEid);
-          const d = t.getEntity(r);
+        let spawnedEid = null;
+        let currentDishMesh = null;
 
-          const targetX = ev.data.worldPosition.x;
-          const targetY = ev.data.worldPosition.y;
-          const targetZ = ev.data.worldPosition.z;
+        const scaleDuration = 2000;    // 2000ms Escala (EaseOut Quadratic)
+        const rotDuration = 3000;      // 3000ms Rotación total (EaseOut Quintic)
+        const opacityDuration = 800;   // 800ms Opacidad rápida
+        const totalSpinAngle = -Math.PI * 3;
 
-          // Rotación binaria base (0° o 180°)
-          const baseRotY = Math.random() < 0.5 ? 0 : Math.PI;
-
-          // Posición fija sobre la mesa arrancando en escala inicial segura
-          d.setLocalPosition({ x: targetX, y: targetY + 0.001, z: targetZ });
-          e.Scale.set(t, r, { x: 0.001, y: 0.001, z: 0.001 });
-          d.set(e.Quaternion, e.math.quat.yRadians(baseRotY));
-
-          const scaleDuration = 2000;    // v4.47: 2000ms Escala (EaseOut Quadratic)
-          const rotDuration = 3000;      // v4.47: 3000ms Rotación total (EaseOut Quintic)
-          const opacityDuration = 800;   // v4.47: 800ms Opacidad rápida con presencia inmediata
-          const totalSpinAngle = -Math.PI * 3; // -540° (1.5 vueltas completas en sentido horario)
-          let animationStarted = false;
-
-          const dispararCinematicaSpawn = () => {
-            if (animationStarted) return;
-            animationStarted = true;
-            if (window.notificarSpawnIniciado) {
-              window.notificarSpawnIniciado();
-            }
-
-            const spawnMaterials = [];
-
-            if (t.three && t.three.scene) {
-              t.three.scene.traverse((child) => {
-                if (child.isMesh && child.material) {
-                  if (child.material.type === 'ShadowMaterial' || child.name === "Ground") {
-                    child.material.opacity = 0.40;
-                  } else if (child.name !== "Ground" && child.name !== "Hider") {
-                    const mats = Array.isArray(child.material) ? child.material : [child.material];
-                    mats.forEach(m => {
-                      if (m.type !== 'ShadowMaterial') {
-                        m.transparent = true;
-                        m.opacity = 0.0;
-                        spawnMaterials.push(m);
-                      }
-                    });
+        // Función de destrucción profunda de mallas y texturas (VRAM = 0)
+        const destruirMallaProfunda = (meshNode) => {
+          if (!meshNode) return;
+          meshNode.traverse((child) => {
+            if (child.isMesh) {
+              if (child.geometry) child.geometry.dispose();
+              if (child.material) {
+                const mats = Array.isArray(child.material) ? child.material : [child.material];
+                mats.forEach((m) => {
+                  for (const key in m) {
+                    if (m[key] && m[key].isTexture) {
+                      m[key].dispose();
+                    }
                   }
-                }
-              });
-            }
-
-            let spawnStartTime = performance.now();
-
-            const animarSpawnCompleto = () => {
-              const elapsed = performance.now() - spawnStartTime;
-
-              // 1. Cinemática de Escala (2000ms - Quadratic Ease-Out)
-              const progressScale = Math.min(1.0, elapsed / scaleDuration);
-              const easeScale = 1.0 - Math.pow(1.0 - progressScale, 2);
-              const currentScaleVal = Math.max(0.001, easeScale);
-
-              // 2. Cinemática de Rotación (3000ms - Quintic Ease-Out pronunciado)
-              const progressRot = Math.min(1.0, elapsed / rotDuration);
-              const easeRot = 1.0 - Math.pow(1.0 - progressRot, 5);
-              const currentAngle = baseRotY + (totalSpinAngle * easeRot);
-
-              // 3. Fundido de Opacidad Rápido (800ms - Presencia visual temprana)
-              const progressOpacity = Math.min(1.0, elapsed / opacityDuration);
-              const easeOpacity = 1.0 - Math.pow(1.0 - progressOpacity, 2);
-              spawnMaterials.forEach(m => {
-                m.opacity = easeOpacity;
-              });
-
-              e.Scale.set(t, r, { x: currentScaleVal, y: currentScaleVal, z: currentScaleVal });
-              d.set(e.Quaternion, e.math.quat.yRadians(currentAngle));
-
-              if (elapsed < rotDuration) {
-                requestAnimationFrame(animarSpawnCompleto);
-              } else {
-                e.Scale.set(t, r, { x: 1.0, y: 1.0, z: 1.0 });
-                d.set(e.Quaternion, e.math.quat.yRadians(baseRotY + totalSpinAngle));
-                spawnMaterials.forEach(m => {
-                  m.opacity = 1.0;
-                  m.transparent = false;
-                  m.depthWrite = true;
-                  m.needsUpdate = true;
+                  m.dispose();
                 });
               }
-            };
-            requestAnimationFrame(animarSpawnCompleto);
+            }
+          });
+          if (meshNode.parent) {
+            meshNode.parent.remove(meshNode);
+          }
+        };
+
+        const dispararCinematicaSpawn = (rootTarget, baseRotY = 0) => {
+          const spawnMaterials = [];
+
+          if (t.three && t.three.scene) {
+            t.three.scene.traverse((child) => {
+              if (child.isMesh && child.material) {
+                if (child.material.type === 'ShadowMaterial' || child.name === "Ground") {
+                  child.material.opacity = 0.40;
+                } else if (child.name !== "Ground" && child.name !== "Hider") {
+                  const mats = Array.isArray(child.material) ? child.material : [child.material];
+                  mats.forEach(m => {
+                    if (m.type !== 'ShadowMaterial') {
+                      m.transparent = true;
+                      m.opacity = 0.0;
+                      spawnMaterials.push(m);
+                    }
+                  });
+                }
+              }
+            });
+          }
+
+          if (window.notificarSpawnIniciado) {
+            window.notificarSpawnIniciado();
+          }
+
+          let spawnStartTime = performance.now();
+
+          const animarSpawnCompleto = () => {
+            const elapsed = performance.now() - spawnStartTime;
+
+            const progressScale = Math.min(1.0, elapsed / scaleDuration);
+            const easeScale = 1.0 - Math.pow(1.0 - progressScale, 2);
+            const currentScaleVal = Math.max(0.001, easeScale);
+
+            const progressRot = Math.min(1.0, elapsed / rotDuration);
+            const easeRot = 1.0 - Math.pow(1.0 - progressRot, 5);
+            const currentAngle = baseRotY + (totalSpinAngle * easeRot);
+
+            const progressOpacity = Math.min(1.0, elapsed / opacityDuration);
+            const easeOpacity = 1.0 - Math.pow(1.0 - progressOpacity, 2);
+            spawnMaterials.forEach(m => {
+              m.opacity = easeOpacity;
+            });
+
+            e.Scale.set(t, rootTarget, { x: currentScaleVal, y: currentScaleVal, z: currentScaleVal });
+            t.getEntity(rootTarget).set(e.Quaternion, e.math.quat.yRadians(currentAngle));
+
+            if (elapsed < rotDuration) {
+              requestAnimationFrame(animarSpawnCompleto);
+            } else {
+              e.Scale.set(t, rootTarget, { x: 1.0, y: 1.0, z: 1.0 });
+              t.getEntity(rootTarget).set(e.Quaternion, e.math.quat.yRadians(baseRotY + totalSpinAngle));
+              spawnMaterials.forEach(m => {
+                m.opacity = 1.0;
+                m.transparent = false;
+                m.depthWrite = true;
+                m.needsUpdate = true;
+              });
+            }
           };
+          requestAnimationFrame(animarSpawnCompleto);
+        };
 
-          // Sondeo directo: asegura la aplicación de shaders y arranca la cinemática sin bloqueos
-          const comprobarMallaLista = () => {
-            if (animationStarted) return;
-            let encontrada = false;
+        i("initial").initial()
+          .listen(t.events.globalId, "auto-place-dish", ev => {
+            if (isPlaced) return;
+            if (!ev.data || !ev.data.worldPosition) return;
+            isPlaced = true;
+            const prefabEid = schemaAttr.get(a).prefab;
+            spawnedEid = t.createEntity(prefabEid);
+            const d = t.getEntity(spawnedEid);
 
+            const targetX = ev.data.worldPosition.x;
+            const targetY = ev.data.worldPosition.y;
+            const targetZ = ev.data.worldPosition.z;
+
+            const baseRotY = Math.random() < 0.5 ? 0 : Math.PI;
+
+            d.setLocalPosition({ x: targetX, y: targetY + 0.001, z: targetZ });
+            e.Scale.set(t, spawnedEid, { x: 0.001, y: 0.001, z: 0.001 });
+            d.set(e.Quaternion, e.math.quat.yRadians(baseRotY));
+
+            let animationStarted = false;
+            const comprobarMallaLista = () => {
+              if (animationStarted) return;
+              let encontrada = false;
+
+              if (t.three && t.three.scene) {
+                t.three.scene.traverse((child) => {
+                  if (child.isMesh && child.geometry && child.geometry.attributes && child.geometry.attributes.position && child.geometry.attributes.position.count > 0 && child.name !== "Ground" && child.name !== "Hider" && (!child.material || child.material.type !== 'ShadowMaterial')) {
+                    encontrada = true;
+                    currentDishMesh = child;
+                  }
+                });
+              }
+
+              if (encontrada) {
+                animationStarted = true;
+                if (window.aplicarAjustesSceneViewer) {
+                  window.aplicarAjustesSceneViewer(t.three.scene);
+                }
+                dispararCinematicaSpawn(spawnedEid, baseRotY);
+              } else {
+                requestAnimationFrame(comprobarMallaLista);
+              }
+            };
+            requestAnimationFrame(comprobarMallaLista);
+          })
+          // v4.54: Cambio de modelo en caliente con hundimiento hacia el Hider y sustitución en VRAM
+          .listen(t.events.globalId, "switch-dish-model", ev => {
+            if (!isPlaced || !spawnedEid || !ev.data || !ev.data.modelSrc || !window.THREE) return;
+
+            const rInstance = window.THREE;
+            const dishPos = t.transform.getWorldPosition(spawnedEid);
+
+            // 1. Medición de la altura del bounding box para el hundimiento
+            let dishHeight = 0.15;
+            if (t.three && t.three.scene) {
+              const bBox = new rInstance.Box3();
+              t.three.scene.traverse((child) => {
+                if (child.isMesh && child.name !== "Ground" && child.name !== "Hider" && (!child.material || child.material.type !== 'ShadowMaterial')) {
+                  bBox.expandByObject(child);
+                }
+              });
+              const sz = new rInstance.Vector3();
+              bBox.getSize(sz);
+              if (sz.y > 0.02) dishHeight = sz.y;
+            }
+
+            // 2. Cinemática de Hundimiento (1.000 ms: Y -> -H, Opacidad 1.0 -> 0.5)
+            const sinkStartTime = performance.now();
+            const sinkDuration = 1000;
+            const startY = dishPos.y;
+            const targetSinkY = startY - dishHeight - 0.02;
+
+            const activeMats = [];
             if (t.three && t.three.scene) {
               t.three.scene.traverse((child) => {
-                if (child.isMesh && child.geometry && child.geometry.attributes && child.geometry.attributes.position && child.geometry.attributes.position.count > 0 && child.name !== "Ground" && child.name !== "Hider" && (!child.material || child.material.type !== 'ShadowMaterial')) {
-                  encontrada = true;
+                if (child.isMesh && child.name !== "Ground" && child.name !== "Hider" && child.material && child.material.type !== 'ShadowMaterial') {
+                  const mats = Array.isArray(child.material) ? child.material : [child.material];
+                  mats.forEach(m => { m.transparent = true; activeMats.push(m); });
                 }
               });
             }
 
-            if (encontrada) {
-              if (window.aplicarAjustesSceneViewer) {
-                window.aplicarAjustesSceneViewer(t.three.scene);
+            const animarHundimiento = () => {
+              const elapsed = performance.now() - sinkStartTime;
+              const progress = Math.min(1.0, elapsed / sinkDuration);
+
+              const currentY = rInstance.MathUtils.lerp(startY, targetSinkY, progress);
+              const currentOpacity = rInstance.MathUtils.lerp(1.0, 0.5, progress);
+
+              t.transform.setWorldPosition(spawnedEid, { x: dishPos.x, y: currentY, z: dishPos.z });
+              activeMats.forEach(m => { m.opacity = currentOpacity; });
+
+              if (progress < 1.0) {
+                requestAnimationFrame(animarHundimiento);
+              } else {
+                // 3. Destrucción profunda del modelo saliente (VRAM limpia)
+                if (t.three && t.three.scene) {
+                  const nodosBorrar = [];
+                  t.three.scene.traverse((child) => {
+                    if (child.name === "Model" || (child.isMesh && child.name !== "Ground" && child.name !== "Hider" && (!child.material || child.material.type !== 'ShadowMaterial'))) {
+                      nodosBorrar.push(child);
+                    }
+                  });
+                  nodosBorrar.forEach(n => destruirMallaProfunda(n));
+                }
+
+                // 4. Carga del nuevo GLTF en la posición de la mesa
+                const loader = (window.THREE.GLTFLoader) ? new window.THREE.GLTFLoader() : null;
+                if (loader && t.three && t.three.scene) {
+                  loader.load(ev.data.modelSrc, (gltf) => {
+                    const newModel = gltf.scene;
+                    newModel.name = "Model";
+
+                    t.transform.setWorldPosition(spawnedEid, { x: dishPos.x, y: 0.001, z: dishPos.z });
+                    e.Scale.set(t, spawnedEid, { x: 0.001, y: 0.001, z: 0.001 });
+
+                    t.three.scene.add(newModel);
+
+                    if (window.aplicarAjustesSceneViewer) {
+                      window.aplicarAjustesSceneViewer(t.three.scene);
+                    }
+
+                    dispararCinematicaSpawn(spawnedEid, 0);
+                  });
+                }
               }
-              dispararCinematicaSpawn();
-            } else {
-              requestAnimationFrame(comprobarMallaLista);
-            }
-          };
-          requestAnimationFrame(comprobarMallaLista);
-        });
+            };
+            requestAnimationFrame(animarHundimiento);
+          });
       }
     });
 
@@ -300,11 +397,11 @@
         bboxSizeZ = DRAG_RETICLE_CONFIG.baseSize,
         reticleLocalCenterX = 0,
         reticleLocalCenterZ = 0,
-        dishBaseRadius = 0.13;
+        bboxCalculated = false;
 
-        // v4.47: Medición exacta por muestreo de vértices al inicio del gesto (holgura calibrada a +1.2cm)
+        // v4.54: Medición de dimensiones por muestreo de vértices cacheada tras el primer cálculo (+1.2cm holgura)
         const actualizarBoundingBox = (THREE_INSTANCE) => {
-          if (!t.three || !t.three.scene) return;
+          if (bboxCalculated || !t.three || !t.three.scene) return;
 
           t.three.scene.updateMatrixWorld(true);
 
@@ -359,18 +456,17 @@
             unifiedBox.getCenter(ctr);
 
             if (sz.x > 0.05 && sz.z > 0.05 && sz.x < 2.5 && sz.z < 2.5) {
-              // v4.47: Ajuste ceñido exacto (+1.2cm holgura periférica real)
+              // v4.54: Ajuste ceñido exacto (+1.2cm holgura periférica real)
               bboxSizeX = sz.x + 0.012;
               bboxSizeZ = sz.z + 0.012;
               reticleLocalCenterX = ctr.x;
               reticleLocalCenterZ = ctr.z;
+              bboxCalculated = true;
             }
           }
-
-          dishBaseRadius = Math.max(bboxSizeX, bboxSizeZ) * 0.50;
         };
 
-        // v4.47: Sincronización ultraligera 60 FPS en GPU (posición Y=0, escala dinámica y rotación en vivo)
+        // v4.54: Sincronización ultraligera 60 FPS en GPU (posición Y=0, escala dinámica y rotación en vivo)
         const sincronizarTransformReticula = (ret, THREE_INSTANCE) => {
           if (!ret || !THREE_INSTANCE) return;
 
@@ -392,7 +488,7 @@
           ret.scale.set(currentScale, currentScale, currentScale);
         };
 
-        // v4.47: Obtención con caché estable: creación única por gesto y actualización por matrices continuas
+        // v4.54: Obtención con caché estable: creación única por gesto y actualización por matrices continuas
         const obtenerReticula = (THREE_INSTANCE, scene) => {
           if (reticleMesh) {
             sincronizarTransformReticula(reticleMesh, THREE_INSTANCE);
@@ -455,7 +551,6 @@
               return;
             }
 
-            // v4.47: Invalidación limpia al inicio del toque para recalcular medidas frescas sin impacto durante el arrastre
             if (reticleMesh && t.three && t.three.scene) {
               t.three.scene.remove(reticleMesh);
               if (reticleMesh.geometry) reticleMesh.geometry.dispose();
@@ -473,12 +568,6 @@
             dragOffsetZ = 0,
             planarX = n.x,
             planarZ = n.z;
-
-            try {
-              if (e.PositionAnimation && e.PositionAnimation.remove) {
-                e.PositionAnimation.remove(t, a);
-              }
-            } catch (err) {}
 
             if (!i || !r) return;
 
@@ -537,13 +626,12 @@
                 const rInstance = window.THREE;
 
                 if (rInstance) {
-                  // v4.47: Caída vertical y bamboleo físico con elevación de seguridad de 8mm (+0.008) anti-clipping
                   const wobbleDuration = 1200;
                   const wobbleStartTime = performance.now();
                   const startY = n.y;
-                  const dropTimeMs = 200; // Caída vertical pura
+                  const dropTimeMs = 200;
 
-                  const initialTilt = 0.080; // ~4.5° de inclinación
+                  const initialTilt = 0.080;
                   const randomPhase = Math.random() * Math.PI * 2;
                   const totalYawSpin = 0.16 * (Math.random() < 0.5 ? 1 : -1);
 
@@ -559,12 +647,10 @@
                     const wElapsed = performance.now() - wobbleStartTime;
                     const wProgress = Math.min(1.0, wElapsed / wobbleDuration);
 
-                    // 1. Caída vertical pura en Y
                     const dropProgress = Math.min(1.0, wElapsed / dropTimeMs);
                     const dropEase = dropProgress * dropProgress;
                     let currentY = rInstance.MathUtils.lerp(startY, dragPlaneY, dropEase);
 
-                    // 2. Inclinación física y bamboleo amortiguado con elevación de 8mm que decae a 0
                     let tiltX = 0, tiltZ = 0, naturalY = currentRotY;
 
                     if (wElapsed >= dropTimeMs) {
@@ -578,7 +664,6 @@
                       tiltZ = Math.sin(wobbleDir) * tiltAmount;
                       naturalY = currentRotY + (totalYawSpin * (1.0 - decay));
 
-                      // Elevación de seguridad (+8mm) que decae suavemente con el bamboleo hasta posarse a ras
                       const liftOffset = 0.008 * decay;
                       currentY = dragPlaneY + liftOffset;
                     }
@@ -629,7 +714,6 @@
           .listen(t.events.globalId, e.input.GESTURE_MOVE, o => {
             if (!isModelTouchActive || !isTwoFingerGesture || 2 !== o.data.touchCount) return;
 
-            // 1. ROTACIÓN ESTÁNDAR
             if (o.data.positionChange && o.data.positionChange.x) {
               const angleDelta = o.data.positionChange.x * MODEL_GESTURES.rotationSensitivity;
               t.transform.rotateSelf(a, e.math.quat.yRadians(angleDelta));
@@ -640,7 +724,6 @@
               }
             }
 
-            // 2. ESCALA CON DEADZONE BLINDADO (vB1.03 Checkpoint)
             if (o.data.startSpread > 0 && o.data.spread > 0) {
               const spreadRatio = o.data.spread / o.data.startSpread;
               const spreadDeltaRatio = Math.abs(spreadRatio - 1.0);
@@ -843,65 +926,6 @@
             }
           },
           "order": 2.1029089692509704
-        },
-
-        // Pantalla de Carga (Overlay negro)
-        "c7231d72-b7a3-44ea-b5f5-bb9ea9572ed9": {
-          "id": "c7231d72-b7a3-44ea-b5f5-bb9ea9572ed9",
-          "position": [0, 10.938518268367439, -2.5468804365107705],
-          "rotation": [0, 0, 0, 1],
-          "scale": [1, 1, 1],
-          "geometry": null,
-          "material": null,
-          "parentId": "84028e73-ee70-412d-b8d4-c09bf07c655c",
-          "components": {
-            "f31ef85b-8c9e-41ca-817f-a53bb7000a2d": {
-              "id": "f31ef85b-8c9e-41ca-817f-a53bb7000a2d",
-              "name": "hide-on-ready",
-              "parameters": {}
-            }
-          },
-          "ui": {
-            "flexDirection": "row",
-            "width": "100%",
-            "height": "100%",
-            "type": "overlay",
-            "background": "#000000",
-            "backgroundOpacity": 1,
-            "alignItems": "center",
-            "justifyContent": "center",
-            "stackingOrder": 100
-          },
-          "name": "Loading Screen",
-          "order": 16.570036688545937
-        },
-
-        // Texto "Camera Loading"
-        "2f4186f0-5825-4b3c-868a-24bc7945a328": {
-          "id": "2f4186f0-5825-4b3c-868a-24bc7945a328",
-          "position": [0, 0, 0],
-          "rotation": [0, 0, 0, 1],
-          "scale": [1, 1, 1],
-          "geometry": null,
-          "material": null,
-          "parentId": "c7231d72-b7a3-44ea-b5f5-bb9ea9572ed9",
-          "components": {},
-          "ui": {
-            "width": 200,
-            "height": 200,
-            "text": "Camera Loading",
-            "color": "#ffffff",
-            "fontSize": 24,
-            "type": "3d",
-            "font": {
-              "type": "font",
-              "font": "Roboto"
-            },
-            "textAlign": "center",
-            "verticalTextAlign": "center"
-          },
-          "name": "Text",
-          "order": 1.9632252822400198
         },
 
         // Plano del suelo (Ground) con colocador único automático
