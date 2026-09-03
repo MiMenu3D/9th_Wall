@@ -1,4 +1,4 @@
-﻿// 9th Wall v4.57
+﻿// 9th Wall v4.58
 (() => {
   var e = {
     574() {
@@ -50,7 +50,7 @@
     scaleDeadzone: 0.085
   });
 
-  // v4.57: retícula adaptativa ceñida a dimensión real v4.53 (+1.2cm holgura) y fijada a Y=0 de suelo
+  // v4.58: retícula adaptativa ceñida a dimensión real (+1.2cm holgura) y fijada a Y=0 de suelo
   const DRAG_RETICLE_CONFIG = Object.freeze({
     liftHeight: 0.05,
     liftSmoothingRate: 8.0,
@@ -140,7 +140,7 @@
     a(574);
     const e = window.ecs;
 
-    // v4.57: Spawner con Transform Snapshot, arranque robusto v4.53 y hundimiento 800ms EaseIn a 60 FPS
+    // v4.58: Spawner restaurado con arranque puro v4.53 y sustitución limpia de mallas en jerarquía ECS
     e.registerComponent({
       name: "dish-spawner",
       schema: { prefab: "eid" },
@@ -149,10 +149,10 @@
         let spawnedEid = null;
         let isTransitioning = false;
 
-        const scaleDuration = 2000;    // 2000ms Escala (EaseOut Quadratic)
-        const rotDuration = 3000;      // 3000ms Rotación total (EaseOut Quintic)
-        const opacityDuration = 800;   // 800ms Opacidad rápida
-        const totalSpinAngle = -Math.PI * 3;
+        const scaleDuration = 2000;    // v4.47: 2000ms Escala (EaseOut Quadratic)
+        const rotDuration = 3000;      // v4.47: 3000ms Rotación total (EaseOut Quintic)
+        const opacityDuration = 800;   // v4.47: 800ms Opacidad rápida con presencia inmediata
+        const totalSpinAngle = -Math.PI * 3; // -540° (1.5 vueltas completas en sentido horario)
 
         // Destrucción profunda de mallas y texturas (VRAM = 0)
         const destruirMallaProfunda = (meshNode) => {
@@ -179,6 +179,11 @@
         };
 
         const dispararCinematicaSpawn = (rootTarget, baseRotY = 0, targetScale = 1.0) => {
+          // v4.53: Notificación de inicio de animación para el cronómetro Post-Listo
+          if (window.notificarSpawnIniciado) {
+            window.notificarSpawnIniciado();
+          }
+
           const spawnMaterials = [];
 
           if (t.three && t.three.scene) {
@@ -186,13 +191,12 @@
               if (child.isMesh && child.material) {
                 if (child.material.type === 'ShadowMaterial' || child.name === "Ground") {
                   child.material.opacity = 0.40;
-                } else if (child.name !== "Ground" && child.name !== "Hider" && child.name !== "Loading Screen") {
+                } else if (child.name !== "Ground" && child.name !== "Hider" && child.material.type !== 'ShadowMaterial' && child.material.colorWrite !== false) {
                   const mats = Array.isArray(child.material) ? child.material : [child.material];
                   mats.forEach(m => {
-                    if (m.type !== 'ShadowMaterial') {
+                    if (m.type !== 'ShadowMaterial' && m.colorWrite !== false) {
                       m.transparent = true;
                       m.opacity = 0.0;
-                      m.depthWrite = true;
                       spawnMaterials.push(m);
                     }
                   });
@@ -201,52 +205,46 @@
             });
           }
 
-          if (window.notificarSpawnIniciado) {
-            window.notificarSpawnIniciado();
-          }
+          let spawnStartTime = performance.now();
 
-          // v4.57: Espera de 2 frames antes de fijar spawnStartTime para evitar que la compilación de shaders consuma la cinemática
-          requestAnimationFrame(() => {
-            requestAnimationFrame(() => {
-              let spawnStartTime = performance.now();
+          const animarSpawnCompleto = () => {
+            const elapsed = performance.now() - spawnStartTime;
 
-              const animarSpawnCompleto = () => {
-                const elapsed = performance.now() - spawnStartTime;
+            // 1. Cinemática de Escala (2000ms - Quadratic Ease-Out)
+            const progressScale = Math.min(1.0, elapsed / scaleDuration);
+            const easeScale = 1.0 - Math.pow(1.0 - progressScale, 2);
+            const currentScaleVal = Math.max(0.001, easeScale * targetScale);
 
-                const progressScale = Math.min(1.0, elapsed / scaleDuration);
-                const easeScale = 1.0 - Math.pow(1.0 - progressScale, 2);
-                const currentScaleVal = Math.max(0.001, easeScale * targetScale);
+            // 2. Cinemática de Rotación (3000ms - Quintic Ease-Out pronunciado)
+            const progressRot = Math.min(1.0, elapsed / rotDuration);
+            const easeRot = 1.0 - Math.pow(1.0 - progressRot, 5);
+            const currentAngle = baseRotY + (totalSpinAngle * easeRot);
 
-                const progressRot = Math.min(1.0, elapsed / rotDuration);
-                const easeRot = 1.0 - Math.pow(1.0 - progressRot, 5);
-                const currentAngle = baseRotY + (totalSpinAngle * easeRot);
-
-                const progressOpacity = Math.min(1.0, elapsed / opacityDuration);
-                const easeOpacity = 1.0 - Math.pow(1.0 - progressOpacity, 2);
-                spawnMaterials.forEach(m => {
-                  m.opacity = easeOpacity;
-                });
-
-                e.Scale.set(t, rootTarget, { x: currentScaleVal, y: currentScaleVal, z: currentScaleVal });
-                t.getEntity(rootTarget).set(e.Quaternion, e.math.quat.yRadians(currentAngle));
-
-                if (elapsed < rotDuration) {
-                  requestAnimationFrame(animarSpawnCompleto);
-                } else {
-                  isTransitioning = false;
-                  e.Scale.set(t, rootTarget, { x: targetScale, y: targetScale, z: targetScale });
-                  t.getEntity(rootTarget).set(e.Quaternion, e.math.quat.yRadians(baseRotY + totalSpinAngle));
-                  spawnMaterials.forEach(m => {
-                    m.opacity = 1.0;
-                    m.transparent = false;
-                    m.depthWrite = true;
-                    m.needsUpdate = true;
-                  });
-                }
-              };
-              requestAnimationFrame(animarSpawnCompleto);
+            // 3. Fundido de Opacidad Rápido (800ms - Presencia visual temprana)
+            const progressOpacity = Math.min(1.0, elapsed / opacityDuration);
+            const easeOpacity = 1.0 - Math.pow(1.0 - progressOpacity, 2);
+            spawnMaterials.forEach(m => {
+              m.opacity = easeOpacity;
             });
-          });
+
+            e.Scale.set(t, rootTarget, { x: currentScaleVal, y: currentScaleVal, z: currentScaleVal });
+            t.getEntity(rootTarget).set(e.Quaternion, e.math.quat.yRadians(currentAngle));
+
+            if (elapsed < rotDuration) {
+              requestAnimationFrame(animarSpawnCompleto);
+            } else {
+              isTransitioning = false;
+              e.Scale.set(t, rootTarget, { x: targetScale, y: targetScale, z: targetScale });
+              t.getEntity(rootTarget).set(e.Quaternion, e.math.quat.yRadians(baseRotY + totalSpinAngle));
+              spawnMaterials.forEach(m => {
+                m.opacity = 1.0;
+                m.transparent = false;
+                m.depthWrite = true;
+                m.needsUpdate = true;
+              });
+            }
+          };
+          requestAnimationFrame(animarSpawnCompleto);
         };
 
         i("initial").initial()
@@ -262,20 +260,24 @@
             const targetY = ev.data.worldPosition.y;
             const targetZ = ev.data.worldPosition.z;
 
+            // Rotación binaria base (0° o 180°)
             const baseRotY = Math.random() < 0.5 ? 0 : Math.PI;
 
+            // Posición fija sobre la mesa arrancando en escala inicial segura
             d.setLocalPosition({ x: targetX, y: targetY + 0.001, z: targetZ });
             e.Scale.set(t, spawnedEid, { x: 0.001, y: 0.001, z: 0.001 });
             d.set(e.Quaternion, e.math.quat.yRadians(baseRotY));
 
             let animationStarted = false;
+
+            // Sondeo directo v4.53: asegura la aplicación de shaders y arranca la cinemática sin bloqueos
             const comprobarMallaLista = () => {
               if (animationStarted) return;
               let encontrada = false;
 
               if (t.three && t.three.scene) {
                 t.three.scene.traverse((child) => {
-                  if (child.isMesh && child.geometry && child.geometry.attributes && child.geometry.attributes.position && child.geometry.attributes.position.count > 0 && child.name !== "Ground" && child.name !== "Hider" && (!child.material || child.material.type !== 'ShadowMaterial')) {
+                  if (child.isMesh && child.geometry && child.geometry.attributes && child.geometry.attributes.position && child.geometry.attributes.position.count > 0 && child.name !== "Ground" && child.name !== "Hider" && (!child.material || (child.material.type !== 'ShadowMaterial' && child.material.colorWrite !== false))) {
                     encontrada = true;
                   }
                 });
@@ -293,19 +295,17 @@
             };
             requestAnimationFrame(comprobarMallaLista);
           })
-          // v4.57: Cambio de plato por Transform Snapshot, 800ms EaseIn y recreación de entidad limpia
+          // v4.58: Sustitución limpia dentro del árbol ECS sin recrear entidades ni duplicar modelos
           .listen(t.events.globalId, "switch-dish-model", ev => {
-            if (!isPlaced || !spawnedEid || isTransitioning) return;
+            if (!isPlaced || !spawnedEid || isTransitioning || !ev.data || !ev.data.modelSrc || !window.THREE) return;
             isTransitioning = true;
 
             // Fail-safe de desbloqueo a los 4.5 segundos
             setTimeout(() => { isTransitioning = false; }, 4500);
 
             const rInstance = window.THREE;
-            if (!rInstance) return;
-
-            // 1. Snapshot del modelo actual
             const dishPos = t.transform.getWorldPosition(spawnedEid);
+
             let currentScale = 1.0;
             if (e.Scale && e.Scale.has(t, spawnedEid)) {
               const sData = e.Scale.get(t, spawnedEid);
@@ -320,16 +320,18 @@
               currentRotY = euler.y;
             }
 
-            // 2. Cinemática de Hundimiento 800ms con EaseIn puro (suave al inicio, acelera hacia abajo a 60 FPS)
+            // 1. Cinemática de Hundimiento cruzando el Hider
             const sinkStartTime = performance.now();
             const sinkDuration = 800;
             const startY = dishPos.y;
-            const targetSinkY = startY - 0.25; // Hundimiento bajo el Hider
+            const targetSinkY = startY - 0.25;
 
             const activeMats = [];
+            let oldDishNode = null;
+
             if (t.three && t.three.scene) {
               t.three.scene.traverse((child) => {
-                if (child.isMesh && child.name !== "Ground" && child.name !== "Hider" && child.material && child.material.type !== 'ShadowMaterial') {
+                if (child.isMesh && child.name !== "Ground" && child.name !== "Hider" && child.material && child.material.type !== 'ShadowMaterial' && child.material.colorWrite !== false) {
                   const mats = Array.isArray(child.material) ? child.material : [child.material];
                   mats.forEach(m => {
                     m.transparent = true;
@@ -337,15 +339,19 @@
                     m.depthTest = true;
                     activeMats.push(m);
                   });
+                  if (!oldDishNode) {
+                    oldDishNode = child.parent || child;
+                  }
                 }
               });
             }
+
+            const loader = (window.THREE.GLTFLoader) ? new window.THREE.GLTFLoader() : null;
 
             const animarHundimiento = () => {
               const elapsed = performance.now() - sinkStartTime;
               const progress = Math.min(1.0, elapsed / sinkDuration);
 
-              // Curva EaseIn Cuadrática pura
               const easeIn = progress * progress;
               const currentY = rInstance.MathUtils.lerp(startY, targetSinkY, easeIn);
               const currentOpacity = rInstance.MathUtils.lerp(1.0, 0.3, easeIn);
@@ -356,36 +362,38 @@
               if (progress < 1.0) {
                 requestAnimationFrame(animarHundimiento);
               } else {
-                // 3. Destrucción de la entidad saliente
-                if (t.three && t.three.scene) {
-                  const nodosBorrar = [];
-                  t.three.scene.traverse((child) => {
-                    if (child.name === "Model" || (child.isMesh && child.name !== "Ground" && child.name !== "Hider" && (!child.material || child.material.type !== 'ShadowMaterial'))) {
-                      nodosBorrar.push(child);
-                    }
-                  });
-                  nodosBorrar.forEach(n => destruirMallaProfunda(n));
-                }
-                t.deleteEntity(spawnedEid);
-
-                // 4. Instanciación limpia del nuevo modelo con el Transform Snapshot
-                const loader = (window.THREE.GLTFLoader) ? new window.THREE.GLTFLoader() : null;
-                if (loader && ev.data.modelSrc) {
+                if (loader) {
                   loader.load(ev.data.modelSrc, (gltf) => {
-                    const prefabEid = schemaAttr.get(a).prefab;
-                    spawnedEid = t.createEntity(prefabEid);
-                    const d = t.getEntity(spawnedEid);
+                    // Localizar nodo contenedor del modelo bajo la entidad ECS
+                    let modelParent = null;
+                    const nodosBorrar = [];
+
+                    if (t.three && t.three.scene) {
+                      t.three.scene.traverse((child) => {
+                        if (child.name === "Model" || (child.isMesh && child.name !== "Ground" && child.name !== "Hider" && (!child.material || (child.material.type !== 'ShadowMaterial' && child.material.colorWrite !== false)))) {
+                          if (!modelParent && child.parent) {
+                            modelParent = child.parent;
+                          }
+                          nodosBorrar.push(child);
+                        }
+                      });
+                      nodosBorrar.forEach(n => destruirMallaProfunda(n));
+                    }
 
                     const newModel = gltf.scene;
                     newModel.name = "Model";
 
-                    d.setLocalPosition({ x: dishPos.x, y: 0.001, z: dishPos.z });
+                    if (modelParent) {
+                      modelParent.add(newModel);
+                    } else if (t.three && t.three.scene) {
+                      t.three.scene.add(newModel);
+                    }
+
+                    // Reposicionar la entidad ECS en la superficie
+                    t.transform.setWorldPosition(spawnedEid, { x: dishPos.x, y: 0.001, z: dishPos.z });
                     e.Scale.set(t, spawnedEid, { x: 0.001, y: 0.001, z: 0.001 });
-                    d.set(e.Quaternion, e.math.quat.yRadians(currentRotY));
+                    t.getEntity(spawnedEid).set(e.Quaternion, e.math.quat.yRadians(currentRotY));
 
-                    t.three.scene.add(newModel);
-
-                    // Forzamos recalculo del bounding box en controles gestuales
                     t.events.dispatch(spawnedEid, "recalc-bounding-box");
 
                     if (window.aplicarAjustesSceneViewer) {
@@ -427,9 +435,11 @@
         lastLiftFrameTime = performance.now(),
         bboxSizeX = DRAG_RETICLE_CONFIG.baseSize,
         bboxSizeZ = DRAG_RETICLE_CONFIG.baseSize,
+        reticleLocalCenterX = 0,
+        reticleLocalCenterZ = 0,
         bboxCalculated = false;
 
-        // v4.57: Medición de dimensiones estricta v4.53 (centrada y filtrando exclusivamente el plato)
+        // v4.58: Medición de dimensiones estricta v4.53 con filtrado riguroso por nombre y tipo de material
         const actualizarBoundingBox = (THREE_INSTANCE) => {
           if (bboxCalculated || !t.three || !t.three.scene) return;
 
@@ -450,8 +460,7 @@
           const vTemp = new THREE_INSTANCE.Vector3();
 
           t.three.scene.traverse((child) => {
-            if (
-              child.isMesh &&
+            const esMallaValida = child.isMesh &&
               child.geometry &&
               child.geometry.attributes &&
               child.geometry.attributes.position &&
@@ -459,10 +468,12 @@
               child.name !== "Hider" &&
               child.name !== "Loading Screen" &&
               child !== reticleMesh &&
-              (!child.material || child.material.type !== 'ShadowMaterial')
-            ) {
+              (!child.material || (child.material.type !== 'ShadowMaterial' && child.material.colorWrite !== false));
+
+            if (esMallaValida) {
               const posAttr = child.geometry.attributes.position;
               const stride = Math.max(1, Math.floor(posAttr.count / 300));
+              const meshLocalBox = new THREE_INSTANCE.Box3();
 
               for (let i = 0; i < posAttr.count; i += stride) {
                 vTemp
@@ -472,27 +483,31 @@
                   .applyQuaternion(invQuat)
                   .multiplyScalar(invScale);
 
-                // Filtrar cualquier vértice fuera de los límites de un plato (evita contaminación por suelo)
-                if (Math.abs(vTemp.x) < 1.2 && Math.abs(vTemp.z) < 1.2) {
-                  unifiedBox.expandByPoint(vTemp);
-                  hasGeom = true;
-                }
+                unifiedBox.expandByPoint(vTemp);
+                meshLocalBox.expandByPoint(vTemp);
               }
+              hasGeom = true;
             }
           });
 
           if (hasGeom) {
             const sz = new THREE_INSTANCE.Vector3();
+            const ctr = new THREE_INSTANCE.Vector3();
             unifiedBox.getSize(sz);
+            unifiedBox.getCenter(ctr);
 
-            if (sz.x > 0.05 && sz.z > 0.05 && sz.x < 1.5 && sz.z < 1.5) {
+            if (sz.x > 0.05 && sz.z > 0.05 && sz.x < 2.5 && sz.z < 2.5) {
+              // v4.53: Ajuste ceñido exacto (+1.2cm holgura periférica real)
               bboxSizeX = sz.x + 0.012;
               bboxSizeZ = sz.z + 0.012;
+              reticleLocalCenterX = ctr.x;
+              reticleLocalCenterZ = ctr.z;
               bboxCalculated = true;
             }
           }
         };
 
+        // v4.58: Sincronización ultraligera 60 FPS en GPU con offsetRotated v4.53
         const sincronizarTransformReticula = (ret, THREE_INSTANCE) => {
           if (!ret || !THREE_INSTANCE) return;
 
@@ -508,10 +523,13 @@
           const qYaw = new THREE_INSTANCE.Quaternion().setFromAxisAngle(new THREE_INSTANCE.Vector3(0, 1, 0), yawAngle);
           ret.quaternion.copy(qYaw).multiply(qPitch);
 
-          ret.position.set(planarX, 0.0015, planarZ);
+          const offsetRotated = new THREE_INSTANCE.Vector3(reticleLocalCenterX * currentScale, 0, reticleLocalCenterZ * currentScale).applyAxisAngle(new THREE_INSTANCE.Vector3(0, 1, 0), yawAngle);
+
+          ret.position.set(planarX + offsetRotated.x, 0.0015, planarZ + offsetRotated.z);
           ret.scale.set(currentScale, currentScale, currentScale);
         };
 
+        // v4.53: Obtención con caché estable: creación única por gesto y actualización por matrices continuas
         const obtenerReticula = (THREE_INSTANCE, scene) => {
           if (reticleMesh) {
             sincronizarTransformReticula(reticleMesh, THREE_INSTANCE);
@@ -544,6 +562,7 @@
           return reticleMesh;
         };
 
+        // Elevación suave e independiente del evento
         const actualizarElevacion = () => {
           const now = performance.now();
           const deltaSec = Math.max(0.001, (now - lastLiftFrameTime) / 1000);
@@ -580,6 +599,7 @@
               return;
             }
 
+            // v4.53: Invalidación limpia al inicio del toque para recalcular medidas frescas sin impacto durante el arrastre
             if (reticleMesh && t.three && t.three.scene) {
               t.three.scene.remove(reticleMesh);
               if (reticleMesh.geometry) reticleMesh.geometry.dispose();
@@ -655,12 +675,13 @@
                 const rInstance = window.THREE;
 
                 if (rInstance) {
+                  // v4.53: Caída vertical y bamboleo físico con elevación de seguridad de 8mm (+0.008) anti-clipping
                   const wobbleDuration = 1200;
                   const wobbleStartTime = performance.now();
                   const startY = n.y;
-                  const dropTimeMs = 200;
+                  const dropTimeMs = 200; // Caída vertical pura
 
-                  const initialTilt = 0.080;
+                  const initialTilt = 0.080; // ~4.5° de inclinación
                   const randomPhase = Math.random() * Math.PI * 2;
                   const totalYawSpin = 0.16 * (Math.random() < 0.5 ? 1 : -1);
 
@@ -676,10 +697,12 @@
                     const wElapsed = performance.now() - wobbleStartTime;
                     const wProgress = Math.min(1.0, wElapsed / wobbleDuration);
 
+                    // 1. Caída vertical pura en Y
                     const dropProgress = Math.min(1.0, wElapsed / dropTimeMs);
                     const dropEase = dropProgress * dropProgress;
                     let currentY = rInstance.MathUtils.lerp(startY, dragPlaneY, dropEase);
 
+                    // 2. Inclinación física y bamboleo amortiguado con elevación de 8mm que decae a 0
                     let tiltX = 0, tiltZ = 0, naturalY = currentRotY;
 
                     if (wElapsed >= dropTimeMs) {
@@ -693,6 +716,7 @@
                       tiltZ = Math.sin(wobbleDir) * tiltAmount;
                       naturalY = currentRotY + (totalYawSpin * (1.0 - decay));
 
+                      // Elevación de seguridad (+8mm) que decae suavemente con el bamboleo hasta posarse a ras
                       const liftOffset = 0.008 * decay;
                       currentY = dragPlaneY + liftOffset;
                     }
@@ -743,6 +767,7 @@
           .listen(t.events.globalId, e.input.GESTURE_MOVE, o => {
             if (!isModelTouchActive || !isTwoFingerGesture || 2 !== o.data.touchCount) return;
 
+            // 1. ROTACIÓN ESTÁNDAR
             if (o.data.positionChange && o.data.positionChange.x) {
               const angleDelta = o.data.positionChange.x * MODEL_GESTURES.rotationSensitivity;
               t.transform.rotateSelf(a, e.math.quat.yRadians(angleDelta));
@@ -753,6 +778,7 @@
               }
             }
 
+            // 2. ESCALA CON DEADZONE BLINDADO (vB1.03 Checkpoint)
             if (o.data.startSpread > 0 && o.data.spread > 0) {
               const spreadRatio = o.data.spread / o.data.startSpread;
               const spreadDeltaRatio = Math.abs(spreadRatio - 1.0);
