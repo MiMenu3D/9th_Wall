@@ -1,4 +1,4 @@
-﻿// 9th Wall v4.58
+﻿// 9th Wall v4.59
 (() => {
   var e = {
     574() {
@@ -50,7 +50,8 @@
     scaleDeadzone: 0.085
   });
 
-  // v4.58: retícula adaptativa ceñida a dimensión real (+1.2cm holgura) y fijada a Y=0 de suelo
+  // [INMUTABLE - NO MODIFICAR BAJO NINGÚN CONCEPTO: RETÍCULA ADAPTATIVA v4.53 CONSOLIDADA]
+  // v4.59: retícula adaptativa ceñida a dimensión real (+1.2cm holgura) y fijada a Y=0 de suelo
   const DRAG_RETICLE_CONFIG = Object.freeze({
     liftHeight: 0.05,
     liftSmoothingRate: 8.0,
@@ -61,6 +62,7 @@
     color: 0x66ffff
   });
 
+  // [INMUTABLE - NO MODIFICAR BAJO NINGÚN CONCEPTO: GEOMETRÍA ANALÍTICA DE MARCO v4.53]
   // v4.47: Generación geométrica analítica determinista de marco plano (BufferGeometry directa sin booleanas ni Earcut)
   function crearGeometriaMarcoReticula(THREE_INSTANCE, sizeX, sizeZ, thickness, radius) {
     const sx = sizeX / 2;
@@ -140,7 +142,8 @@
     a(574);
     const e = window.ecs;
 
-    // v4.58: Spawner restaurado con arranque puro v4.53 y sustitución limpia de mallas en jerarquía ECS
+    // [INMUTABLE - NO MODIFICAR BAJO NINGÚN CONCEPTO: ARRANQUE CINEMÁTICO INICIAL v4.53]
+    // v4.59: Spawner con arranque v4.53, hundimiento dinámico proporcional y anclaje ECS nativo
     e.registerComponent({
       name: "dish-spawner",
       schema: { prefab: "eid" },
@@ -295,7 +298,7 @@
             };
             requestAnimationFrame(comprobarMallaLista);
           })
-          // v4.58: Sustitución limpia dentro del árbol ECS sin recrear entidades ni duplicar modelos
+          // v4.59: Hundimiento dinámico 800ms EaseIn y emparentamiento nativo ECS findObject
           .listen(t.events.globalId, "switch-dish-model", ev => {
             if (!isPlaced || !spawnedEid || isTransitioning || !ev.data || !ev.data.modelSrc || !window.THREE) return;
             isTransitioning = true;
@@ -320,14 +323,27 @@
               currentRotY = euler.y;
             }
 
-            // 1. Cinemática de Hundimiento cruzando el Hider
+            // 1. Medición de la altura real del modelo para un hundimiento dinámico proporcional
+            let dishHeight = 0.15;
+            if (t.three && t.three.scene) {
+              const bBox = new rInstance.Box3();
+              t.three.scene.traverse((child) => {
+                if (child.isMesh && child.name !== "Ground" && child.name !== "Hider" && (!child.material || (child.material.type !== 'ShadowMaterial' && child.material.colorWrite !== false))) {
+                  bBox.expandByObject(child);
+                }
+              });
+              const sz = new rInstance.Vector3();
+              bBox.getSize(sz);
+              if (sz.y > 0.01) dishHeight = sz.y;
+            }
+
+            // 2. Cinemática de Hundimiento 800ms con EaseIn bajando tanto como alto sea el modelo (+3cm holgura)
             const sinkStartTime = performance.now();
             const sinkDuration = 800;
             const startY = dishPos.y;
-            const targetSinkY = startY - 0.25;
+            const targetSinkY = startY - (dishHeight + 0.03);
 
             const activeMats = [];
-            let oldDishNode = null;
 
             if (t.three && t.three.scene) {
               t.three.scene.traverse((child) => {
@@ -339,9 +355,6 @@
                     m.depthTest = true;
                     activeMats.push(m);
                   });
-                  if (!oldDishNode) {
-                    oldDishNode = child.parent || child;
-                  }
                 }
               });
             }
@@ -364,16 +377,14 @@
               } else {
                 if (loader) {
                   loader.load(ev.data.modelSrc, (gltf) => {
-                    // Localizar nodo contenedor del modelo bajo la entidad ECS
-                    let modelParent = null;
-                    const nodosBorrar = [];
+                    // Obtención del Object3D de la entidad ECS para garantizar anclaje SLAM nativo
+                    const entityObj = (t.three && t.three.findObject) ? t.three.findObject(spawnedEid) : null;
 
+                    // Limpieza profunda de las mallas anteriores (VRAM = 0)
                     if (t.three && t.three.scene) {
+                      const nodosBorrar = [];
                       t.three.scene.traverse((child) => {
                         if (child.name === "Model" || (child.isMesh && child.name !== "Ground" && child.name !== "Hider" && (!child.material || (child.material.type !== 'ShadowMaterial' && child.material.colorWrite !== false)))) {
-                          if (!modelParent && child.parent) {
-                            modelParent = child.parent;
-                          }
                           nodosBorrar.push(child);
                         }
                       });
@@ -383,8 +394,9 @@
                     const newModel = gltf.scene;
                     newModel.name = "Model";
 
-                    if (modelParent) {
-                      modelParent.add(newModel);
+                    // Emparentamiento estricto en el nodo de la entidad ECS
+                    if (entityObj) {
+                      entityObj.add(newModel);
                     } else if (t.three && t.three.scene) {
                       t.three.scene.add(newModel);
                     }
@@ -414,6 +426,7 @@
       }
     });
 
+    // [INMUTABLE - NO MODIFICAR BAJO NINGÚN CONCEPTO: RETÍCULA Y GESTOS TÁCTILES v4.53]
     e.registerComponent({
       name: "model-gesture-controls",
       stateMachine: ({ world: t, eid: a, defineState: o }) => {
