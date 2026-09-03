@@ -1,9 +1,9 @@
-<!-- 9th Wall v4.56 (Pure Photo Capture & 1-Tap Auto-Save / Universal CSS Portrait Lock / In-App Photo Slider & Native Share / Video Stripped / Clean Navigation) -->
+<!-- 9th Wall v4.57 (Multi-Select Photo Strip & Native Share / Gallery Backbutton Interception / 1-Tap Auto-Save / Universal CSS Portrait Lock / Clean Navigation) -->
 <html>
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no,viewport-fit=cover">
-  <title>9th Wall AR 4.56</title>
+  <title>9th Wall AR 4.57</title>
   <script crossorigin="anonymous" src="external/runtime/runtime.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@8thwall/engine-binary@1/dist/xr.js" async crossorigin="anonymous" data-preload-chunks="slam"></script>
   <script src="https://cdn.jsdelivr.net/npm/@8thwall/landing-page@1/dist/landing-page.js" crossorigin="anonymous"></script>
@@ -19,8 +19,8 @@
     style="position:fixed;top:10px;right:10px;z-index:1000000;background:rgba(0,0,0,0.9);color:#0f0;font-family:monospace;font-size:12px;padding:8px;border-radius:4px;cursor:pointer;line-height:1.3;border:1px solid #0f0;display:none;pointer-events:auto;">
     <div id="debugTitle">FPS: --</div>
     <div id="debugContent">
-      ar-world: v4.56<br>
-      bundle: v4.56<br>
+      ar-world: v4.57<br>
+      bundle: v4.57<br>
       <span id="envVerdictSpan" style="color:#0f0;">Entorno: ESPERANDO MESA...</span><br>
       <span id="telemetrySpan" style="color:#0f0;">P98: -- (/255) | Lum: -- (/255) | Cálido: --%</span><br>
       <span id="benchmarkSpan" style="color:#0f0;">Pre: --sec - Post: --sec</span><br>
@@ -58,14 +58,14 @@
   </button>
 
   <!-- ========================================================================= -->
-  <!-- UI CLEAN: CARRUSEL AR, CAPTURA DE FOTOS LIMPIA Y VISOR (v4.56) -->
+  <!-- UI CLEAN: CARRUSEL AR, CAPTURA DE FOTOS LIMPIA Y VISOR MULTI-SELECT (v4.57) -->
   <!-- ========================================================================= -->
 
   <!-- Flechas laterales de cambio de plato -->
   <button id="prevDishBtn" class="ar-clean-ui ar-nav-arrow" style="left:12px;">&#8249;</button>
   <button id="nextDishBtn" class="ar-clean-ui ar-nav-arrow" style="right:12px;">&#8250;</button>
 
-  <!-- Contenedor inferior de captura limpia (Sólo Foto) -->
+  <!-- Contenedor inferior de captura limpia -->
   <div id="captureContainer" class="ar-clean-ui">
     <!-- Miniatura de Galería (Oculta por defecto hasta tomar la 1ª foto) -->
     <div id="galleryThumbnailBtn" style="display:none;">
@@ -82,7 +82,7 @@
   <div id="captureFlash"></div>
   <div id="freezeTravelCard"></div>
 
-  <!-- Visor deslizante de fotos tomadas (In-App Photo Drawer) -->
+  <!-- v4.57: Visor con Tira de Miniaturas y Selector Múltiple -->
   <div id="mediaViewerModal" style="display:none;">
     <div class="media-viewer-header">
       <button id="closeViewerBtn" class="viewer-icon-btn">&#10005;</button>
@@ -91,21 +91,28 @@
         <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>
       </button>
     </div>
+
     <div class="media-viewer-content">
       <button id="viewerPrevBtn" class="viewer-nav-btn">&#8249;</button>
       <div id="viewerMediaContainer"></div>
       <button id="viewerNextBtn" class="viewer-nav-btn">&#8250;</button>
     </div>
+
+    <!-- Tira horizontal inferior de miniaturas con Checkbox -->
+    <div id="thumbnailStripWrapper">
+      <div id="thumbnailStripContainer"></div>
+    </div>
+
     <div class="media-viewer-footer">
       <button id="shareMediaBtn" class="viewer-action-btn primary">
         <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor" style="margin-right:8px;"><path d="M18 16.08c-.76 0-1.44.3-1.96.77L8.91 12.7c.05-.23.09-.46.09-.7s-.04-.47-.09-.7l7.05-4.11c.54.5 1.25.81 2.04.81 1.66 0 3-1.34 3-3s-1.34-3-3-3-3 1.34-3 3c0 .24.04.47.09.7L8.04 9.81C7.5 9.31 6.79 9 6 9c-1.66 0-3 1.34-3 3s1.34 3 3 3c.79 0 1.5-.31 2.04-.81l7.12 4.16c-.05.21-.08.43-.08.65 0 1.61 1.31 2.92 2.92 2.92s2.92-1.31 2.92-2.92c0-1.61-1.31-2.92-2.92-2.92z"/></svg>
-        Compartir foto
+        <span id="shareBtnLabel">Compartir foto</span>
       </button>
     </div>
   </div>
 
   <style>
-    /* v4.56: Bloqueo estricto de orientación vertical universal por contra-rotación CSS (Android e iOS) */
+    /* v4.57: Bloqueo estricto de orientación vertical universal por contra-rotación CSS (Android e iOS) */
     @media screen and (orientation: landscape) {
       body {
         transform: rotate(-90deg);
@@ -230,11 +237,11 @@
       z-index: 999997;
     }
 
-    /* Visor de Fotos */
+    /* Visor de Fotos con Tira de Miniaturas */
     #mediaViewerModal {
       position: fixed;
       inset: 0;
-      background: rgba(0,0,0,0.94);
+      background: rgba(0,0,0,0.95);
       backdrop-filter: blur(12px);
       z-index: 1000002;
       display: flex;
@@ -246,7 +253,7 @@
       display: flex;
       justify-content: space-between;
       align-items: center;
-      padding: 16px 20px;
+      padding: 16px 20px 8px 20px;
     }
     .viewer-icon-btn {
       background: rgba(255,255,255,0.2);
@@ -273,7 +280,7 @@
     }
     #viewerMediaContainer {
       width: 88vw;
-      height: 65vh;
+      height: 54vh;
       display: flex;
       align-items: center;
       justify-content: center;
@@ -306,16 +313,72 @@
     }
     #viewerPrevBtn { left: 12px; }
     #viewerNextBtn { right: 12px; }
+
+    /* v4.57: Tira horizontal de miniaturas con selector */
+    #thumbnailStripWrapper {
+      width: 100vw;
+      overflow-x: auto;
+      padding: 8px 16px;
+      box-sizing: border-box;
+      -webkit-overflow-scrolling: touch;
+      display: flex;
+      justify-content: flex-start;
+    }
+    #thumbnailStripContainer {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+    }
+    .strip-thumb-card {
+      position: relative;
+      width: 54px;
+      height: 54px;
+      border-radius: 8px;
+      overflow: hidden;
+      border: 2px solid transparent;
+      flex-shrink: 0;
+      cursor: pointer;
+      background: #222;
+      -webkit-tap-highlight-color: transparent;
+      transition: border-color 0.2s, transform 0.1s;
+    }
+    .strip-thumb-card.active { border-color: #00e5ff; transform: scale(1.05); }
+    .strip-thumb-img { width: 100%; height: 100%; object-fit: cover; }
+    .strip-thumb-check {
+      position: absolute;
+      top: 3px;
+      right: 3px;
+      width: 16px;
+      height: 16px;
+      border-radius: 50%;
+      background: rgba(0,0,0,0.6);
+      border: 1.5px solid white;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .strip-thumb-card.selected .strip-thumb-check {
+      background: #00e5ff;
+      border-color: #00e5ff;
+    }
+    .strip-thumb-card.selected .strip-thumb-check::after {
+      content: "✓";
+      color: #000;
+      font-size: 11px;
+      font-weight: bold;
+      line-height: 1;
+    }
+
     .media-viewer-footer {
       display: flex;
-      padding: 16px 20px 32px 20px;
+      padding: 10px 20px 24px 20px;
     }
     .viewer-action-btn {
       flex: 1;
       display: flex;
       align-items: center;
       justify-content: center;
-      padding: 15px 0;
+      padding: 14px 0;
       border-radius: 26px;
       font-family: sans-serif;
       font-size: 15px;
@@ -1077,6 +1140,7 @@
                       if (py < minCoreY) minCoreY = py; if (py > maxCoreY) maxCoreY = py;
                     }
 
+                    // Evaluación de Calidez Global del píxel
                     const cb = -0.168736 * r - 0.331264 * g + 0.5 * b + 128;
                     const cr = 0.5 * r - 0.418688 * g - 0.081312 * b + 128;
                     if (lum >= 15 && cr > (cb + 4)) {
@@ -1478,7 +1542,7 @@
     };
 
     // =========================================================================
-    // LÓGICA DE CARRUSEL, CAPTURA DE FOTOS Y VISOR SLIDER (v4.56)
+    // LÓGICA DE CARRUSEL, CAPTURA DE FOTOS Y VISOR MULTI-SELECT (v4.57)
     // =========================================================================
     const _modelsList = [
       "Plato_01.glb", "Plato_02.glb", "Plato_03.glb", "Plato_04.glb",
@@ -1515,9 +1579,10 @@
     nextDishBtn.addEventListener('click', () => cambiarPlatoAR(1));
 
     // =========================================================================
-    // CAPTURA DIRECTA Y GUARDADO INSTANTÁNEO EN UN TOQUE (v4.56)
+    // CAPTURA DIRECTA Y GUARDADO INSTANTÁNEO EN UN TOQUE (v4.57)
     // =========================================================================
     const sessionCapturedMedia = [];
+    const selectedIndices = new Set();
     let currentViewerIndex = 0;
 
     const shutterBtn = document.getElementById('shutterBtn');
@@ -1534,13 +1599,13 @@
     const viewerMediaContainer = document.getElementById('viewerMediaContainer');
     const mediaCounterTitle = document.getElementById('mediaCounterTitle');
     const shareMediaBtn = document.getElementById('shareMediaBtn');
+    const shareBtnLabel = document.getElementById('shareBtnLabel');
+    const thumbnailStripContainer = document.getElementById('thumbnailStripContainer');
 
     const dispararAnimacionCaptura = (dataUrl) => {
-      // 1. Destello sutil (30% de opacidad)
       captureFlash.style.opacity = '0.30';
       setTimeout(() => { captureFlash.style.opacity = '0'; }, 80);
 
-      // 2. Animación fluida de viaje hacia la miniatura
       freezeTravelCard.style.backgroundImage = `url(${dataUrl})`;
       freezeTravelCard.style.transition = 'none';
       freezeTravelCard.style.top = '0px';
@@ -1550,7 +1615,6 @@
       freezeTravelCard.style.borderRadius = '0px';
       freezeTravelCard.style.opacity = '1';
 
-      // Forzamos el reflow del navegador para garantizar fluidez
       void freezeTravelCard.offsetWidth;
 
       galleryThumbnailBtn.style.display = 'flex';
@@ -1577,7 +1641,6 @@
       const threeCanvas = _renderer ? _renderer.domElement : null;
       if (!video || !threeCanvas) return;
 
-      // Render síncrono previo
       if (_renderer && _scene && _activeCamera) {
         _renderer.render(_scene, _activeCamera);
       }
@@ -1592,11 +1655,10 @@
       ctx.drawImage(video, 0, 0, w, h);
       ctx.drawImage(threeCanvas, 0, 0, w, h);
 
-      // Conversión síncrona en 0ms
       const dataUrl = offCanvas.toDataURL('image/jpeg', 0.95);
       const fileName = `Plato_AR_${Date.now()}.jpg`;
 
-      // 1. Descarga/Guardado directo e inmediato en el almacenamiento del móvil (User Activation activa)
+      // 1. Descarga/Guardado directo e inmediato en el almacenamiento
       const downloadAnchor = document.createElement('a');
       downloadAnchor.href = dataUrl;
       downloadAnchor.download = fileName;
@@ -1604,21 +1666,67 @@
       downloadAnchor.click();
       document.body.removeChild(downloadAnchor);
 
-      // 2. Registro síncrono en la memoria del visor
+      // 2. Registro en memoria
+      const newIdx = sessionCapturedMedia.length;
       sessionCapturedMedia.push({ url: dataUrl, name: fileName });
+      selectedIndices.add(newIdx);
 
-      // 3. Feedback visual elegante
+      // 3. Feedback visual
       dispararAnimacionCaptura(dataUrl);
     };
 
     shutterBtn.addEventListener('click', capturarYGuardarFoto);
 
     // =========================================================================
-    // VISOR DE FOTOS (Sólo previsualización y compartir)
+    // VISOR DE FOTOS CON TIRA DE MINIATURAS Y SELECTOR MÚLTIPLE (v4.57)
     // =========================================================================
+    const renderizarTiraMiniaturas = () => {
+      thumbnailStripContainer.innerHTML = '';
+      sessionCapturedMedia.forEach((item, idx) => {
+        const card = document.createElement('div');
+        card.className = `strip-thumb-card ${idx === currentViewerIndex ? 'active' : ''} ${selectedIndices.has(idx) ? 'selected' : ''}`;
+
+        const img = document.createElement('img');
+        img.src = item.url;
+        img.className = 'strip-thumb-img';
+        card.appendChild(img);
+
+        const check = document.createElement('div');
+        check.className = 'strip-thumb-check';
+        check.addEventListener('click', (e) => {
+          e.stopPropagation();
+          if (selectedIndices.has(idx)) {
+            selectedIndices.delete(idx);
+          } else {
+            selectedIndices.add(idx);
+          }
+          actualizarBotonCompartir();
+          renderizarTiraMiniaturas();
+        });
+        card.appendChild(check);
+
+        card.addEventListener('click', () => {
+          currentViewerIndex = idx;
+          actualizarContenidoVisor();
+        });
+
+        thumbnailStripContainer.appendChild(card);
+      });
+      actualizarBotonCompartir();
+    };
+
+    const actualizarBotonCompartir = () => {
+      const count = selectedIndices.size;
+      if (count <= 1) {
+        shareBtnLabel.innerText = "Compartir foto";
+      } else {
+        shareBtnLabel.innerText = `Compartir ${count} fotos`;
+      }
+    };
+
     const actualizarContenidoVisor = () => {
       if (sessionCapturedMedia.length === 0) {
-        mediaViewerModal.style.display = 'none';
+        cerrarVisorFotos();
         galleryThumbnailBtn.style.display = 'none';
         return;
       }
@@ -1634,18 +1742,38 @@
 
       viewerPrevBtn.style.display = sessionCapturedMedia.length > 1 ? 'flex' : 'none';
       viewerNextBtn.style.display = sessionCapturedMedia.length > 1 ? 'flex' : 'none';
+
+      renderizarTiraMiniaturas();
     };
 
-    galleryThumbnailBtn.addEventListener('click', () => {
+    const abrirVisorFotos = () => {
       if (sessionCapturedMedia.length > 0) {
         currentViewerIndex = sessionCapturedMedia.length - 1;
+        // Inyectamos estado de historial local para que el botón Atrás no salga al menú principal
+        history.pushState({ modalAbierto: true }, '');
         actualizarContenidoVisor();
         mediaViewerModal.style.display = 'flex';
       }
-    });
+    };
 
-    closeViewerBtn.addEventListener('click', () => {
-      mediaViewerModal.style.display = 'none';
+    const cerrarVisorFotos = () => {
+      if (mediaViewerModal.style.display === 'flex') {
+        mediaViewerModal.style.display = 'none';
+        // Si el modal se cierra con la cruz, limpiamos el estado del historial
+        if (history.state && history.state.modalAbierto) {
+          history.back();
+        }
+      }
+    };
+
+    galleryThumbnailBtn.addEventListener('click', abrirVisorFotos);
+    closeViewerBtn.addEventListener('click', cerrarVisorFotos);
+
+    // v4.57: Intercepción del botón Atrás del móvil para cerrar el visor y quedarse en la AR
+    window.addEventListener('popstate', (e) => {
+      if (mediaViewerModal.style.display === 'flex') {
+        mediaViewerModal.style.display = 'none';
+      }
     });
 
     viewerPrevBtn.addEventListener('click', () => {
@@ -1660,8 +1788,19 @@
 
     deleteCurrentMediaBtn.addEventListener('click', () => {
       sessionCapturedMedia.splice(currentViewerIndex, 1);
+      selectedIndices.delete(currentViewerIndex);
+
+      // Reindexamos seleccionados
+      const reindexed = new Set();
+      selectedIndices.forEach(idx => {
+        if (idx > currentViewerIndex) reindexed.add(idx - 1);
+        else if (idx < currentViewerIndex) reindexed.add(idx);
+      });
+      selectedIndices.clear();
+      reindexed.forEach(idx => selectedIndices.add(idx));
+
       if (sessionCapturedMedia.length === 0) {
-        mediaViewerModal.style.display = 'none';
+        cerrarVisorFotos();
         galleryThumbnailBtn.style.display = 'none';
       } else {
         galleryThumbImg.src = sessionCapturedMedia[sessionCapturedMedia.length - 1].url;
@@ -1669,16 +1808,21 @@
       }
     });
 
-    // Compartir nativo puro (Envío estricto de archivo File sin texto)
+    // Compartir nativo con soporte para multi-selección estricta
     shareMediaBtn.addEventListener('click', async () => {
       if (sessionCapturedMedia.length === 0) return;
-      const item = sessionCapturedMedia[currentViewerIndex];
+
+      const indicesACompartir = selectedIndices.size > 0 ? Array.from(selectedIndices) : [currentViewerIndex];
 
       try {
-        const res = await fetch(item.url);
-        const blob = await res.blob();
-        const file = new File([blob], item.name, { type: 'image/jpeg' });
-        const files = [file];
+        const filePromises = indicesACompartir.map(async (idx) => {
+          const item = sessionCapturedMedia[idx];
+          const res = await fetch(item.url);
+          const blob = await res.blob();
+          return new File([blob], item.name, { type: 'image/jpeg' });
+        });
+
+        const files = await Promise.all(filePromises);
 
         if (navigator.canShare && navigator.canShare({ files })) {
           await navigator.share({ files });
