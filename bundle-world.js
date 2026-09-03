@@ -1,4 +1,4 @@
-﻿// 9th Wall v4.60
+﻿// 9th Wall v4.61
 (() => {
   var e = {
     574() {
@@ -51,7 +51,7 @@
   });
 
   // [INMUTABLE - NO MODIFICAR BAJO NINGÚN CONCEPTO: RETÍCULA ADAPTATIVA v4.53 CONSOLIDADA]
-  // v4.60: retícula adaptativa ceñida a dimensión real (+1.2cm holgura) y fijada a Y=0 de suelo
+  // v4.61: retícula adaptativa ceñida a dimensión real (+1.2cm holgura) y fijada a Y=0 de suelo
   const DRAG_RETICLE_CONFIG = Object.freeze({
     liftHeight: 0.05,
     liftSmoothingRate: 8.0,
@@ -143,7 +143,7 @@
     const e = window.ecs;
 
     // [INMUTABLE - NO MODIFICAR BAJO NINGÚN CONCEPTO: ARRANQUE CINEMÁTICO INICIAL v4.53]
-    // v4.60: Spawner con arranque v4.53, hundimiento dinámico y anclaje ECS nativo via entityToObject
+    // v4.61: Spawner con hundimiento físico opaco, Contact AO garantizado y anclaje SLAM nativo
     e.registerComponent({
       name: "dish-spawner",
       schema: { prefab: "eid" },
@@ -194,7 +194,9 @@
               if (child.isMesh && child.material) {
                 if (child.material.type === 'ShadowMaterial' || child.name === "Ground") {
                   child.material.opacity = 0.40;
+                  child.receiveShadow = true;
                 } else if (child.name !== "Ground" && child.name !== "Hider" && child.material.type !== 'ShadowMaterial' && child.material.colorWrite !== false) {
+                  child.castShadow = true;
                   const mats = Array.isArray(child.material) ? child.material : [child.material];
                   mats.forEach(m => {
                     if (m.type !== 'ShadowMaterial' && m.colorWrite !== false) {
@@ -298,7 +300,7 @@
             };
             requestAnimationFrame(comprobarMallaLista);
           })
-          // v4.60: Sustitución limpia dentro del Object3D real de la entidad ECS (entityToObject)
+          // v4.61: Hundimiento opaco y anclaje SLAM con sombras Contact AO activas
           .listen(t.events.globalId, "switch-dish-model", ev => {
             if (!isPlaced || !spawnedEid || isTransitioning || !ev.data || !ev.data.modelSrc || !window.THREE) return;
             isTransitioning = true;
@@ -337,27 +339,11 @@
               if (sz.y > 0.01) dishHeight = sz.y;
             }
 
-            // 2. Cinemática de Hundimiento 800ms con EaseIn bajando tanto como alto sea el modelo (+3cm holgura)
+            // 2. Cinemática de Hundimiento 800ms con EaseIn 100% opaco ocluido bajo el Hider
             const sinkStartTime = performance.now();
             const sinkDuration = 800;
             const startY = dishPos.y;
             const targetSinkY = startY - (dishHeight + 0.03);
-
-            const activeMats = [];
-
-            if (t.three && t.three.scene) {
-              t.three.scene.traverse((child) => {
-                if (child.isMesh && child.name !== "Ground" && child.name !== "Hider" && child.material && child.material.type !== 'ShadowMaterial' && child.material.colorWrite !== false) {
-                  const mats = Array.isArray(child.material) ? child.material : [child.material];
-                  mats.forEach(m => {
-                    m.transparent = true;
-                    m.depthWrite = true;
-                    m.depthTest = true;
-                    activeMats.push(m);
-                  });
-                }
-              });
-            }
 
             const loader = (window.THREE.GLTFLoader) ? new window.THREE.GLTFLoader() : null;
 
@@ -367,10 +353,8 @@
 
               const easeIn = progress * progress;
               const currentY = rInstance.MathUtils.lerp(startY, targetSinkY, easeIn);
-              const currentOpacity = rInstance.MathUtils.lerp(1.0, 0.3, easeIn);
 
               t.transform.setWorldPosition(spawnedEid, { x: dishPos.x, y: currentY, z: dishPos.z });
-              activeMats.forEach(m => { m.opacity = currentOpacity; });
 
               if (progress < 1.0) {
                 requestAnimationFrame(animarHundimiento);
@@ -401,6 +385,13 @@
                     newModel.position.set(0, 0, 0);
                     newModel.rotation.set(0, 0, 0);
                     newModel.scale.set(1, 1, 1);
+
+                    // v4.61: Asegurar que el nuevo modelo proyecte sombras sobre Ground (Contact AO)
+                    newModel.traverse((c) => {
+                      if (c.isMesh) {
+                        c.castShadow = true;
+                      }
+                    });
 
                     // Emparentamiento directo en el Object3D de la entidad ECS
                     if (entityObj) {
