@@ -1,9 +1,9 @@
-<!-- 9th Wall v4.55 (Synchronous GPU Capture / 4Mbps 30FPS Direct Stream / In-App Multi-Preview Drawer / Pure File Sharing & Direct Save / iOS Counter-Rotation / Sequential Sinking Lock) -->
+<!-- 9th Wall v4.56 (Pure Photo Capture & 1-Tap Auto-Save / Universal CSS Portrait Lock / In-App Photo Slider & Native Share / Video Stripped / Clean Navigation) -->
 <html>
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no,viewport-fit=cover">
-  <title>9th Wall AR 4.55</title>
+  <title>9th Wall AR 4.56</title>
   <script crossorigin="anonymous" src="external/runtime/runtime.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@8thwall/engine-binary@1/dist/xr.js" async crossorigin="anonymous" data-preload-chunks="slam"></script>
   <script src="https://cdn.jsdelivr.net/npm/@8thwall/landing-page@1/dist/landing-page.js" crossorigin="anonymous"></script>
@@ -19,8 +19,8 @@
     style="position:fixed;top:10px;right:10px;z-index:1000000;background:rgba(0,0,0,0.9);color:#0f0;font-family:monospace;font-size:12px;padding:8px;border-radius:4px;cursor:pointer;line-height:1.3;border:1px solid #0f0;display:none;pointer-events:auto;">
     <div id="debugTitle">FPS: --</div>
     <div id="debugContent">
-      ar-world: v4.55<br>
-      bundle: v4.55<br>
+      ar-world: v4.56<br>
+      bundle: v4.56<br>
       <span id="envVerdictSpan" style="color:#0f0;">Entorno: ESPERANDO MESA...</span><br>
       <span id="telemetrySpan" style="color:#0f0;">P98: -- (/255) | Lum: -- (/255) | Cálido: --%</span><br>
       <span id="benchmarkSpan" style="color:#0f0;">Pre: --sec - Post: --sec</span><br>
@@ -58,54 +58,35 @@
   </button>
 
   <!-- ========================================================================= -->
-  <!-- UI CLEAN: CARRUSEL AR, CAPTURA SCENE VIEWER Y CAJÓN DE MEDIOS (v4.55) -->
+  <!-- UI CLEAN: CARRUSEL AR, CAPTURA DE FOTOS LIMPIA Y VISOR (v4.56) -->
   <!-- ========================================================================= -->
 
   <!-- Flechas laterales de cambio de plato -->
   <button id="prevDishBtn" class="ar-clean-ui ar-nav-arrow" style="left:12px;">&#8249;</button>
   <button id="nextDishBtn" class="ar-clean-ui ar-nav-arrow" style="right:12px;">&#8250;</button>
 
-  <!-- Contenedor inferior de captura Scene Viewer Clásico -->
+  <!-- Contenedor inferior de captura limpia (Sólo Foto) -->
   <div id="captureContainer" class="ar-clean-ui">
-    <!-- Miniatura de Galería (Inferior Izquierda) -->
-    <div id="galleryThumbnailBtn">
-      <img id="galleryThumbImg" src="" style="display:none;" />
-      <div id="galleryThumbPlaceholder">
-        <svg viewBox="0 0 24 24" width="22" height="22" fill="rgba(255,255,255,0.7)"><path d="M21 19V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2zM8.5 13.5l2.5 3.01L14.5 12l4.5 6H5l3.5-4.5z"/></svg>
-      </div>
-      <div id="galleryBadge" style="display:none;position:absolute;top:-4px;right:-4px;background:#00e5ff;color:#000;font-size:10px;font-weight:bold;width:18px;height:18px;border-radius:50%;align-items:center;justify-content:center;">0</div>
+    <!-- Miniatura de Galería (Oculta por defecto hasta tomar la 1ª foto) -->
+    <div id="galleryThumbnailBtn" style="display:none;">
+      <img id="galleryThumbImg" src="" />
     </div>
 
-    <!-- Obturador Central con Anillo de Progreso de 10s -->
-    <div id="shutterWrapper">
-      <svg id="shutterProgressSvg" viewBox="0 0 84 84">
-        <circle id="shutterProgressCircle" cx="42" cy="42" r="38" />
-      </svg>
-      <button id="shutterBtn">
-        <div id="shutterInner"></div>
-      </button>
-    </div>
-
-    <!-- Selector Apilado (Foto / Vídeo) -->
-    <div id="captureModeStack">
-      <button id="photoModeBtn" class="mode-stack-btn active">
-        <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M12 15.2a3.2 3.2 0 1 0 0-6.4 3.2 3.2 0 0 0 0 6.4zm7-9.2h-3.17L14.4 4.5h-4.8L8.17 6H5c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2zm0 12H5V8h3.8l1.43-1.5h3.54L15.2 8H19v10z"/></svg>
-      </button>
-      <button id="videoModeBtn" class="mode-stack-btn">
-        <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M17 10.5V7c0-.55-.45-1-1-1H4c-.55 0-1 .45-1 1v10c0 .55.45 1 1 1h12c.55 0 1-.45 1-1v-3.5l4 4v-11l-4 4z"/></svg>
-      </button>
-    </div>
+    <!-- Obturador Central de Foto -->
+    <button id="shutterBtn">
+      <div id="shutterInner"></div>
+    </button>
   </div>
 
-  <!-- Flash y animación de congelado que viaja a la miniatura -->
+  <!-- Destello sutil fotográfico y animación de fotograma viajero -->
   <div id="captureFlash"></div>
   <div id="freezeTravelCard"></div>
 
-  <!-- v4.55: VISOR DE CAPTURAS MULTI-ARCHIVO (In-App Preview Drawer) -->
+  <!-- Visor deslizante de fotos tomadas (In-App Photo Drawer) -->
   <div id="mediaViewerModal" style="display:none;">
     <div class="media-viewer-header">
       <button id="closeViewerBtn" class="viewer-icon-btn">&#10005;</button>
-      <span id="mediaCounterTitle" style="color:white;font-weight:bold;font-family:sans-serif;font-size:15px;">Captura 1 / 1</span>
+      <span id="mediaCounterTitle" style="color:white;font-weight:bold;font-family:sans-serif;font-size:15px;">Foto 1 / 1</span>
       <button id="deleteCurrentMediaBtn" class="viewer-icon-btn">
         <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>
       </button>
@@ -116,33 +97,17 @@
       <button id="viewerNextBtn" class="viewer-nav-btn">&#8250;</button>
     </div>
     <div class="media-viewer-footer">
-      <button id="saveToGalleryBtn" class="viewer-action-btn primary">
-        <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor" style="margin-right:6px;"><path d="M19.35 10.04C18.67 6.59 15.64 4 12 4 9.11 4 6.6 5.64 5.35 8.04 2.34 8.36 0 10.91 0 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96zM17 13l-5 5-5-5h3V9h4v4h3z"/></svg>
-        Guardar en Dispositivo
+      <button id="shareMediaBtn" class="viewer-action-btn primary">
+        <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor" style="margin-right:8px;"><path d="M18 16.08c-.76 0-1.44.3-1.96.77L8.91 12.7c.05-.23.09-.46.09-.7s-.04-.47-.09-.7l7.05-4.11c.54.5 1.25.81 2.04.81 1.66 0 3-1.34 3-3s-1.34-3-3-3-3 1.34-3 3c0 .24.04.47.09.7L8.04 9.81C7.5 9.31 6.79 9 6 9c-1.66 0-3 1.34-3 3s1.34 3 3 3c.79 0 1.5-.31 2.04-.81l7.12 4.16c-.05.21-.08.43-.08.65 0 1.61 1.31 2.92 2.92 2.92s2.92-1.31 2.92-2.92c0-1.61-1.31-2.92-2.92-2.92z"/></svg>
+        Compartir foto
       </button>
-      <button id="shareMediaBtn" class="viewer-action-btn secondary">
-        <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor" style="margin-right:6px;"><path d="M18 16.08c-.76 0-1.44.3-1.96.77L8.91 12.7c.05-.23.09-.46.09-.7s-.04-.47-.09-.7l7.05-4.11c.54.5 1.25.81 2.04.81 1.66 0 3-1.34 3-3s-1.34-3-3-3-3 1.34-3 3c0 .24.04.47.09.7L8.04 9.81C7.5 9.31 6.79 9 6 9c-1.66 0-3 1.34-3 3s1.34 3 3 3c.79 0 1.5-.31 2.04-.81l7.12 4.16c-.05.21-.08.43-.08.65 0 1.61 1.31 2.92 2.92 2.92s2.92-1.31 2.92-2.92c0-1.61-1.31-2.92-2.92-2.92z"/></svg>
-        Compartir
-      </button>
-    </div>
-  </div>
-
-  <!-- Modal Opción C: Confirmación estricta de salida -->
-  <div id="saveConfirmModal">
-    <div class="confirm-dialog-card">
-      <div class="confirm-title">Fotos o vídeos sin guardar</div>
-      <div class="confirm-desc">¿Deseas guardar tus capturas en tu dispositivo antes de salir?</div>
-      <div class="confirm-actions">
-        <button id="confirmNoBtn" class="confirm-btn no">Salir sin guardar</button>
-        <button id="confirmYesBtn" class="confirm-btn yes">Guardar y salir</button>
-      </div>
     </div>
   </div>
 
   <style>
-    /* v4.55: Contra-rotación de 90 grados para iOS */
+    /* v4.56: Bloqueo estricto de orientación vertical universal por contra-rotación CSS (Android e iOS) */
     @media screen and (orientation: landscape) {
-      body.ios-device {
+      body {
         transform: rotate(-90deg);
         transform-origin: top left;
         width: 100vh !important;
@@ -154,7 +119,7 @@
       }
     }
 
-    /* Estilos del Carrusel y Captura Scene Viewer Clásico */
+    /* Estilos del Carrusel y Captura Limpia */
     .ar-nav-arrow {
       position: fixed;
       top: 50%;
@@ -175,6 +140,8 @@
       backdrop-filter: blur(4px);
       cursor: pointer;
       pointer-events: auto !important;
+      -webkit-tap-highlight-color: transparent;
+      outline: none;
       transition: background 0.2s, transform 0.1s, opacity 0.2s;
     }
     .ar-nav-arrow:active { background: rgba(255, 255, 255, 0.45); transform: translateY(-50%) scale(0.92); }
@@ -194,9 +161,9 @@
 
     #galleryThumbnailBtn {
       position: absolute;
-      left: 24px;
-      width: 48px;
-      height: 48px;
+      left: 28px;
+      width: 50px;
+      height: 50px;
       border-radius: 50%;
       border: 2px solid white;
       background: rgba(0, 0, 0, 0.4);
@@ -207,39 +174,16 @@
       pointer-events: auto !important;
       cursor: pointer;
       box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+      -webkit-tap-highlight-color: transparent;
+      outline: none;
+      transition: transform 0.15s ease, opacity 0.3s ease;
     }
+    #galleryThumbnailBtn:active { transform: scale(0.92); }
     #galleryThumbImg { width: 100%; height: 100%; object-fit: cover; }
 
-    #shutterWrapper {
-      position: relative;
-      width: 84px;
-      height: 84px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-    }
-
-    #shutterProgressSvg {
-      position: absolute;
-      inset: 0;
-      width: 84px;
-      height: 84px;
-      transform: rotate(90deg); /* Arranca abajo a las 6 en punto en sentido horario */
-      pointer-events: none;
-    }
-    #shutterProgressCircle {
-      fill: none;
-      stroke: #00e5ff;
-      stroke-width: 4;
-      stroke-dasharray: 238.76;
-      stroke-dashoffset: 238.76;
-      stroke-linecap: round;
-      transition: stroke-dashoffset 0.1s linear;
-    }
-
     #shutterBtn {
-      width: 72px;
-      height: 72px;
+      width: 76px;
+      height: 76px;
       border-radius: 50%;
       background: transparent;
       border: 3.5px solid white;
@@ -250,56 +194,22 @@
       cursor: pointer;
       box-shadow: 0 4px 14px rgba(0,0,0,0.4);
       padding: 0;
+      -webkit-tap-highlight-color: transparent;
+      outline: none;
       transition: transform 0.1s;
     }
-    #shutterBtn:active { transform: scale(0.93); }
+    #shutterBtn:active { transform: scale(0.92); }
 
     #shutterInner {
-      width: 56px;
-      height: 56px;
+      width: 60px;
+      height: 60px;
       border-radius: 50%;
       background: white;
-      transition: all 0.25s ease;
+      transition: transform 0.1s ease;
     }
+    #shutterBtn:active #shutterInner { transform: scale(0.90); }
 
-    /* Estado de grabación de vídeo activa */
-    #shutterBtn.recording #shutterInner {
-      width: 26px;
-      height: 26px;
-      border-radius: 6px;
-      background: #ff3b30;
-    }
-
-    #captureModeStack {
-      position: absolute;
-      right: 28px;
-      display: flex;
-      flex-direction: column;
-      gap: 10px;
-      background: rgba(0,0,0,0.45);
-      padding: 6px;
-      border-radius: 20px;
-      border: 1px solid rgba(255,255,255,0.25);
-      pointer-events: auto !important;
-    }
-    .mode-stack-btn {
-      background: transparent;
-      border: none;
-      color: rgba(255,255,255,0.45);
-      padding: 6px;
-      border-radius: 50%;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      cursor: pointer;
-      transition: color 0.2s, background 0.2s;
-    }
-    .mode-stack-btn.active {
-      color: white;
-      background: rgba(255,255,255,0.25);
-    }
-
-    /* Efectos de Flash y Fotograma viajero */
+    /* Destello sutil fotográfico (30% opacidad y 80ms) */
     #captureFlash {
       position: fixed;
       inset: 0;
@@ -307,8 +217,9 @@
       opacity: 0;
       pointer-events: none;
       z-index: 999998;
-      transition: opacity 0.15s ease-out;
+      transition: opacity 0.08s ease-out;
     }
+
     #freezeTravelCard {
       position: fixed;
       inset: 0;
@@ -317,14 +228,13 @@
       opacity: 0;
       pointer-events: none;
       z-index: 999997;
-      transition: all 0.45s cubic-bezier(0.2, 0.9, 0.3, 1);
     }
 
-    /* v4.55: Estilos del Cajón/Visor de Capturas */
+    /* Visor de Fotos */
     #mediaViewerModal {
       position: fixed;
       inset: 0;
-      background: rgba(0,0,0,0.92);
+      background: rgba(0,0,0,0.94);
       backdrop-filter: blur(12px);
       z-index: 1000002;
       display: flex;
@@ -343,13 +253,15 @@
       border: none;
       color: white;
       font-size: 18px;
-      width: 36px;
-      height: 36px;
+      width: 38px;
+      height: 38px;
       border-radius: 50%;
       display: flex;
       align-items: center;
       justify-content: center;
       cursor: pointer;
+      -webkit-tap-highlight-color: transparent;
+      outline: none;
     }
     .media-viewer-content {
       position: relative;
@@ -366,7 +278,7 @@
       align-items: center;
       justify-content: center;
     }
-    #viewerMediaContainer img, #viewerMediaContainer video {
+    #viewerMediaContainer img {
       max-width: 100%;
       max-height: 100%;
       object-fit: contain;
@@ -389,12 +301,13 @@
       justify-content: center;
       cursor: pointer;
       z-index: 10;
+      -webkit-tap-highlight-color: transparent;
+      outline: none;
     }
     #viewerPrevBtn { left: 12px; }
     #viewerNextBtn { right: 12px; }
     .media-viewer-footer {
       display: flex;
-      gap: 12px;
       padding: 16px 20px 32px 20px;
     }
     .viewer-action-btn {
@@ -402,72 +315,20 @@
       display: flex;
       align-items: center;
       justify-content: center;
-      padding: 14px 0;
-      border-radius: 24px;
+      padding: 15px 0;
+      border-radius: 26px;
       font-family: sans-serif;
-      font-size: 14px;
-      font-weight: bold;
-      border: none;
-      cursor: pointer;
-    }
-    .viewer-action-btn.primary { background: #00e5ff; color: #000; }
-    .viewer-action-btn.secondary { background: rgba(255,255,255,0.2); color: #fff; }
-
-    /* Modal Opción C */
-    #saveConfirmModal {
-      position: fixed;
-      inset: 0;
-      background: rgba(0,0,0,0.75);
-      backdrop-filter: blur(8px);
-      z-index: 1000003;
-      display: none;
-      align-items: center;
-      justify-content: center;
-      pointer-events: auto;
-    }
-    .confirm-dialog-card {
-      background: #1c1c1e;
-      border: 1px solid rgba(255,255,255,0.2);
-      border-radius: 20px;
-      padding: 24px;
-      width: 82%;
-      max-width: 320px;
-      text-align: center;
-      color: white;
-      font-family: sans-serif;
-      box-shadow: 0 10px 30px rgba(0,0,0,0.8);
-    }
-    .confirm-title { font-size: 17px; font-weight: bold; margin-bottom: 8px; }
-    .confirm-desc { font-size: 14px; color: #aaa; margin-bottom: 20px; line-height: 1.4; }
-    .confirm-actions { display: flex; flex-direction: column; gap: 10px; }
-    .confirm-btn {
-      width: 100%;
-      padding: 13px 0;
-      border-radius: 12px;
       font-size: 15px;
       font-weight: bold;
       border: none;
       cursor: pointer;
+      -webkit-tap-highlight-color: transparent;
+      outline: none;
     }
-    .confirm-btn.no { background: #2c2c2e; color: #ff453a; }
-    .confirm-btn.yes { background: #00e5ff; color: #000; }
+    .viewer-action-btn.primary { background: #00e5ff; color: #000; }
   </style>
 
   <script>
-    // =========================================================================
-    // BLOQUEO VERTICAL NATIVO Y DETECCIÓN iOS (v4.55)
-    // =========================================================================
-    const isIOSDevice = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
-    if (isIOSDevice) {
-      document.body.classList.add('ios-device');
-    }
-
-    try {
-      if (!isIOSDevice && screen.orientation && screen.orientation.lock) {
-        screen.orientation.lock('portrait').catch(() => {});
-      }
-    } catch(e) {}
-
     // =========================================================================
     // CRONÓMETRO DE RENDIMIENTO (Benchmark Pre y Post-Listo)
     // =========================================================================
@@ -489,7 +350,6 @@
         window._tPostDuration = ((performance.now() - window._tListoClick) / 1000).toFixed(2);
         window.actualizarHUDBenchmark();
       }
-      // Habilitamos flechas tras finalizar la aparición
       document.getElementById('prevDishBtn').classList.remove('disabled');
       document.getElementById('nextDishBtn').classList.remove('disabled');
     };
@@ -498,15 +358,10 @@
     // CONSOLA DE ESPECULARES (Ajuste rápido de lóbulos Thin, Wide y Both)
     // =========================================================================
     const SPECULAR_CONFIG = {
-      // Capa 1: Lóbulo THIN (Núcleo nítido puntual)
-      thin_intensity: 1.00,      // Multiplicador de brillo / energía del núcleo
-      thin_expansion: 2.60,      // Exponente de concentración (mayor = más fino/puntual)
-
-      // Capa 2: Lóbulo WIDE (Halo suave difuso)
-      wide_intensity: 0.45,      // Multiplicador de brillo / presencia del halo
-      wide_expansion: 0.75,      // Exponente de dispersión (menor = más extendido/sedoso)
-
-      // Atenuación difusa en modo BOTH (Equilibrio de energía Checkpoint vB1.03)
+      thin_intensity: 1.00,
+      thin_expansion: 2.60,
+      wide_intensity: 0.45,
+      wide_expansion: 0.75,
       both_diffuse_mult: 0.75
     };
 
@@ -520,7 +375,6 @@
       night_shadow_radius: 8.0,
       ground_opacity_fixed: 0.40,
 
-      // Presupuestos maestros consolidados (-10% día, -8% ambiente, +PMREM)
       day_total_energy: 4.68,
       day_pmrem_mult: 1.65,
       day_pedestal: 0.035,
@@ -592,7 +446,6 @@
     let currentPedestal = LIGHTING_CONFIG.day_pedestal;
     let environmentFactor = 0.0;
 
-    // v4.55: Estado del modo especular (0: THIN, 1: WIDE, 2: BOTH por defecto)
     let currentSpecularMode = 2;
 
     const crearRanuraLuz = () => ({
@@ -652,7 +505,6 @@
 
     document.getElementById('envToggle').addEventListener('click', () => toggleEnv());
 
-    // v4.55: Conmutador dinámico de modo especular 100% en tiempo real por Uniform en GPU
     const specToggleBtn = document.getElementById('specToggle');
     if (specToggleBtn) {
       specToggleBtn.addEventListener('click', () => {
@@ -675,7 +527,6 @@
       });
     }
 
-    // v4.26: Gestión estricta de Modos UI (Arranque Clean por defecto)
     let currentUIMode = sessionStorage.getItem("ar_ui_mode");
     if (!currentUIMode || (currentUIMode !== "buttons" && currentUIMode !== "slam")) {
       currentUIMode = "clean";
@@ -741,7 +592,6 @@
       });
     }
 
-    // Receptor secreto Easter Egg permanente (4 toques conmutan en vivo estrictamente entre clean y buttons)
     if (secretTrigger) {
       let secretTaps = [];
       const procesarToqueSecreto = () => {
@@ -762,7 +612,6 @@
       secretTrigger.addEventListener('pointerdown', procesarToqueSecreto);
     }
 
-    // v4.55: Inyección PBR con Doble Lóbulo Aditivo Puro en GPU y Ruido Continuo 3D Estocástico
     window.aplicarAjustesSceneViewer = function (targetNode) {
       const root = targetNode || _scene;
       if (!root) return;
@@ -1162,14 +1011,6 @@
                 if (isCalibrating || isCalibrated) return;
 
                 window._tListoClick = performance.now();
-
-                // v4.55: Reafirmar fullscreen y bloqueo en Android al entrar
-                if (!isIOSDevice) {
-                  try {
-                    if (document.documentElement.requestFullscreen) document.documentElement.requestFullscreen().catch(() => {});
-                    if (screen.orientation && screen.orientation.lock) screen.orientation.lock('portrait').catch(() => {});
-                  } catch(err) {}
-                }
 
                 if (window.XR8 && window.XR8.XrController) {
                   try { window.XR8.XrController.recenter(); } catch (err) {}
@@ -1637,7 +1478,7 @@
     };
 
     // =========================================================================
-    // LÓGICA DE CARRUSEL, CAPTURA Y CAJÓN MULTI-PREVIEW (v4.55)
+    // LÓGICA DE CARRUSEL, CAPTURA DE FOTOS Y VISOR SLIDER (v4.56)
     // =========================================================================
     const _modelsList = [
       "Plato_01.glb", "Plato_02.glb", "Plato_03.glb", "Plato_04.glb",
@@ -1656,7 +1497,6 @@
     const nextDishBtn = document.getElementById('nextDishBtn');
 
     const cambiarPlatoAR = (direction) => {
-      // Bloqueamos temporalmente botones de cambio para evitar desincronización
       prevDishBtn.classList.add('disabled');
       nextDishBtn.classList.add('disabled');
 
@@ -1674,24 +1514,15 @@
     prevDishBtn.addEventListener('click', () => cambiarPlatoAR(-1));
     nextDishBtn.addEventListener('click', () => cambiarPlatoAR(1));
 
-    // Sistema de Captura Foto / Vídeo
-    let currentCaptureMode = 'photo';
-    let isRecordingVideo = false;
-    let mediaRecorder = null;
-    let recordedChunks = [];
-    let recordTimer = null;
-    let recordStartTime = 0;
+    // =========================================================================
+    // CAPTURA DIRECTA Y GUARDADO INSTANTÁNEO EN UN TOQUE (v4.56)
+    // =========================================================================
     const sessionCapturedMedia = [];
     let currentViewerIndex = 0;
 
-    const photoModeBtn = document.getElementById('photoModeBtn');
-    const videoModeBtn = document.getElementById('videoModeBtn');
     const shutterBtn = document.getElementById('shutterBtn');
-    const shutterProgressCircle = document.getElementById('shutterProgressCircle');
     const galleryThumbnailBtn = document.getElementById('galleryThumbnailBtn');
     const galleryThumbImg = document.getElementById('galleryThumbImg');
-    const galleryThumbPlaceholder = document.getElementById('galleryThumbPlaceholder');
-    const galleryBadge = document.getElementById('galleryBadge');
     const captureFlash = document.getElementById('captureFlash');
     const freezeTravelCard = document.getElementById('freezeTravelCard');
 
@@ -1702,64 +1533,14 @@
     const viewerNextBtn = document.getElementById('viewerNextBtn');
     const viewerMediaContainer = document.getElementById('viewerMediaContainer');
     const mediaCounterTitle = document.getElementById('mediaCounterTitle');
-    const saveToGalleryBtn = document.getElementById('saveToGalleryBtn');
     const shareMediaBtn = document.getElementById('shareMediaBtn');
 
-    photoModeBtn.addEventListener('click', () => {
-      if (isRecordingVideo) return;
-      currentCaptureMode = 'photo';
-      photoModeBtn.classList.add('active');
-      videoModeBtn.classList.remove('active');
-    });
+    const dispararAnimacionCaptura = (dataUrl) => {
+      // 1. Destello sutil (30% de opacidad)
+      captureFlash.style.opacity = '0.30';
+      setTimeout(() => { captureFlash.style.opacity = '0'; }, 80);
 
-    videoModeBtn.addEventListener('click', () => {
-      if (isRecordingVideo) return;
-      currentCaptureMode = 'video';
-      videoModeBtn.classList.add('active');
-      photoModeBtn.classList.remove('active');
-    });
-
-    // v4.55: Renderizado síncrono del WebGL antes de extraer el frame para garantizar el modelo 3D
-    const capturarFrameCompuesto = (targetCanvas) => {
-      const video = document.querySelector('video');
-      const threeCanvas = _renderer ? _renderer.domElement : null;
-      if (!video || !threeCanvas) return null;
-
-      // Forzamos el render síncrono justo antes de copiar
-      if (_renderer && _scene && _activeCamera) {
-        _renderer.render(_scene, _activeCamera);
-      }
-
-      const w = window.innerWidth;
-      const h = window.innerHeight;
-      targetCanvas.width = w;
-      targetCanvas.height = h;
-
-      const ctx = targetCanvas.getContext('2d');
-      // Dibujamos cámara
-      ctx.drawImage(video, 0, 0, w, h);
-      // Dibujamos escena 3D encima
-      ctx.drawImage(threeCanvas, 0, 0, w, h);
-      return targetCanvas;
-    };
-
-    const actualizarBadgeGaleria = () => {
-      if (sessionCapturedMedia.length > 0) {
-        galleryBadge.innerText = sessionCapturedMedia.length.toString();
-        galleryBadge.style.display = 'flex';
-      } else {
-        galleryBadge.style.display = 'none';
-        galleryThumbImg.style.display = 'none';
-        galleryThumbPlaceholder.style.display = 'block';
-      }
-    };
-
-    const dispararAnimacionMiniatura = (dataUrl) => {
-      // 1. Destello instantáneo (0ms)
-      captureFlash.style.opacity = '0.85';
-      setTimeout(() => { captureFlash.style.opacity = '0'; }, 100);
-
-      // 2. Viaje de fotograma
+      // 2. Animación fluida de viaje hacia la miniatura
       freezeTravelCard.style.backgroundImage = `url(${dataUrl})`;
       freezeTravelCard.style.transition = 'none';
       freezeTravelCard.style.top = '0px';
@@ -1769,172 +1550,87 @@
       freezeTravelCard.style.borderRadius = '0px';
       freezeTravelCard.style.opacity = '1';
 
+      // Forzamos el reflow del navegador para garantizar fluidez
+      void freezeTravelCard.offsetWidth;
+
+      galleryThumbnailBtn.style.display = 'flex';
       const thumbRect = galleryThumbnailBtn.getBoundingClientRect();
 
       requestAnimationFrame(() => {
-        freezeTravelCard.style.transition = 'all 0.40s cubic-bezier(0.2, 0.9, 0.3, 1)';
+        freezeTravelCard.style.transition = 'all 0.38s cubic-bezier(0.2, 0.9, 0.3, 1)';
         freezeTravelCard.style.top = `${thumbRect.top}px`;
         freezeTravelCard.style.left = `${thumbRect.left}px`;
         freezeTravelCard.style.width = `${thumbRect.width}px`;
         freezeTravelCard.style.height = `${thumbRect.height}px`;
         freezeTravelCard.style.borderRadius = '50%';
-        freezeTravelCard.style.opacity = '0.3';
+        freezeTravelCard.style.opacity = '0.2';
 
         setTimeout(() => {
           freezeTravelCard.style.opacity = '0';
           galleryThumbImg.src = dataUrl;
-          galleryThumbImg.style.display = 'block';
-          galleryThumbPlaceholder.style.display = 'none';
-          actualizarBadgeGaleria();
-        }, 400);
+        }, 380);
       });
     };
 
-    // Disparador de Foto ultra-rápido (<150ms)
-    const tomarFoto = () => {
-      const offCanvas = document.createElement('canvas');
-      capturarFrameCompuesto(offCanvas);
-      const dataUrl = offCanvas.toDataURL('image/jpeg', 0.92);
-      dispararAnimacionMiniatura(dataUrl);
-
-      offCanvas.toBlob((blob) => {
-        if (!blob) return;
-        const file = new File([blob], `Plato_AR_${Date.now()}.jpg`, { type: 'image/jpeg' });
-        sessionCapturedMedia.push({ file, url: dataUrl, type: 'image' });
-        actualizarBadgeGaleria();
-      }, 'image/jpeg', 0.92);
-    };
-
-    // Grabación de Vídeo directa a 30 FPS y 4 Mbps
-    const iniciarGrabacion = () => {
+    const capturarYGuardarFoto = () => {
       const video = document.querySelector('video');
       const threeCanvas = _renderer ? _renderer.domElement : null;
-      if (!threeCanvas) return;
+      if (!video || !threeCanvas) return;
 
-      const recordCanvas = document.createElement('canvas');
+      // Render síncrono previo
+      if (_renderer && _scene && _activeCamera) {
+        _renderer.render(_scene, _activeCamera);
+      }
+
       const w = window.innerWidth;
       const h = window.innerHeight;
-      recordCanvas.width = w;
-      recordCanvas.height = h;
-      const rCtx = recordCanvas.getContext('2d');
+      const offCanvas = document.createElement('canvas');
+      offCanvas.width = w;
+      offCanvas.height = h;
 
-      let renderActive = true;
-      const renderLoop = () => {
-        if (!renderActive) return;
-        if (video) rCtx.drawImage(video, 0, 0, w, h);
-        if (_renderer && _scene && _activeCamera) {
-          _renderer.render(_scene, _activeCamera);
-        }
-        if (threeCanvas) rCtx.drawImage(threeCanvas, 0, 0, w, h);
-        requestAnimationFrame(renderLoop);
-      };
-      renderLoop();
+      const ctx = offCanvas.getContext('2d');
+      ctx.drawImage(video, 0, 0, w, h);
+      ctx.drawImage(threeCanvas, 0, 0, w, h);
 
-      const stream = recordCanvas.captureStream(30);
-      recordedChunks = [];
+      // Conversión síncrona en 0ms
+      const dataUrl = offCanvas.toDataURL('image/jpeg', 0.95);
+      const fileName = `Plato_AR_${Date.now()}.jpg`;
 
-      let mimeType = 'video/mp4';
-      if (!MediaRecorder.isTypeSupported('video/mp4')) {
-        mimeType = MediaRecorder.isTypeSupported('video/webm;codecs=vp9') ? 'video/webm;codecs=vp9' : 'video/webm';
-      }
+      // 1. Descarga/Guardado directo e inmediato en el almacenamiento del móvil (User Activation activa)
+      const downloadAnchor = document.createElement('a');
+      downloadAnchor.href = dataUrl;
+      downloadAnchor.download = fileName;
+      document.body.appendChild(downloadAnchor);
+      downloadAnchor.click();
+      document.body.removeChild(downloadAnchor);
 
-      mediaRecorder = new MediaRecorder(stream, {
-        mimeType,
-        videoBitsPerSecond: 4000000 // 4.0 Mbps cristalino
-      });
+      // 2. Registro síncrono en la memoria del visor
+      sessionCapturedMedia.push({ url: dataUrl, name: fileName });
 
-      mediaRecorder.ondataavailable = (e) => {
-        if (e.data && e.data.size > 0) recordedChunks.push(e.data);
-      };
-
-      mediaRecorder.onstop = () => {
-        renderActive = false;
-        const videoBlob = new Blob(recordedChunks, { type: mimeType });
-        const ext = mimeType.includes('mp4') ? 'mp4' : 'webm';
-        const file = new File([videoBlob], `Plato_AR_Video_${Date.now()}.${ext}`, { type: mimeType });
-        const videoUrl = URL.createObjectURL(videoBlob);
-
-        const thumbCanvas = document.createElement('canvas');
-        capturarFrameCompuesto(thumbCanvas);
-        const thumbUrl = thumbCanvas.toDataURL('image/jpeg', 0.8);
-
-        sessionCapturedMedia.push({ file, url: videoUrl, thumbUrl, type: 'video' });
-        dispararAnimacionMiniatura(thumbUrl);
-      };
-
-      mediaRecorder.start();
-      isRecordingVideo = true;
-      shutterBtn.classList.add('recording');
-      recordStartTime = performance.now();
-
-      const totalDurationMs = 10000;
-      const circMax = 238.76;
-
-      const actualizarProgreso = () => {
-        if (!isRecordingVideo) return;
-        const elapsed = performance.now() - recordStartTime;
-        const p = Math.min(1.0, elapsed / totalDurationMs);
-        shutterProgressCircle.style.strokeDashoffset = (circMax * (1.0 - p)).toString();
-
-        if (elapsed >= totalDurationMs) {
-          detenerGrabacion();
-        } else {
-          recordTimer = requestAnimationFrame(actualizarProgreso);
-        }
-      };
-      recordTimer = requestAnimationFrame(actualizarProgreso);
+      // 3. Feedback visual elegante
+      dispararAnimacionCaptura(dataUrl);
     };
 
-    const detenerGrabacion = () => {
-      if (!isRecordingVideo) return;
-      isRecordingVideo = false;
-      cancelAnimationFrame(recordTimer);
-      shutterBtn.classList.remove('recording');
-      shutterProgressCircle.style.strokeDashoffset = '238.76';
-      if (mediaRecorder && mediaRecorder.state !== 'inactive') {
-        mediaRecorder.stop();
-      }
-    };
-
-    shutterBtn.addEventListener('click', () => {
-      if (currentCaptureMode === 'photo') {
-        tomarFoto();
-      } else {
-        if (!isRecordingVideo) {
-          iniciarGrabacion();
-        } else {
-          detenerGrabacion();
-        }
-      }
-    });
+    shutterBtn.addEventListener('click', capturarYGuardarFoto);
 
     // =========================================================================
-    // VISOR DE CAPTURAS DESLIZABLE (Multi-archivo)
+    // VISOR DE FOTOS (Sólo previsualización y compartir)
     // =========================================================================
     const actualizarContenidoVisor = () => {
       if (sessionCapturedMedia.length === 0) {
         mediaViewerModal.style.display = 'none';
+        galleryThumbnailBtn.style.display = 'none';
         return;
       }
       currentViewerIndex = Math.max(0, Math.min(currentViewerIndex, sessionCapturedMedia.length - 1));
       const item = sessionCapturedMedia[currentViewerIndex];
 
-      mediaCounterTitle.innerText = `Captura ${currentViewerIndex + 1} / ${sessionCapturedMedia.length}`;
+      mediaCounterTitle.innerText = `Foto ${currentViewerIndex + 1} / ${sessionCapturedMedia.length}`;
       viewerMediaContainer.innerHTML = '';
 
-      if (item.type === 'image') {
-        const img = document.createElement('img');
-        img.src = item.url;
-        viewerMediaContainer.appendChild(img);
-      } else {
-        const vid = document.createElement('video');
-        vid.src = item.url;
-        vid.controls = true;
-        vid.autoplay = true;
-        vid.loop = true;
-        vid.playsInline = true;
-        viewerMediaContainer.appendChild(vid);
-      }
+      const img = document.createElement('img');
+      img.src = item.url;
+      viewerMediaContainer.appendChild(img);
 
       viewerPrevBtn.style.display = sessionCapturedMedia.length > 1 ? 'flex' : 'none';
       viewerNextBtn.style.display = sessionCapturedMedia.length > 1 ? 'flex' : 'none';
@@ -1964,78 +1660,31 @@
 
     deleteCurrentMediaBtn.addEventListener('click', () => {
       sessionCapturedMedia.splice(currentViewerIndex, 1);
-      actualizarBadgeGaleria();
       if (sessionCapturedMedia.length === 0) {
         mediaViewerModal.style.display = 'none';
+        galleryThumbnailBtn.style.display = 'none';
       } else {
+        galleryThumbImg.src = sessionCapturedMedia[sessionCapturedMedia.length - 1].url;
         actualizarContenidoVisor();
       }
     });
 
-    // Guardado directo en dispositivo (Descarga e indexación en Galería)
-    saveToGalleryBtn.addEventListener('click', () => {
-      if (sessionCapturedMedia.length === 0) return;
-      const item = sessionCapturedMedia[currentViewerIndex];
-      const a = document.createElement('a');
-      a.href = item.url;
-      a.download = item.file.name;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-    });
-
-    // Compartir nativo puro (Envío estricto de archivos sin texto para compatibilidad con WhatsApp)
+    // Compartir nativo puro (Envío estricto de archivo File sin texto)
     shareMediaBtn.addEventListener('click', async () => {
       if (sessionCapturedMedia.length === 0) return;
       const item = sessionCapturedMedia[currentViewerIndex];
-      const files = [item.file];
 
-      if (navigator.canShare && navigator.canShare({ files })) {
-        try {
+      try {
+        const res = await fetch(item.url);
+        const blob = await res.blob();
+        const file = new File([blob], item.name, { type: 'image/jpeg' });
+        const files = [file];
+
+        if (navigator.canShare && navigator.canShare({ files })) {
           await navigator.share({ files });
-        } catch (err) {}
-      } else {
-        // Fallback a descarga si compartir no está soportado
-        saveToGalleryBtn.click();
-      }
+        }
+      } catch (err) {}
     });
-
-    // =========================================================================
-    // MODAL OPCIÓN C ESTRICTO (Sólo al salir con capturas pendientes)
-    // =========================================================================
-    const saveConfirmModal = document.getElementById('saveConfirmModal');
-    const confirmYesBtn = document.getElementById('confirmYesBtn');
-    const confirmNoBtn = document.getElementById('confirmNoBtn');
-
-    confirmYesBtn.addEventListener('click', () => {
-      // Descarga de todas las capturas en lote
-      sessionCapturedMedia.forEach(item => {
-        const a = document.createElement('a');
-        a.href = item.url;
-        a.download = item.file.name;
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-      });
-      sessionCapturedMedia.length = 0;
-      saveConfirmModal.style.display = 'none';
-      window.history.back();
-    });
-
-    confirmNoBtn.addEventListener('click', () => {
-      sessionCapturedMedia.length = 0;
-      saveConfirmModal.style.display = 'none';
-      window.history.back();
-    });
-
-    // Intercepción del botón Atrás
-    window.addEventListener('popstate', (e) => {
-      if (sessionCapturedMedia.length > 0) {
-        history.pushState(null, null, window.location.href);
-        saveConfirmModal.style.display = 'flex';
-      }
-    });
-    history.pushState(null, null, window.location.href);
   </script>
 
   <script src="bundle-world.js"></script>

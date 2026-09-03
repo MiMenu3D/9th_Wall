@@ -5,10 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="screen-orientation" content="portrait">
-<link rel="manifest" href="data:application/manifest+json,%7B%22orientation%22%3A%22portrait%22%7D">
-<title>Google AI Studio 4.55</title>
-<!-- version 4.55 -->
+<title>Google AI Studio 4.56</title>
+<!-- version 4.56 -->
 
 <script type="module" src="https://unpkg.com/@google/model-viewer/dist/model-viewer.min.js"></script>
 
@@ -29,9 +27,9 @@ html, body {
   background: #1f1a17;
 }
 
-/* v4.55: Bloqueo de rotación por re-orientación CSS de 90 grados exclusivo para iOS */
+/* v4.56: Bloqueo estricto de orientación vertical universal por contra-rotación CSS (Android e iOS) */
 @media screen and (orientation: landscape) {
-  body.ios-device {
+  body {
     transform: rotate(-90deg);
     transform-origin: top left;
     width: 100vh !important;
@@ -105,7 +103,7 @@ model-viewer {
 <div id="mvContainer"></div>
 
 <div id="startScreen">
-  <div id="prueba">Google AI Studio 4.55</div>
+  <div id="prueba">Google AI Studio 4.56</div>
   <div id="label">Plato 01</div>
 
   <div class="arrowContainer">
@@ -117,38 +115,5 @@ model-viewer {
 </div>
 
 <script src="menu.js"></script>
-<script>
-  // v4.55: Detección estricta de iOS para activación de contra-rotación CSS
-  const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
-  if (isIOS) {
-    document.body.classList.add('ios-device');
-  }
-
-  // v4.55: Pantalla completa nativa previa obligatoria para desbloquear el bloqueo vertical en Android
-  const bloquearOrientacionVertical = () => {
-    const docEl = document.documentElement;
-
-    // 1. Solicitud de Fullscreen nativo
-    if (!document.fullscreenElement && docEl.requestFullscreen) {
-      docEl.requestFullscreen().then(() => {
-        if (screen.orientation && screen.orientation.lock) {
-          screen.orientation.lock('portrait-primary').catch(() => {
-            screen.orientation.lock('portrait').catch(() => {});
-          });
-        }
-      }).catch(() => {
-        // Fallback si Fullscreen es denegado
-        if (screen.orientation && screen.orientation.lock) {
-          screen.orientation.lock('portrait').catch(() => {});
-        }
-      });
-    } else if (screen.orientation && screen.orientation.lock) {
-      screen.orientation.lock('portrait').catch(() => {});
-    }
-  };
-
-  document.addEventListener('pointerdown', bloquearOrientacionVertical, { once: true });
-  document.addEventListener('touchstart', bloquearOrientacionVertical, { once: true });
-</script>
 </body>
 </html>

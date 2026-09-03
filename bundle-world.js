@@ -1,4 +1,4 @@
-﻿// 9th Wall v4.55
+﻿// 9th Wall v4.56
 (() => {
   var e = {
     574() {
@@ -50,7 +50,7 @@
     scaleDeadzone: 0.085
   });
 
-  // v4.55: retícula adaptativa ceñida a dimensión real (+1.2cm holgura) y fijada a Y=0 de suelo
+  // v4.56: retícula adaptativa ceñida a dimensión real (+1.2cm holgura) y fijada a Y=0 de suelo
   const DRAG_RETICLE_CONFIG = Object.freeze({
     liftHeight: 0.05,
     liftSmoothingRate: 8.0,
@@ -84,7 +84,7 @@
     const cornersInner = [
       { cx: inSx - inR, cz: -inSz + inR, startAngle: -Math.PI / 2, endAngle: 0 },
       { cx: inSx - inR, cz: inSz - inR, startAngle: 0, endAngle: Math.PI / 2 },
-      { cx: -inSx + inR, cz: inSz - inR, startAngle: Math.PI / 2, endAngle: Math.PI },
+      { cx: -inSx + inR, cz: -inSz + inR, startAngle: Math.PI / 2, endAngle: Math.PI },
       { cx: -inSx + inR, cz: -inSz + inR, startAngle: Math.PI, endAngle: (3 * Math.PI) / 2 }
     ];
 
@@ -140,7 +140,7 @@
     a(574);
     const e = window.ecs;
 
-    // v4.55: Spawner con bloqueo secuencial estricto, oclusión real por Hider y reemplazo en jerarquía ECS
+    // v4.56: Spawner con bloqueo secuencial estricto, oclusión real por Hider y reemplazo en jerarquía ECS
     e.registerComponent({
       name: "dish-spawner",
       schema: { prefab: "eid" },
@@ -288,7 +288,7 @@
             };
             requestAnimationFrame(comprobarMallaLista);
           })
-          // v4.55: Cambio de modelo con bloqueo secuencial, profundidad activa en Hider y montaje dentro de la entidad ECS
+          // v4.56: Cambio de modelo con bloqueo secuencial, profundidad activa en Hider y montaje dentro de la entidad ECS
           .listen(t.events.globalId, "switch-dish-model", ev => {
             if (!isPlaced || !spawnedEid || !ev.data || !ev.data.modelSrc || !window.THREE || isTransitioning) return;
             isTransitioning = true;
@@ -422,7 +422,7 @@
         reticleLocalCenterZ = 0,
         bboxCalculated = false;
 
-        // v4.55: Medición de dimensiones por muestreo de vértices cacheada (+1.2cm holgura)
+        // v4.56: Medición de dimensiones por muestreo de vértices cacheada (+1.2cm holgura)
         const actualizarBoundingBox = (THREE_INSTANCE) => {
           if (bboxCalculated || !t.three || !t.three.scene) return;
 
@@ -988,6 +988,26 @@
           "shadow": {
             "receiveShadow": true
           }
+        },
+
+        // Plano Ocultador (Hider físico nativo 8th Wall de v3.48)
+        "17af117a-efce-48dd-857e-e383a3649c7b": {
+          "id": "17af117a-efce-48dd-857e-e383a3649c7b",
+          "position": [0, -0.001, 0],
+          "rotation": [-0.707106799999999, 0, 0, 0.7071067623730954],
+          "scale": [2, 2, 2],
+          "geometry": {
+            "type": "plane",
+            "width": 1,
+            "height": 1
+          },
+          "material": {
+            "type": "hider"
+          },
+          "parentId": "84028e73-ee70-412d-b8d4-c09bf07c655c",
+          "components": {},
+          "name": "Hider",
+          "order": 7.322553197845954
         },
 
         // Entidad del Modelo 3D (El archivo .glb)

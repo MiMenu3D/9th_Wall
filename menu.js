@@ -1,4 +1,4 @@
-// Menu v2.0 - dos páginas html - Over Success04-Copilot 1.09
+// Google AI Studio 4.56
 
 let current = 0;
 let mv = null;
