@@ -1,4 +1,4 @@
-﻿// 9th Wall v4.59
+﻿// 9th Wall v4.60
 (() => {
   var e = {
     574() {
@@ -51,7 +51,7 @@
   });
 
   // [INMUTABLE - NO MODIFICAR BAJO NINGÚN CONCEPTO: RETÍCULA ADAPTATIVA v4.53 CONSOLIDADA]
-  // v4.59: retícula adaptativa ceñida a dimensión real (+1.2cm holgura) y fijada a Y=0 de suelo
+  // v4.60: retícula adaptativa ceñida a dimensión real (+1.2cm holgura) y fijada a Y=0 de suelo
   const DRAG_RETICLE_CONFIG = Object.freeze({
     liftHeight: 0.05,
     liftSmoothingRate: 8.0,
@@ -143,7 +143,7 @@
     const e = window.ecs;
 
     // [INMUTABLE - NO MODIFICAR BAJO NINGÚN CONCEPTO: ARRANQUE CINEMÁTICO INICIAL v4.53]
-    // v4.59: Spawner con arranque v4.53, hundimiento dinámico proporcional y anclaje ECS nativo
+    // v4.60: Spawner con arranque v4.53, hundimiento dinámico y anclaje ECS nativo via entityToObject
     e.registerComponent({
       name: "dish-spawner",
       schema: { prefab: "eid" },
@@ -298,7 +298,7 @@
             };
             requestAnimationFrame(comprobarMallaLista);
           })
-          // v4.59: Hundimiento dinámico 800ms EaseIn y emparentamiento nativo ECS findObject
+          // v4.60: Sustitución limpia dentro del Object3D real de la entidad ECS (entityToObject)
           .listen(t.events.globalId, "switch-dish-model", ev => {
             if (!isPlaced || !spawnedEid || isTransitioning || !ev.data || !ev.data.modelSrc || !window.THREE) return;
             isTransitioning = true;
@@ -377,11 +377,16 @@
               } else {
                 if (loader) {
                   loader.load(ev.data.modelSrc, (gltf) => {
-                    // Obtención del Object3D de la entidad ECS para garantizar anclaje SLAM nativo
-                    const entityObj = (t.three && t.three.findObject) ? t.three.findObject(spawnedEid) : null;
+                    // API Oficial 8th Wall ECS: Obtener el Object3D de la entidad
+                    const entityObj = (t.three && t.three.entityToObject) ? t.three.entityToObject.get(spawnedEid) : null;
 
-                    // Limpieza profunda de las mallas anteriores (VRAM = 0)
-                    if (t.three && t.three.scene) {
+                    // Limpieza profunda de los hijos de la entidad anterior (VRAM = 0)
+                    if (entityObj) {
+                      while (entityObj.children.length > 0) {
+                        const childNode = entityObj.children[0];
+                        destruirMallaProfunda(childNode);
+                      }
+                    } else if (t.three && t.three.scene) {
                       const nodosBorrar = [];
                       t.three.scene.traverse((child) => {
                         if (child.name === "Model" || (child.isMesh && child.name !== "Ground" && child.name !== "Hider" && (!child.material || (child.material.type !== 'ShadowMaterial' && child.material.colorWrite !== false)))) {
@@ -393,8 +398,11 @@
 
                     const newModel = gltf.scene;
                     newModel.name = "Model";
+                    newModel.position.set(0, 0, 0);
+                    newModel.rotation.set(0, 0, 0);
+                    newModel.scale.set(1, 1, 1);
 
-                    // Emparentamiento estricto en el nodo de la entidad ECS
+                    // Emparentamiento directo en el Object3D de la entidad ECS
                     if (entityObj) {
                       entityObj.add(newModel);
                     } else if (t.three && t.three.scene) {
