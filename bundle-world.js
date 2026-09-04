@@ -1,4 +1,4 @@
-﻿// 9th Wall v4.61
+﻿// 9th Wall v4.62
 (() => {
   var e = {
     574() {
@@ -143,7 +143,7 @@
     const e = window.ecs;
 
     // [INMUTABLE - NO MODIFICAR BAJO NINGÚN CONCEPTO: ARRANQUE CINEMÁTICO INICIAL v4.53]
-    // v4.61: Spawner con hundimiento físico opaco, Contact AO garantizado y anclaje SLAM nativo
+    // v4.62: Spawner con hundimiento físico opaco, Contact AO garantizado, anclaje SLAM nativo y purga total de VRAM
     e.registerComponent({
       name: "dish-spawner",
       schema: { prefab: "eid" },
@@ -157,7 +157,7 @@
         const opacityDuration = 800;   // v4.47: 800ms Opacidad rápida con presencia inmediata
         const totalSpinAngle = -Math.PI * 3; // -540° (1.5 vueltas completas en sentido horario)
 
-        // Destrucción profunda de mallas y texturas (VRAM = 0)
+        // Destrucción profunda de mallas, buffers y texturas PBR (VRAM = 0)
         const destruirMallaProfunda = (meshNode) => {
           if (!meshNode) return;
           meshNode.traverse((child) => {
@@ -166,6 +166,16 @@
               if (child.material) {
                 const mats = Array.isArray(child.material) ? child.material : [child.material];
                 mats.forEach((m) => {
+                  const textureKeys = [
+                    'map', 'normalMap', 'roughnessMap', 'metalnessMap',
+                    'aoMap', 'emissiveMap', 'lightMap', 'bumpMap',
+                    'displacementMap', 'alphaMap', 'envMap'
+                  ];
+                  textureKeys.forEach(k => {
+                    if (m[k] && m[k].isTexture) {
+                      m[k].dispose();
+                    }
+                  });
                   for (const key in m) {
                     if (m[key] && m[key].isTexture) {
                       m[key].dispose();
@@ -247,6 +257,11 @@
                 m.depthWrite = true;
                 m.needsUpdate = true;
               });
+
+              // v4.62: Desbloqueo de las flechas únicamente al finalizar la cinemática completa
+              if (window.notificarSpawnFinalizado) {
+                window.notificarSpawnFinalizado();
+              }
             }
           };
           requestAnimationFrame(animarSpawnCompleto);
@@ -300,13 +315,18 @@
             };
             requestAnimationFrame(comprobarMallaLista);
           })
-          // v4.61: Hundimiento opaco y anclaje SLAM con sombras Contact AO activas
+          // v4.62: Hundimiento opaco, anclaje SLAM, sombras Contact AO y purga exhaustiva de VRAM
           .listen(t.events.globalId, "switch-dish-model", ev => {
             if (!isPlaced || !spawnedEid || isTransitioning || !ev.data || !ev.data.modelSrc || !window.THREE) return;
             isTransitioning = true;
 
             // Fail-safe de desbloqueo a los 4.5 segundos
-            setTimeout(() => { isTransitioning = false; }, 4500);
+            setTimeout(() => {
+              if (isTransitioning) {
+                isTransitioning = false;
+                if (window.notificarSpawnFinalizado) window.notificarSpawnFinalizado();
+              }
+            }, 4500);
 
             const rInstance = window.THREE;
             const dishPos = t.transform.getWorldPosition(spawnedEid);
@@ -386,7 +406,7 @@
                     newModel.rotation.set(0, 0, 0);
                     newModel.scale.set(1, 1, 1);
 
-                    // v4.61: Asegurar que el nuevo modelo proyecte sombras sobre Ground (Contact AO)
+                    // v4.62: Asegurar que el nuevo modelo proyecte sombras sobre Ground (Contact AO)
                     newModel.traverse((c) => {
                       if (c.isMesh) {
                         c.castShadow = true;
@@ -414,9 +434,11 @@
                     dispararCinematicaSpawn(spawnedEid, currentRotY, currentScale);
                   }, undefined, () => {
                     isTransitioning = false;
+                    if (window.notificarSpawnFinalizado) window.notificarSpawnFinalizado();
                   });
                 } else {
                   isTransitioning = false;
+                  if (window.notificarSpawnFinalizado) window.notificarSpawnFinalizado();
                 }
               }
             };

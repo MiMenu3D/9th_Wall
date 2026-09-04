@@ -1,15 +1,27 @@
-<!-- 9th Wall v4.59 (Dual-Lobe Specular System Locked / Multi-Select Photo Strip & Native Share / Gallery Backbutton Interception / 1-Tap Auto-Save / Universal CSS Portrait Lock) -->
+<!-- 9th Wall v4.62 (Dual-Lobe Specular System Locked / Multi-Select Photo Strip & Native Share / Gallery Backbutton Interception / 1-Tap Auto-Save / Landscape Warning Blocker) -->
 <html>
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no,viewport-fit=cover">
-  <title>9th Wall AR 4.59</title>
+  <title>9th Wall AR 4.62</title>
   <script crossorigin="anonymous" src="external/runtime/runtime.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@8thwall/engine-binary@1/dist/xr.js" async crossorigin="anonymous" data-preload-chunks="slam"></script>
   <script src="https://cdn.jsdelivr.net/npm/@8thwall/landing-page@1/dist/landing-page.js" crossorigin="anonymous"></script>
   <script src="https://cdn.jsdelivr.net/npm/three@0.160.0/examples/js/loaders/GLTFLoader.js"></script>
 </head>
 <body>
+  <!-- Bloqueador visual para posición vertical (v4.62) -->
+  <div id="orientationBlocker">
+    <svg viewBox="0 0 24 24" width="48" height="48" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-bottom:16px;">
+      <rect x="5" y="2" width="14" height="20" rx="2" ry="2"></rect>
+      <line x1="12" y1="18" x2="12.01" y2="18"></line>
+      <path d="M17 6h2a2 2 0 0 1 2 2v2"></path>
+      <path d="M7 6H5a2 2 0 0 0-2 2v2"></path>
+    </svg>
+    <div style="font-size:18px; font-weight:bold; margin-bottom:8px;">Gira tu dispositivo</div>
+    <div style="font-size:14px; opacity:0.8;">Por favor, coloca el teléfono en posición vertical para continuar la experiencia AR.</div>
+  </div>
+
   <div id="touchBlocker" style="position:fixed;inset:0;width:100vw;height:100vh;z-index:999990;pointer-events:auto;background:transparent;"></div>
 
   <!-- Disparador secreto permanente: bajo el cuadro debug (4 toques en < 1000ms en zona 200x200) -->
@@ -19,8 +31,8 @@
     style="position:fixed;top:10px;right:10px;z-index:1000000;background:rgba(0,0,0,0.9);color:#0f0;font-family:monospace;font-size:12px;padding:8px;border-radius:4px;cursor:pointer;line-height:1.3;border:1px solid #0f0;display:none;pointer-events:auto;">
     <div id="debugTitle">FPS: --</div>
     <div id="debugContent">
-      ar-world: v4.59<br>
-      bundle: v4.61<br>
+      ar-world: v4.62<br>
+      bundle: v4.62<br>
       <span id="envVerdictSpan" style="color:#0f0;">Entorno: ESPERANDO MESA...</span><br>
       <span id="telemetrySpan" style="color:#0f0;">P98: -- (/255) | Lum: -- (/255) | Cálido: --%</span><br>
       <span id="benchmarkSpan" style="color:#0f0;">Pre: --sec - Post: --sec</span><br>
@@ -58,7 +70,7 @@
   </button>
 
   <!-- ========================================================================= -->
-  <!-- UI CLEAN: CARRUSEL AR, CAPTURA DE FOTOS LIMPIA Y VISOR MULTI-SELECT (v4.59) -->
+  <!-- UI CLEAN: CARRUSEL AR, CAPTURA DE FOTOS LIMPIA Y VISOR MULTI-SELECT (v4.62) -->
   <!-- ========================================================================= -->
 
   <!-- Flechas laterales de cambio de plato -->
@@ -112,17 +124,29 @@
   </div>
 
   <style>
-    /* Bloqueo estricto de orientación vertical universal por contra-rotación CSS (Android e iOS) */
+    /* v4.62: Bloqueador visual de orientación vertical (Landscape Warning Overlay) */
+    #orientationBlocker {
+      display: none;
+      position: fixed;
+      inset: 0;
+      width: 100vw;
+      height: 100vh;
+      background: #000;
+      z-index: 1000005;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      color: white;
+      font-family: sans-serif;
+      text-align: center;
+      padding: 24px;
+      box-sizing: border-box;
+      pointer-events: auto;
+    }
+
     @media screen and (orientation: landscape) {
-      body {
-        transform: rotate(-90deg);
-        transform-origin: top left;
-        width: 100vh !important;
-        height: 100vw !important;
-        position: absolute;
-        top: 100%;
-        left: 0;
-        overflow: hidden;
+      #orientationBlocker {
+        display: flex;
       }
     }
 
@@ -413,8 +437,14 @@
         window._tPostDuration = ((performance.now() - window._tListoClick) / 1000).toFixed(2);
         window.actualizarHUDBenchmark();
       }
-      document.getElementById('prevDishBtn').classList.remove('disabled');
-      document.getElementById('nextDishBtn').classList.remove('disabled');
+    };
+
+    // v4.62: Desbloqueo estricto de flechas de navegación al terminar la cinemática de spawn
+    window.notificarSpawnFinalizado = function () {
+      const prevBtn = document.getElementById('prevDishBtn');
+      const nextBtn = document.getElementById('nextDishBtn');
+      if (prevBtn) prevBtn.classList.remove('disabled');
+      if (nextBtn) nextBtn.classList.remove('disabled');
     };
 
     // [INMUTABLE - NO MODIFICAR BAJO NINGÚN CONCEPTO: CONSOLA DE ESPECULARES v4.53 CONSOLIDADA]
@@ -423,15 +453,15 @@
     // =========================================================================
     const SPECULAR_CONFIG = {
       // Capa 1: Lóbulo THIN (Núcleo nítido puntual)
-      thin_intensity: 1.00,      // Multiplicador de brillo / energía del núcleo
-      thin_expansion: 2.60,      // Exponente de concentración (mayor = más fino/puntual)
+      thin_intensity: 0.50,      // Multiplicador de brillo / energía del núcleo
+      thin_expansion: 1.30,      // Exponente de concentración (mayor = más fino/puntual)
 
       // Capa 2: Lóbulo WIDE (Halo suave difuso)
-      wide_intensity: 0.45,      // Multiplicador de brillo / presencia del halo
-      wide_expansion: 0.75,      // Exponente de dispersión (menor = más extendido/sedoso)
+      wide_intensity: 0.65,      // Multiplicador de brillo / presencia del halo
+      wide_expansion: 0.55,      // Exponente de dispersión (menor = más extendido/sedoso)
 
       // Atenuación difusa en modo BOTH (Equilibrio de energía Checkpoint vB1.03)
-      both_diffuse_mult: 0.75
+      both_diffuse_mult: 0.65
     };
 
     const LIGHTING_CONFIG = {
@@ -1558,7 +1588,7 @@
     };
 
     // =========================================================================
-    // LÓGICA DE CARRUSEL, CAPTURA DE FOTOS Y VISOR MULTI-SELECT (v4.59)
+    // LÓGICA DE CARRUSEL, CAPTURA DE FOTOS Y VISOR MULTI-SELECT (v4.62)
     // =========================================================================
     const _modelsList = [
       "Plato_01.glb", "Plato_02.glb", "Plato_03.glb", "Plato_04.glb",
@@ -1595,7 +1625,7 @@
     nextDishBtn.addEventListener('click', () => cambiarPlatoAR(1));
 
     // =========================================================================
-    // CAPTURA DIRECTA Y GUARDADO INSTANTÁNEO EN UN TOQUE (v4.59)
+    // CAPTURA DIRECTA Y GUARDADO INSTANTÁNEO EN UN TOQUE (v4.62)
     // =========================================================================
     const sessionCapturedMedia = [];
     const selectedIndices = new Set();
@@ -1694,7 +1724,7 @@
     shutterBtn.addEventListener('click', capturarYGuardarFoto);
 
     // =========================================================================
-    // VISOR DE FOTOS CON TIRA DE MINIATURAS Y SELECTOR MÚLTIPLE (v4.59)
+    // VISOR DE FOTOS CON TIRA DE MINIATURAS Y SELECTOR MÚLTIPLE (v4.62)
     // =========================================================================
     const renderizarTiraMiniaturas = () => {
       thumbnailStripContainer.innerHTML = '';

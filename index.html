@@ -5,8 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
-<title>Google AI Studio 4.56</title>
-<!-- version 4.56 -->
+<title>Google AI Studio 4.62</title>
+<!-- version 4.62 -->
 
 <script type="module" src="https://unpkg.com/@google/model-viewer/dist/model-viewer.min.js"></script>
 
@@ -27,17 +27,28 @@ html, body {
   background: #1f1a17;
 }
 
-/* v4.56: Bloqueo estricto de orientación vertical universal por contra-rotación CSS (Android e iOS) */
+/* v4.62: Bloqueador visual de orientación vertical (Landscape Warning Overlay) */
+#orientationBlocker {
+  display: none;
+  position: fixed;
+  inset: 0;
+  width: 100vw;
+  height: 100vh;
+  background: #1f1a17;
+  z-index: 1000005;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-family: sans-serif;
+  text-align: center;
+  padding: 24px;
+  box-sizing: border-box;
+}
+
 @media screen and (orientation: landscape) {
-  body {
-    transform: rotate(-90deg);
-    transform-origin: top left;
-    width: 100vh !important;
-    height: 100vw !important;
-    position: absolute;
-    top: 100%;
-    left: 0;
-    overflow: hidden;
+  #orientationBlocker {
+    display: flex;
   }
 }
 
@@ -100,10 +111,21 @@ model-viewer {
 
 <body>
 
+<div id="orientationBlocker">
+  <svg viewBox="0 0 24 24" width="48" height="48" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-bottom:16px;">
+    <rect x="5" y="2" width="14" height="20" rx="2" ry="2"></rect>
+    <line x1="12" y1="18" x2="12.01" y2="18"></line>
+    <path d="M17 6h2a2 2 0 0 1 2 2v2"></path>
+    <path d="M7 6H5a2 2 0 0 0-2 2v2"></path>
+  </svg>
+  <div style="font-size:18px; font-weight:bold; margin-bottom:8px;">Gira tu dispositivo</div>
+  <div style="font-size:14px; opacity:0.8;">Por favor, coloca el teléfono en posición vertical para continuar.</div>
+</div>
+
 <div id="mvContainer"></div>
 
 <div id="startScreen">
-  <div id="prueba">Google AI Studio 4.56</div>
+  <div id="prueba">Google AI Studio 4.62</div>
   <div id="label">Plato 01</div>
 
   <div class="arrowContainer">
