@@ -1,15 +1,37 @@
-<!-- 9th Wall v4.62y (Dual-Lobe Specular System Locked / Multi-Select Photo Strip & Native Share / Gallery Backbutton Interception / 1-Tap Auto-Save / Landscape Warning Blocker) -->
+<!-- 9th Wall v4.64 (Dual-Lobe Specular System Locked / Multi-Select Photo Strip & Native Share / Gallery Backbutton Interception / 1-Tap Auto-Save / Landscape Warning Blocker) -->
 <html>
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no,viewport-fit=cover">
-  <title>9th Wall AR 4.62</title>
+  <title>9th Wall AR 4.64</title>
   <script crossorigin="anonymous" src="external/runtime/runtime.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@8thwall/engine-binary@1/dist/xr.js" async crossorigin="anonymous" data-preload-chunks="slam"></script>
   <script src="https://cdn.jsdelivr.net/npm/@8thwall/landing-page@1/dist/landing-page.js" crossorigin="anonymous"></script>
   <script src="https://cdn.jsdelivr.net/npm/three@0.160.0/examples/js/loaders/GLTFLoader.js"></script>
 </head>
 <body>
+
+  <!-- ========================================================================= -->
+  <!-- 1. CUADRO DEBUG Y NOMBRES DE VERSIÓN                                      -->
+  <!-- ========================================================================= -->
+  <div id="debugLog" onclick="this.classList.toggle('minimized')"
+    style="position:fixed;top:10px;right:10px;z-index:1000000;background:rgba(0,0,0,0.9);color:#0f0;font-family:monospace;font-size:12px;padding:8px;border-radius:4px;cursor:pointer;line-height:1.3;border:1px solid #0f0;display:none;pointer-events:auto;">
+    <div id="debugTitle">FPS: --</div>
+    <div id="debugContent">
+      ar-world: v4.64<br>
+      bundle: v4.64<br>
+      <span id="envVerdictSpan" style="color:#0f0;">Entorno: ESPERANDO MESA...</span><br>
+      <span id="telemetrySpan" style="color:#0f0;">P98: -- (/255) | Lum: -- (/255) | Cálido: --%</span><br>
+      <span id="benchmarkSpan" style="color:#0f0;">Pre: --sec - Post: --sec</span><br>
+      <span id="lightsCountSpan" style="color:#0f0;">Luces: 1</span><br>
+      <span id="latencySpan" style="color:#0f0;">Latencia: -- ms</span>
+    </div>
+  </div>
+  <style>
+    #debugLog.minimized { height: 15px; width: 60px; overflow: hidden; border-color: #555; }
+    #debugLog.minimized #debugContent { display: none; }
+  </style>
+
   <!-- Bloqueador visual para posición vertical (v4.62) -->
   <div id="orientationBlocker">
     <svg viewBox="0 0 24 24" width="48" height="48" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-bottom:16px;">
@@ -26,24 +48,6 @@
 
   <!-- Disparador secreto permanente: bajo el cuadro debug (4 toques en < 1000ms en zona 200x200) -->
   <div id="secretDebugTrigger" style="position:fixed;top:0;right:0;width:200px;height:200px;z-index:999995;pointer-events:auto;background:transparent;display:block;"></div>
-
-  <div id="debugLog" onclick="this.classList.toggle('minimized')"
-    style="position:fixed;top:10px;right:10px;z-index:1000000;background:rgba(0,0,0,0.9);color:#0f0;font-family:monospace;font-size:12px;padding:8px;border-radius:4px;cursor:pointer;line-height:1.3;border:1px solid #0f0;display:none;pointer-events:auto;">
-    <div id="debugTitle">FPS: --</div>
-    <div id="debugContent">
-      ar-world: v4.62y<br>
-      bundle: v4.62<br>
-      <span id="envVerdictSpan" style="color:#0f0;">Entorno: ESPERANDO MESA...</span><br>
-      <span id="telemetrySpan" style="color:#0f0;">P98: -- (/255) | Lum: -- (/255) | Cálido: --%</span><br>
-      <span id="benchmarkSpan" style="color:#0f0;">Pre: --sec - Post: --sec</span><br>
-      <span id="lightsCountSpan" style="color:#0f0;">Luces: 1</span><br>
-      <span id="latencySpan" style="color:#0f0;">Latencia: -- ms</span>
-    </div>
-  </div>
-  <style>
-    #debugLog.minimized { height: 15px; width: 60px; overflow: hidden; border-color: #555; }
-    #debugLog.minimized #debugContent { display: none; }
-  </style>
 
   <div id="readyPromptContainer" style="position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);z-index:999999;display:flex;flex-direction:column;align-items:center;pointer-events:none;opacity:0;transition:opacity 0.5s ease;">
     <div style="background:rgba(0,0,0,0.75);color:white;font-family:sans-serif;font-size:16px;font-weight:bold;padding:10px 22px;border-radius:22px;border:1px solid rgba(255,255,255,0.4);margin-bottom:14px;text-align:center;white-space:nowrap;">
@@ -176,6 +180,7 @@
       transition: background 0.2s, transform 0.1s, opacity 0.2s;
     }
     .ar-nav-arrow:active { background: rgba(255, 255, 255, 0.45); transform: translateY(-50%) scale(0.92); }
+    .ar-nav-arrow:disabled { opacity: 0.3; pointer-events: none !important; cursor: not-allowed; }
     .ar-nav-arrow.disabled { opacity: 0.3; pointer-events: none !important; }
 
     #captureContainer {
@@ -416,40 +421,9 @@
   </style>
 
   <script>
-    // =========================================================================
-    // CRONÓMETRO DE RENDIMIENTO (Benchmark Pre y Post-Listo)
-    // =========================================================================
-    window._t0PageStart = performance.now();
-    window._tPreDuration = null;
-    window._tListoClick = null;
-    window._tPostDuration = null;
-
-    window.actualizarHUDBenchmark = function () {
-      const benchSpan = document.getElementById('benchmarkSpan');
-      if (!benchSpan) return;
-      const preStr = window._tPreDuration !== null ? `${window._tPreDuration}sec` : '--sec';
-      const postStr = window._tPostDuration !== null ? `${window._tPostDuration}sec` : '--sec';
-      benchSpan.innerText = `Pre: ${preStr} - Post: ${postStr}`;
-    };
-
-    window.notificarSpawnIniciado = function () {
-      if (window._tListoClick && window._tPostDuration === null) {
-        window._tPostDuration = ((performance.now() - window._tListoClick) / 1000).toFixed(2);
-        window.actualizarHUDBenchmark();
-      }
-    };
-
-    // v4.62: Desbloqueo estricto de flechas de navegación al terminar la cinemática de spawn
-    window.notificarSpawnFinalizado = function () {
-      const prevBtn = document.getElementById('prevDishBtn');
-      const nextBtn = document.getElementById('nextDishBtn');
-      if (prevBtn) prevBtn.classList.remove('disabled');
-      if (nextBtn) nextBtn.classList.remove('disabled');
-    };
-
     // [INMUTABLE - NO MODIFICAR BAJO NINGÚN CONCEPTO: CONSOLA DE ESPECULARES v4.53 CONSOLIDADA]
     // =========================================================================
-    // CONSOLA DE ESPECULARES (Ajuste rápido de lóbulos Thin, Wide y Both - v4.53 Checkpoint)
+    // 2. CONSOLA DE ESPECULARES (Ajuste rápido de lóbulos Thin, Wide y Both - v4.53 Checkpoint)
     // =========================================================================
     const SPECULAR_CONFIG = {
       // Capa 1: Lóbulo THIN (Núcleo nítido puntual)
@@ -464,6 +438,9 @@
       both_diffuse_mult: 0.75
     };
 
+    // =========================================================================
+    // 3. CONSOLA DE ILUMINACIÓN Y CALIBRACIÓN AMBIENTAL
+    // =========================================================================
     const LIGHTING_CONFIG = {
       pmrem_resolution: 256,
       pmrem_interval_ms: 200,
@@ -513,6 +490,37 @@
       metalness_bypass_threshold: 0.50,
       albedo_desaturation: 0.15,
       temporal_blend_alpha: 0.25
+    };
+
+    // =========================================================================
+    // CRONÓMETRO DE RENDIMIENTO (Benchmark Pre y Post-Listo)
+    // =========================================================================
+    window._t0PageStart = performance.now();
+    window._tPreDuration = null;
+    window._tListoClick = null;
+    window._tPostDuration = null;
+
+    window.actualizarHUDBenchmark = function () {
+      const benchSpan = document.getElementById('benchmarkSpan');
+      if (!benchSpan) return;
+      const preStr = window._tPreDuration !== null ? `${window._tPreDuration}sec` : '--sec';
+      const postStr = window._tPostDuration !== null ? `${window._tPostDuration}sec` : '--sec';
+      benchSpan.innerText = `Pre: ${preStr} - Post: ${postStr}`;
+    };
+
+    window.notificarSpawnIniciado = function () {
+      if (window._tListoClick && window._tPostDuration === null) {
+        window._tPostDuration = ((performance.now() - window._tListoClick) / 1000).toFixed(2);
+        window.actualizarHUDBenchmark();
+      }
+    };
+
+    // v4.64: Desbloqueo nativo (.disabled = false) al terminar la cinemática de spawn
+    window.notificarSpawnFinalizado = function () {
+      const prevBtn = document.getElementById('prevDishBtn');
+      const nextBtn = document.getElementById('nextDishBtn');
+      if (prevBtn) prevBtn.disabled = false;
+      if (nextBtn) nextBtn.disabled = false;
     };
 
     let lastTime = performance.now();
@@ -1588,7 +1596,7 @@
     };
 
     // =========================================================================
-    // LÓGICA DE CARRUSEL, CAPTURA DE FOTOS Y VISOR MULTI-SELECT (v4.62)
+    // LÓGICA DE CARRUSEL, CAPTURA DE FOTOS Y VISOR MULTI-SELECT (v4.64)
     // =========================================================================
     const _modelsList = [
       "Plato_01.glb", "Plato_02.glb", "Plato_03.glb", "Plato_04.glb",
@@ -1607,8 +1615,8 @@
     const nextDishBtn = document.getElementById('nextDishBtn');
 
     const cambiarPlatoAR = (direction) => {
-      prevDishBtn.classList.add('disabled');
-      nextDishBtn.classList.add('disabled');
+      prevDishBtn.disabled = true;
+      nextDishBtn.disabled = true;
 
       currentDishIndex = (currentDishIndex + direction + _modelsList.length) % _modelsList.length;
       sessionStorage.setItem("modelo_actual", currentDishIndex);
@@ -1625,7 +1633,7 @@
     nextDishBtn.addEventListener('click', () => cambiarPlatoAR(1));
 
     // =========================================================================
-    // CAPTURA DIRECTA Y GUARDADO INSTANTÁNEO EN UN TOQUE (v4.62)
+    // CAPTURA DIRECTA Y GUARDADO INSTANTÁNEO EN UN TOQUE (v4.64)
     // =========================================================================
     const sessionCapturedMedia = [];
     const selectedIndices = new Set();
@@ -1724,7 +1732,7 @@
     shutterBtn.addEventListener('click', capturarYGuardarFoto);
 
     // =========================================================================
-    // VISOR DE FOTOS CON TIRA DE MINIATURAS Y SELECTOR MÚLTIPLE (v4.62)
+    // VISOR DE FOTOS CON TIRA DE MINIATURAS Y SELECTOR MÚLTIPLE (v4.64)
     // =========================================================================
     const renderizarTiraMiniaturas = () => {
       thumbnailStripContainer.innerHTML = '';

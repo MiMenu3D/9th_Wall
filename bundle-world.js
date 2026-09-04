@@ -1,4 +1,4 @@
-﻿// 9th Wall v4.62
+﻿// 9th Wall v4.64
 (() => {
   var e = {
     574() {
@@ -143,7 +143,7 @@
     const e = window.ecs;
 
     // [INMUTABLE - NO MODIFICAR BAJO NINGÚN CONCEPTO: ARRANQUE CINEMÁTICO INICIAL v4.53]
-    // v4.62: Spawner con hundimiento físico opaco, Contact AO garantizado, anclaje SLAM nativo y purga total de VRAM
+    // v4.64: Spawner con hundimiento físico opaco, Contact AO garantizado, anclaje SLAM nativo y purga total de VRAM
     e.registerComponent({
       name: "dish-spawner",
       schema: { prefab: "eid" },
@@ -258,7 +258,7 @@
                 m.needsUpdate = true;
               });
 
-              // v4.62: Desbloqueo de las flechas únicamente al finalizar la cinemática completa
+              // v4.64: Desbloqueo de las flechas únicamente al finalizar la cinemática completa
               if (window.notificarSpawnFinalizado) {
                 window.notificarSpawnFinalizado();
               }
@@ -315,7 +315,7 @@
             };
             requestAnimationFrame(comprobarMallaLista);
           })
-          // v4.62: Hundimiento opaco, anclaje SLAM, sombras Contact AO y purga exhaustiva de VRAM
+          // v4.64: Hundimiento opaco, anclaje SLAM, sombras Contact AO y purga exhaustiva de VRAM
           .listen(t.events.globalId, "switch-dish-model", ev => {
             if (!isPlaced || !spawnedEid || isTransitioning || !ev.data || !ev.data.modelSrc || !window.THREE) return;
             isTransitioning = true;
@@ -406,7 +406,7 @@
                     newModel.rotation.set(0, 0, 0);
                     newModel.scale.set(1, 1, 1);
 
-                    // v4.62: Asegurar que el nuevo modelo proyecte sombras sobre Ground (Contact AO)
+                    // v4.64: Asegurar que el nuevo modelo proyecte sombras sobre Ground (Contact AO)
                     newModel.traverse((c) => {
                       if (c.isMesh) {
                         c.castShadow = true;
