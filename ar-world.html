@@ -1,4 +1,4 @@
-<!-- 9th Wall v4.64 (Dual-Lobe Specular System Locked / Multi-Select Photo Strip & Native Share / Gallery Backbutton Interception / 1-Tap Auto-Save / Landscape Warning Blocker) -->
+<!-- 9th Wall v4.64x (Dual-Lobe Specular System Locked / Multi-Select Photo Strip & Native Share / Gallery Backbutton Interception / 1-Tap Auto-Save / Landscape Warning Blocker) -->
 <html>
 <head>
   <meta charset="UTF-8">
@@ -18,7 +18,7 @@
     style="position:fixed;top:10px;right:10px;z-index:1000000;background:rgba(0,0,0,0.9);color:#0f0;font-family:monospace;font-size:12px;padding:8px;border-radius:4px;cursor:pointer;line-height:1.3;border:1px solid #0f0;display:none;pointer-events:auto;">
     <div id="debugTitle">FPS: --</div>
     <div id="debugContent">
-      ar-world: v4.64<br>
+      ar-world: v4.64x<br>
       bundle: v4.64<br>
       <span id="envVerdictSpan" style="color:#0f0;">Entorno: ESPERANDO MESA...</span><br>
       <span id="telemetrySpan" style="color:#0f0;">P98: -- (/255) | Lum: -- (/255) | Cálido: --%</span><br>
@@ -427,15 +427,15 @@
     // =========================================================================
     const SPECULAR_CONFIG = {
       // Capa 1: Lóbulo THIN (Núcleo nítido puntual)
-      thin_intensity: 0.80,      // Multiplicador de brillo / energía del núcleo
-      thin_expansion: 1.00,      // Exponente de concentración (mayor = más fino/puntual)
+      thin_intensity: 1.00,      // Multiplicador de brillo / energía del núcleo
+      thin_expansion: 0.80,      // Exponente de concentración (mayor = más fino/puntual)
 
       // Capa 2: Lóbulo WIDE (Halo suave difuso)
-      wide_intensity: 0.65,      // Multiplicador de brillo / presencia del halo
-      wide_expansion: 0.70,      // Exponente de dispersión (menor = más extendido/sedoso)
+      wide_intensity: 1.20,      // Multiplicador de brillo / presencia del halo
+      wide_expansion: 0.40,      // Exponente de dispersión (menor = más extendido/sedoso)
 
       // Atenuación difusa en modo BOTH (Equilibrio de energía Checkpoint vB1.03)
-      both_diffuse_mult: 0.75
+      both_diffuse_mult: 0.85
     };
 
     // =========================================================================
