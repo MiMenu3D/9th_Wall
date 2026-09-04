@@ -1,4 +1,4 @@
-<!-- 9th Wall v4.62 (Dual-Lobe Specular System Locked / Multi-Select Photo Strip & Native Share / Gallery Backbutton Interception / 1-Tap Auto-Save / Landscape Warning Blocker) -->
+<!-- 9th Wall v4.62x (Dual-Lobe Specular System Locked / Multi-Select Photo Strip & Native Share / Gallery Backbutton Interception / 1-Tap Auto-Save / Landscape Warning Blocker) -->
 <html>
 <head>
   <meta charset="UTF-8">
@@ -453,15 +453,15 @@
     // =========================================================================
     const SPECULAR_CONFIG = {
       // Capa 1: Lóbulo THIN (Núcleo nítido puntual)
-      thin_intensity: 0.50,      // Multiplicador de brillo / energía del núcleo
-      thin_expansion: 1.30,      // Exponente de concentración (mayor = más fino/puntual)
+      thin_intensity: 0.70,      // Multiplicador de brillo / energía del núcleo
+      thin_expansion: 0.90,      // Exponente de concentración (mayor = más fino/puntual)
 
       // Capa 2: Lóbulo WIDE (Halo suave difuso)
-      wide_intensity: 0.65,      // Multiplicador de brillo / presencia del halo
-      wide_expansion: 0.55,      // Exponente de dispersión (menor = más extendido/sedoso)
+      wide_intensity: 0.85,      // Multiplicador de brillo / presencia del halo
+      wide_expansion: 0.65,      // Exponente de dispersión (menor = más extendido/sedoso)
 
       // Atenuación difusa en modo BOTH (Equilibrio de energía Checkpoint vB1.03)
-      both_diffuse_mult: 0.65
+      both_diffuse_mult: 0.85
     };
 
     const LIGHTING_CONFIG = {
