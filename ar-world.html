@@ -1,9 +1,9 @@
-<!-- 9th Wall v4.66 (Dual-Lobe Additive Specular / Diffuse Leveler Hooked / Clean UI & Gallery) -->
+<!-- 9th Wall v4.64z (Dual-Lobe Specular System Locked / Multi-Select Photo Strip & Native Share / Gallery Backbutton Interception / 1-Tap Auto-Save / Landscape Warning Blocker) -->
 <html>
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no,viewport-fit=cover">
-  <title>9th Wall AR 4.66</title>
+  <title>9th Wall AR 4.64</title>
   <script crossorigin="anonymous" src="external/runtime/runtime.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@8thwall/engine-binary@1/dist/xr.js" async crossorigin="anonymous" data-preload-chunks="slam"></script>
   <script src="https://cdn.jsdelivr.net/npm/@8thwall/landing-page@1/dist/landing-page.js" crossorigin="anonymous"></script>
@@ -18,7 +18,7 @@
     style="position:fixed;top:10px;right:10px;z-index:1000000;background:rgba(0,0,0,0.9);color:#0f0;font-family:monospace;font-size:12px;padding:8px;border-radius:4px;cursor:pointer;line-height:1.3;border:1px solid #0f0;display:none;pointer-events:auto;">
     <div id="debugTitle">FPS: --</div>
     <div id="debugContent">
-      ar-world: v4.66<br>
+      ar-world: v4.64z<br>
       bundle: v4.64<br>
       <span id="envVerdictSpan" style="color:#0f0;">Entorno: ESPERANDO MESA...</span><br>
       <span id="telemetrySpan" style="color:#0f0;">P98: -- (/255) | Lum: -- (/255) | Cálido: --%</span><br>
@@ -32,7 +32,7 @@
     #debugLog.minimized #debugContent { display: none; }
   </style>
 
-  <!-- Bloqueador visual para posición vertical -->
+  <!-- Bloqueador visual para posición vertical (v4.62) -->
   <div id="orientationBlocker">
     <svg viewBox="0 0 24 24" width="48" height="48" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-bottom:16px;">
       <rect x="5" y="2" width="14" height="20" rx="2" ry="2"></rect>
@@ -74,7 +74,7 @@
   </button>
 
   <!-- ========================================================================= -->
-  <!-- UI CLEAN: CARRUSEL AR, CAPTURA DE FOTOS LIMPIA Y VISOR MULTI-SELECT       -->
+  <!-- UI CLEAN: CARRUSEL AR, CAPTURA DE FOTOS LIMPIA Y VISOR MULTI-SELECT (v4.62) -->
   <!-- ========================================================================= -->
 
   <!-- Flechas laterales de cambio de plato -->
@@ -128,6 +128,7 @@
   </div>
 
   <style>
+    /* v4.62: Bloqueador visual de orientación vertical (Landscape Warning Overlay) */
     #orientationBlocker {
       display: none;
       position: fixed;
@@ -153,6 +154,7 @@
       }
     }
 
+    /* Estilos del Carrusel y Captura Limpia */
     .ar-nav-arrow {
       position: fixed;
       top: 50%;
@@ -243,6 +245,7 @@
     }
     #shutterBtn:active #shutterInner { transform: scale(0.90); }
 
+    /* Destello sutil fotográfico (30% opacidad y 80ms) */
     #captureFlash {
       position: fixed;
       inset: 0;
@@ -263,6 +266,7 @@
       z-index: 999997;
     }
 
+    /* Visor de Fotos con Tira de Miniaturas */
     #mediaViewerModal {
       position: fixed;
       inset: 0;
@@ -339,6 +343,7 @@
     #viewerPrevBtn { left: 12px; }
     #viewerNextBtn { right: 12px; }
 
+    /* Tira horizontal de miniaturas con selector */
     #thumbnailStripWrapper {
       width: 100vw;
       overflow-x: auto;
@@ -416,38 +421,21 @@
   </style>
 
   <script>
+    // [INMUTABLE - NO MODIFICAR BAJO NINGÚN CONCEPTO: CONSOLA DE ESPECULARES v4.53 CONSOLIDADA]
     // =========================================================================
-    // 2. CONSOLA DE ESPECULARES (v4.66 - Control Aditivo Directo e Intuitivo)
+    // 2. CONSOLA DE ESPECULARES (Ajuste rápido de lóbulos Thin, Wide y Both - v4.53 Checkpoint)
     // =========================================================================
     const SPECULAR_CONFIG = {
-      // -----------------------------------------------------------------------
-      // CAPA 1: LÓBULO THIN (Núcleo puntual / Destello nítido)
-      // -----------------------------------------------------------------------
-      thin_intensity: 0.85,  // INTENSIDAD / BRILLO:
-                             // • Subir valor = Más brillante y potente.
-                             // • Bajar valor = Más tenue y apagado.
+      // Capa 1: Lóbulo THIN (Núcleo nítido puntual)
+      thin_intensity: 0.85,      // Multiplicador de brillo / energía del núcleo
+      thin_expansion: 0.90,      // Exponente de concentración (mayor = más fino/puntual)
 
-      thin_expansion: 1.90,  // CONCENTRACIÓN / TAMAÑO DEL NÚCLEO:
-                             // • SUBIR (> 1.0) = Núcleo MÁS PEQUEÑO, fino y afilado (tipo aguja/punto).
-                             // • BAJAR (< 1.0) = Núcleo MÁS GRANDE y expandido.
+      // Capa 2: Lóbulo WIDE (Halo suave difuso)
+      wide_intensity: 0.50,      // Multiplicador de brillo / presencia del halo
+      wide_expansion: 0.70,      // Exponente de dispersión (menor = más extendido/sedoso)
 
-      // -----------------------------------------------------------------------
-      // CAPA 2: LÓBULO WIDE (Halo suave / Barniz satinado)
-      // -----------------------------------------------------------------------
-      wide_intensity: 0.55,  // INTENSIDAD / BRILLO DEL HALO:
-                             // • Subir valor = Halo más visible y marcado.
-                             // • Bajar valor = Halo más sutil y suave.
-
-      wide_expansion: 0.70,  // DISPERSIÓN / EXTENSIÓN DEL HALO:
-                             // • BAJAR (< 1.0) = Halo MÁS EXTENDIDO y amplio por la pieza.
-                             // • SUBIR (> 1.0) = Halo MÁS RECOGIDO hacia el centro.
-
-      // -----------------------------------------------------------------------
-      // NIVELADOR DIFUSO (Modo BOTH)
-      // -----------------------------------------------------------------------
-      // • 1.00 = 100% color difuso real intacto.
-      // • 0.90 = Atenúa un 10% el color base para dar más protagonismo y contraste al brillo.
-      both_diffuse_mult: 0.90
+      // Atenuación difusa en modo BOTH (Equilibrio de energía Checkpoint vB1.03)
+      both_diffuse_mult: 1.00
     };
 
     // =========================================================================
@@ -463,13 +451,14 @@
       night_shadow_radius: 8.0,
       ground_opacity_fixed: 0.40,
 
+      // Presupuestos maestros consolidados (-10% día, -8% ambiente, +PMREM)
       day_total_energy: 4.68,
       day_pmrem_mult: 1.65,
       day_pedestal: 0.035,
 
-      night_total_energy: 0.85,
-      night_pmrem_mult: 3.35,
-      night_pedestal: 0.045,
+      night_total_energy: 0.74,
+      night_pmrem_mult: 3.45,
+      night_pedestal: 0.050,
 
       weights_1_light: [1.00],
       weights_2_lights: [0.60, 0.40],
@@ -526,6 +515,7 @@
       }
     };
 
+    // v4.64: Desbloqueo nativo (.disabled = false) al terminar la cinemática de spawn
     window.notificarSpawnFinalizado = function () {
       const prevBtn = document.getElementById('prevDishBtn');
       const nextBtn = document.getElementById('nextDishBtn');
@@ -564,7 +554,8 @@
     let currentPedestal = LIGHTING_CONFIG.day_pedestal;
     let environmentFactor = 0.0;
 
-    let currentSpecularMode = 2; // 0: THIN, 1: WIDE, 2: BOTH
+    // v4.53: Estado del modo especular (0: THIN, 1: WIDE, 2: BOTH por defecto)
+    let currentSpecularMode = 2;
 
     const crearRanuraLuz = () => ({
       light: null,
@@ -623,6 +614,8 @@
 
     document.getElementById('envToggle').addEventListener('click', () => toggleEnv());
 
+    // [INMUTABLE - NO MODIFICAR BAJO NINGÚN CONCEPTO: CONMUTADOR ESPECULAR v4.53]
+    // v4.53: Conmutador dinámico de modo especular 100% en tiempo real por Uniform en GPU
     const specToggleBtn = document.getElementById('specToggle');
     if (specToggleBtn) {
       specToggleBtn.addEventListener('click', () => {
@@ -730,9 +723,8 @@
       secretTrigger.addEventListener('pointerdown', procesarToqueSecreto);
     }
 
-    // =========================================================================
-    // INYECCIÓN PBR CON DOBLE LÓBULO ADITIVO PURO (v4.66)
-    // =========================================================================
+    // [INMUTABLE - NO MODIFICAR BAJO NINGÚN CONCEPTO: INYECCIÓN PBR Y SHADERS v4.53]
+    // v4.53: Inyección PBR con Doble Lóbulo Aditivo Puro en GPU y Ruido Continuo 3D Estocástico
     window.aplicarAjustesSceneViewer = function (targetNode) {
       const root = targetNode || _scene;
       if (!root) return;
@@ -751,6 +743,7 @@
               mat.onBeforeCompile = (shader) => {
                 shader.uniforms.uSpecularMode = mat.userData.uSpecularMode;
 
+                // v4.53: Pasamos posición local 3D sin cálculos pesados en vértices
                 shader.vertexShader = shader.vertexShader.replace(
                   '#include <common>',
                   `
@@ -775,7 +768,7 @@
                   `
                 );
 
-                // Micro-relieve continuo orgánico 3D estocástico
+                // v4.53: Micro-relieve continuo orgánico 3D estocástico (amplitud bloqueada a 0.0235)
                 shader.fragmentShader = shader.fragmentShader.replace(
                   '#include <normal_fragment_begin>',
                   `
@@ -796,7 +789,7 @@
                   `
                 );
 
-                // v4.66: Doble Lóbulo Aditivo Directo con Nivelador Difuso conectado
+                // v4.53: Doble Lóbulo Aditivo Puro parametrizado directamente desde SPECULAR_CONFIG
                 shader.fragmentShader = shader.fragmentShader.replace(
                   '#include <lights_fragment_end>',
                   `
@@ -1200,6 +1193,7 @@
                       if (py < minCoreY) minCoreY = py; if (py > maxCoreY) maxCoreY = py;
                     }
 
+                    // Evaluación de Calidez Global del píxel
                     const cb = -0.168736 * r - 0.331264 * g + 0.5 * b + 128;
                     const cr = 0.5 * r - 0.418688 * g - 0.081312 * b + 128;
                     if (lum >= 15 && cr > (cb + 4)) {
@@ -1304,6 +1298,7 @@
 
                       actualizarHUDTelemetria(verdict, avgP98, avgLumFinal, avgWarmRatio * 100);
 
+                      // Inyección post-calibración directa del pedestal actualizado sobre materiales existentes
                       if (_scene && window.aplicarAjustesSceneViewer) {
                         window.aplicarAjustesSceneViewer(_scene);
                       }
@@ -1601,7 +1596,7 @@
     };
 
     // =========================================================================
-    // LÓGICA DE CARRUSEL, CAPTURA DE FOTOS Y VISOR MULTI-SELECT (v4.66)
+    // LÓGICA DE CARRUSEL, CAPTURA DE FOTOS Y VISOR MULTI-SELECT (v4.64)
     // =========================================================================
     const _modelsList = [
       "Plato_01.glb", "Plato_02.glb", "Plato_03.glb", "Plato_04.glb",
@@ -1638,7 +1633,7 @@
     nextDishBtn.addEventListener('click', () => cambiarPlatoAR(1));
 
     // =========================================================================
-    // CAPTURA DIRECTA Y GUARDADO INSTANTÁNEO EN UN TOQUE (v4.66)
+    // CAPTURA DIRECTA Y GUARDADO INSTANTÁNEO EN UN TOQUE (v4.64)
     // =========================================================================
     const sessionCapturedMedia = [];
     const selectedIndices = new Set();
@@ -1717,6 +1712,7 @@
       const dataUrl = offCanvas.toDataURL('image/jpeg', 0.95);
       const fileName = `Plato_AR_${Date.now()}.jpg`;
 
+      // 1. Descarga/Guardado directo e inmediato en el almacenamiento
       const downloadAnchor = document.createElement('a');
       downloadAnchor.href = dataUrl;
       downloadAnchor.download = fileName;
@@ -1724,17 +1720,19 @@
       downloadAnchor.click();
       document.body.removeChild(downloadAnchor);
 
+      // 2. Registro en memoria
       const newIdx = sessionCapturedMedia.length;
       sessionCapturedMedia.push({ url: dataUrl, name: fileName });
       selectedIndices.add(newIdx);
 
+      // 3. Feedback visual
       dispararAnimacionCaptura(dataUrl);
     };
 
     shutterBtn.addEventListener('click', capturarYGuardarFoto);
 
     // =========================================================================
-    // VISOR DE FOTOS CON TIRA DE MINIATURAS Y SELECTOR MÚLTIPLE (v4.66)
+    // VISOR DE FOTOS CON TIRA DE MINIATURAS Y SELECTOR MÚLTIPLE (v4.64)
     // =========================================================================
     const renderizarTiraMiniaturas = () => {
       thumbnailStripContainer.innerHTML = '';
@@ -1805,6 +1803,7 @@
     const abrirVisorFotos = () => {
       if (sessionCapturedMedia.length > 0) {
         currentViewerIndex = sessionCapturedMedia.length - 1;
+        // Inyectamos estado de historial local para que el botón Atrás no salga al menú principal
         history.pushState({ modalAbierto: true }, '');
         actualizarContenidoVisor();
         mediaViewerModal.style.display = 'flex';
@@ -1814,6 +1813,7 @@
     const cerrarVisorFotos = () => {
       if (mediaViewerModal.style.display === 'flex') {
         mediaViewerModal.style.display = 'none';
+        // Si el modal se cierra con la cruz, limpiamos el estado del historial
         if (history.state && history.state.modalAbierto) {
           history.back();
         }
@@ -1823,6 +1823,7 @@
     galleryThumbnailBtn.addEventListener('click', abrirVisorFotos);
     closeViewerBtn.addEventListener('click', cerrarVisorFotos);
 
+    // Intercepción del botón Atrás del móvil para cerrar el visor y quedarse en la AR
     window.addEventListener('popstate', (e) => {
       if (mediaViewerModal.style.display === 'flex') {
         mediaViewerModal.style.display = 'none';
@@ -1843,6 +1844,7 @@
       sessionCapturedMedia.splice(currentViewerIndex, 1);
       selectedIndices.delete(currentViewerIndex);
 
+      // Reindexamos seleccionados
       const reindexed = new Set();
       selectedIndices.forEach(idx => {
         if (idx > currentViewerIndex) reindexed.add(idx - 1);
@@ -1860,6 +1862,7 @@
       }
     });
 
+    // Compartir nativo con soporte para multi-selección estricta
     shareMediaBtn.addEventListener('click', async () => {
       if (sessionCapturedMedia.length === 0) return;
 
