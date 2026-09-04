@@ -1,4 +1,4 @@
-<!-- 9th Wall v4.65x (Dual-Lobe Direct Additive Specular / Unconstrained Energy / Full Diffuse Preservation / Clean UI & Gallery) -->
+<!-- 9th Wall v4.65y (Dual-Lobe Direct Additive Specular / Unconstrained Energy / Full Diffuse Preservation / Clean UI & Gallery) -->
 <html>
 <head>
   <meta charset="UTF-8">
@@ -18,7 +18,7 @@
     style="position:fixed;top:10px;right:10px;z-index:1000000;background:rgba(0,0,0,0.9);color:#0f0;font-family:monospace;font-size:12px;padding:8px;border-radius:4px;cursor:pointer;line-height:1.3;border:1px solid #0f0;display:none;pointer-events:auto;">
     <div id="debugTitle">FPS: --</div>
     <div id="debugContent">
-      ar-world: v4.65x<br>
+      ar-world: v4.65y<br>
       bundle: v4.65<br>
       <span id="envVerdictSpan" style="color:#0f0;">Entorno: ESPERANDO MESA...</span><br>
       <span id="telemetrySpan" style="color:#0f0;">P98: -- (/255) | Lum: -- (/255) | Cálido: --%</span><br>
@@ -434,16 +434,18 @@
       // -----------------------------------------------------------------------
       // CAPA 2: LÓBULO WIDE (Halo suave / Barniz satinado)
       // -----------------------------------------------------------------------
-      wide_intensity: 0.75,  // INTENSIDAD / BRILLO DEL HALO: (antes 0.60)
+      wide_intensity: 0.55,  // INTENSIDAD / BRILLO DEL HALO: (antes 0.60)
                              // • Subir valor = Halo más visible y marcado.
                              // • Bajar valor = Halo más sutil y suave.
 
-      wide_expansion: 0.55   // DISPERSIÓN / EXTENSIÓN DEL HALO: (antes 0.85)
+      wide_expansion: 0.70   // DISPERSIÓN / EXTENSIÓN DEL HALO: (antes 0.85)
                              // • BAJAR (< 1.0) = Halo MÁS EXTENDIDO y amplio por la pieza.
                              // • SUBIR (> 1.0) = Halo MÁS RECOGIDO hacia el centro.
 
-      // NOTA MODO BOTH: Suma ambos lóbulos directamente de forma aditiva (Thin + Wide)
-      // sin recortar ni apagar jamás el color difuso del plato (100% preservado).
+       // Nivelador del color difuso en modo BOTH:
+       // • 1.00 = 100% color difuso real intacto.
+       // • 0.90 = Atenúa un 10% el color base para dar más protagonismo y contraste al brillo.
+        both_diffuse_mult: 0.90
     };
 
     // =========================================================================
@@ -806,6 +808,8 @@
                   } else if (uSpecularMode == 1) {
                     reflectedLight.directSpecular = specWide;
                   } else {
+                    // AQUÍ: Se atenúa el difuso según el valor de la consola (0.90)
+                  reflectedLight.directDiffuse *= ${SPECULAR_CONFIG.both_diffuse_mult.toFixed(2)};
                     reflectedLight.directSpecular = specThin + specWide;
                   }
                   `
