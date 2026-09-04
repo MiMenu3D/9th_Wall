@@ -1,9 +1,9 @@
-<!-- 9th Wall v4.65y (Dual-Lobe Direct Additive Specular / Unconstrained Energy / Full Diffuse Preservation / Clean UI & Gallery) -->
+<!-- 9th Wall v4.66 (Dual-Lobe Additive Specular / Diffuse Leveler Hooked / Clean UI & Gallery) -->
 <html>
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no,viewport-fit=cover">
-  <title>9th Wall AR 4.65</title>
+  <title>9th Wall AR 4.66</title>
   <script crossorigin="anonymous" src="external/runtime/runtime.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@8thwall/engine-binary@1/dist/xr.js" async crossorigin="anonymous" data-preload-chunks="slam"></script>
   <script src="https://cdn.jsdelivr.net/npm/@8thwall/landing-page@1/dist/landing-page.js" crossorigin="anonymous"></script>
@@ -18,8 +18,8 @@
     style="position:fixed;top:10px;right:10px;z-index:1000000;background:rgba(0,0,0,0.9);color:#0f0;font-family:monospace;font-size:12px;padding:8px;border-radius:4px;cursor:pointer;line-height:1.3;border:1px solid #0f0;display:none;pointer-events:auto;">
     <div id="debugTitle">FPS: --</div>
     <div id="debugContent">
-      ar-world: v4.65y<br>
-      bundle: v4.65<br>
+      ar-world: v4.66<br>
+      bundle: v4.64<br>
       <span id="envVerdictSpan" style="color:#0f0;">Entorno: ESPERANDO MESA...</span><br>
       <span id="telemetrySpan" style="color:#0f0;">P98: -- (/255) | Lum: -- (/255) | Cálido: --%</span><br>
       <span id="benchmarkSpan" style="color:#0f0;">Pre: --sec - Post: --sec</span><br>
@@ -417,35 +417,37 @@
 
   <script>
     // =========================================================================
-    // 2. CONSOLA DE ESPECULARES (v4.65 - Control Aditivo Directo e Intuitivo)
+    // 2. CONSOLA DE ESPECULARES (v4.66 - Control Aditivo Directo e Intuitivo)
     // =========================================================================
     const SPECULAR_CONFIG = {
       // -----------------------------------------------------------------------
       // CAPA 1: LÓBULO THIN (Núcleo puntual / Destello nítido)
       // -----------------------------------------------------------------------
-      thin_intensity: 0.85,  // INTENSIDAD / BRILLO: (antes 1.00)
+      thin_intensity: 0.85,  // INTENSIDAD / BRILLO:
                              // • Subir valor = Más brillante y potente.
                              // • Bajar valor = Más tenue y apagado.
 
-      thin_expansion: 1.90,  // CONCENTRACIÓN / TAMAÑO DEL NÚCLEO: )antes 2.20)
+      thin_expansion: 1.90,  // CONCENTRACIÓN / TAMAÑO DEL NÚCLEO:
                              // • SUBIR (> 1.0) = Núcleo MÁS PEQUEÑO, fino y afilado (tipo aguja/punto).
                              // • BAJAR (< 1.0) = Núcleo MÁS GRANDE y expandido.
 
       // -----------------------------------------------------------------------
       // CAPA 2: LÓBULO WIDE (Halo suave / Barniz satinado)
       // -----------------------------------------------------------------------
-      wide_intensity: 0.55,  // INTENSIDAD / BRILLO DEL HALO: (antes 0.60)
+      wide_intensity: 0.55,  // INTENSIDAD / BRILLO DEL HALO:
                              // • Subir valor = Halo más visible y marcado.
                              // • Bajar valor = Halo más sutil y suave.
 
-      wide_expansion: 0.70   // DISPERSIÓN / EXTENSIÓN DEL HALO: (antes 0.85)
+      wide_expansion: 0.70,  // DISPERSIÓN / EXTENSIÓN DEL HALO:
                              // • BAJAR (< 1.0) = Halo MÁS EXTENDIDO y amplio por la pieza.
                              // • SUBIR (> 1.0) = Halo MÁS RECOGIDO hacia el centro.
 
-       // Nivelador del color difuso en modo BOTH:
-       // • 1.00 = 100% color difuso real intacto.
-       // • 0.90 = Atenúa un 10% el color base para dar más protagonismo y contraste al brillo.
-        both_diffuse_mult: 0.90
+      // -----------------------------------------------------------------------
+      // NIVELADOR DIFUSO (Modo BOTH)
+      // -----------------------------------------------------------------------
+      // • 1.00 = 100% color difuso real intacto.
+      // • 0.90 = Atenúa un 10% el color base para dar más protagonismo y contraste al brillo.
+      both_diffuse_mult: 0.90
     };
 
     // =========================================================================
@@ -729,7 +731,7 @@
     }
 
     // =========================================================================
-    // INYECCIÓN PBR CON DOBLE LÓBULO ADITIVO PURO (v4.65)
+    // INYECCIÓN PBR CON DOBLE LÓBULO ADITIVO PURO (v4.66)
     // =========================================================================
     window.aplicarAjustesSceneViewer = function (targetNode) {
       const root = targetNode || _scene;
@@ -794,7 +796,7 @@
                   `
                 );
 
-                // v4.65: Doble Lóbulo Aditivo Directo (Difuso intacto al 100% y suma especular sin limitaciones)
+                // v4.66: Doble Lóbulo Aditivo Directo con Nivelador Difuso conectado
                 shader.fragmentShader = shader.fragmentShader.replace(
                   '#include <lights_fragment_end>',
                   `
@@ -808,8 +810,7 @@
                   } else if (uSpecularMode == 1) {
                     reflectedLight.directSpecular = specWide;
                   } else {
-                    // AQUÍ: Se atenúa el difuso según el valor de la consola (0.90)
-                  reflectedLight.directDiffuse *= ${SPECULAR_CONFIG.both_diffuse_mult.toFixed(2)};
+                    reflectedLight.directDiffuse *= ${SPECULAR_CONFIG.both_diffuse_mult.toFixed(2)};
                     reflectedLight.directSpecular = specThin + specWide;
                   }
                   `
@@ -1600,7 +1601,7 @@
     };
 
     // =========================================================================
-    // LÓGICA DE CARRUSEL, CAPTURA DE FOTOS Y VISOR MULTI-SELECT (v4.65)
+    // LÓGICA DE CARRUSEL, CAPTURA DE FOTOS Y VISOR MULTI-SELECT (v4.66)
     // =========================================================================
     const _modelsList = [
       "Plato_01.glb", "Plato_02.glb", "Plato_03.glb", "Plato_04.glb",
@@ -1637,7 +1638,7 @@
     nextDishBtn.addEventListener('click', () => cambiarPlatoAR(1));
 
     // =========================================================================
-    // CAPTURA DIRECTA Y GUARDADO INSTANTÁNEO EN UN TOQUE (v4.65)
+    // CAPTURA DIRECTA Y GUARDADO INSTANTÁNEO EN UN TOQUE (v4.66)
     // =========================================================================
     const sessionCapturedMedia = [];
     const selectedIndices = new Set();
@@ -1716,7 +1717,6 @@
       const dataUrl = offCanvas.toDataURL('image/jpeg', 0.95);
       const fileName = `Plato_AR_${Date.now()}.jpg`;
 
-      // Guardado automático instantáneo en un toque
       const downloadAnchor = document.createElement('a');
       downloadAnchor.href = dataUrl;
       downloadAnchor.download = fileName;
@@ -1734,7 +1734,7 @@
     shutterBtn.addEventListener('click', capturarYGuardarFoto);
 
     // =========================================================================
-    // VISOR DE FOTOS CON TIRA DE MINIATURAS Y SELECTOR MÚLTIPLE (v4.65)
+    // VISOR DE FOTOS CON TIRA DE MINIATURAS Y SELECTOR MÚLTIPLE (v4.66)
     // =========================================================================
     const renderizarTiraMiniaturas = () => {
       thumbnailStripContainer.innerHTML = '';
