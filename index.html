@@ -1,9 +1,9 @@
-<!-- Versión: 9th_Design v5.00 -->
+<!-- Versión: 9th_Design v5.01 -->
 <!DOCTYPE html>
 <html lang="es">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
   
   <meta name="theme-color" content="#040507">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -20,7 +20,7 @@
 
   <style>
     /* ==========================================================================
-       1. RESET Y VARIABLES GLOBALES
+       1. RESET Y VARIABLES GLOBALES (BLOQUEO ESTRICTO DE SCROLL HORIZONTAL)
        ========================================================================== */
     *, *::before, *::after {
       box-sizing: border-box;
@@ -47,6 +47,36 @@
       color: var(--color-text-active);
       font-family: var(--font-fredoka);
       overflow: hidden;
+      position: fixed;
+      inset: 0;
+      overscroll-behavior-x: none;
+      touch-action: pan-y;
+    }
+
+    /* Bloqueador visual para posición vertical (Landscape Warning) */
+    #orientationBlocker {
+      display: none;
+      position: fixed;
+      inset: 0;
+      width: 100vw;
+      height: 100vh;
+      background: #040507;
+      z-index: 1000005;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      color: white;
+      font-family: var(--font-fredoka);
+      text-align: center;
+      padding: 24px;
+      box-sizing: border-box;
+      pointer-events: auto;
+    }
+
+    @media screen and (orientation: landscape) {
+      #orientationBlocker {
+        display: flex;
+      }
     }
 
     /* ==========================================================================
@@ -58,7 +88,8 @@
       max-width: 30rem;
       height: 100dvh;
       margin: 0 auto;
-      overflow: hidden;
+      overflow-x: hidden;
+      overflow-y: hidden;
       display: flex;
       flex-direction: column;
       background-color: var(--color-bg-base);
@@ -131,7 +162,7 @@
       transform: translateY(-50%) scale(0.92);
     }
 
-    /* Icono flotante indicador de interacción táctil */
+    /* Icono flotante indicador de gestos (-15% de escala = 46px) */
     .gesture-hint-overlay {
       position: absolute;
       inset: 0;
@@ -147,16 +178,16 @@
       opacity: 1;
     }
     .gesture-hint-icon {
-      width: 54px;
-      height: 54px;
+      width: 46px;
+      height: 46px;
       filter: drop-shadow(0 2px 8px rgba(0,0,0,0.6));
       animation: gestureSweep 2.2s ease-in-out infinite;
     }
     @keyframes gestureSweep {
-      0% { transform: scale(0.92) translateX(-22px) rotate(-7deg); opacity: 0.85; }
+      0% { transform: scale(0.92) translateX(-19px) rotate(-7deg); opacity: 0.85; }
       40% { transform: scale(1.0) translateX(0px) rotate(0deg); opacity: 1; }
-      70% { transform: scale(0.98) translateX(22px) rotate(7deg); opacity: 0.95; }
-      100% { transform: scale(0.92) translateX(-22px) rotate(-7deg); opacity: 0.85; }
+      70% { transform: scale(0.98) translateX(19px) rotate(7deg); opacity: 0.95; }
+      100% { transform: scale(0.92) translateX(-19px) rotate(-7deg); opacity: 0.85; }
     }
 
     /* Botón "Ver en tu mesa" */
@@ -193,7 +224,7 @@
     }
 
     /* ==========================================================================
-       4. ZONA INFERIOR: CERÁMICA 3D (40% AZULADO + ARRANQUE ILUMINADO 225°)
+       4. ZONA INFERIOR: CERÁMICA 3D (3 CAPAS CON +5% ESCALA Y LUZ A 225°)
        ========================================================================== */
     .menu-section {
       position: relative;
@@ -224,11 +255,11 @@
       background: linear-gradient(90deg, #CCD6E0 0%, #DCE4EC 25%, #E8EFF5 50%, #F5F8FA 78%, #FFFFFF 100%);
     }
 
-    /* CAPA 1: Terraza central */
+    /* CAPA 1: Terraza central (+5% escala: 16.73rem × 12.53rem) */
     .layer-1 {
-      width: 15.9375rem;
-      height: 11.9375rem;
-      border-radius: 2.75rem;
+      width: 16.734rem;
+      height: 12.534rem;
+      border-radius: 2.8875rem;
       z-index: 5;
       box-shadow: 
         0.5rem 0.875rem 1.5rem rgba(18, 25, 40, 0.08),
@@ -237,11 +268,11 @@
         inset 0.75rem 0.75rem 2rem rgba(165, 180, 198, 0.35);
     }
 
-    /* CAPA 2: Terraza 1 */
+    /* CAPA 2: Terraza 1 (+5% escala: 22.51rem × 18.375rem) */
     .layer-2 {
-      width: 21.4375rem;
-      height: 17.5rem;
-      border-radius: 5rem;
+      width: 22.51rem;
+      height: 18.375rem;
+      border-radius: 5.25rem;
       z-index: 4;
       box-shadow: 
         0.75rem 1.125rem 1.875rem rgba(18, 25, 40, 0.065),
@@ -250,30 +281,17 @@
         inset 1rem 1rem 2.5rem rgba(165, 180, 198, 0.30);
     }
 
-    /* CAPA 3: Terraza 2 */
+    /* CAPA 3: Terraza 2 (+5% escala: 28.35rem × 24.15rem) */
     .layer-3 {
-      width: 27rem;
-      height: 23rem;
-      border-radius: 7.75rem;
+      width: 28.35rem;
+      height: 24.15rem;
+      border-radius: 8.1375rem;
       z-index: 3;
       box-shadow: 
         1rem 1.5rem 2.375rem rgba(18, 25, 40, 0.05),
         0.25rem 0.4375rem 0.875rem rgba(18, 25, 40, 0.02),
         inset -1.25rem -1.25rem 3rem rgba(255, 255, 255, 0.80),
         inset 1.25rem 1.25rem 3rem rgba(165, 180, 198, 0.25);
-    }
-
-    /* CAPA 4: Base exterior */
-    .layer-4 {
-      width: 32.5rem;
-      height: 28.5rem;
-      border-radius: 10.5rem;
-      z-index: 2;
-      box-shadow: 
-        1.375rem 2rem 3.125rem rgba(18, 25, 40, 0.04),
-        0.375rem 0.625rem 1.125rem rgba(18, 25, 40, 0.015),
-        inset -1.5rem -1.5rem 3.5rem rgba(255, 255, 255, 0.75),
-        inset 1.5rem 1.5rem 3.5rem rgba(165, 180, 198, 0.20);
     }
 
     /* Fades de scroll */
@@ -297,7 +315,7 @@
     }
 
     /* ==========================================================================
-       5. LISTA DE PLATOS Y CARD FLUIDA (ACCELERACIÓN GPU PURA + BLUR SANTO GRIAL)
+       5. LISTA DE PLATOS Y CARD FLUIDA (BLUR REDUCIDO 50% = 3px)
        ========================================================================== */
     .menu-list {
       position: relative;
@@ -314,7 +332,7 @@
       display: none;
     }
 
-    /* Inyección dinámica matemática de altura (calc(60dvh - 3.25rem)) para scroll sin topes físicos */
+    /* Inyección dinámica matemática de altura (INMUTABLE) */
     .menu-list.has-expanded {
       padding-bottom: calc(60dvh - 3.25rem) !important;
     }
@@ -337,7 +355,7 @@
       margin: 0;
     }
 
-    /* 1. SOMBRA AMBIENTAL BAJO EL CRISTAL */
+    /* 1. SOMBRA AMBIENTAL (CONTRACCIÓN HORIZONTAL INSTANTÁNEA 0.06s) */
     .glass-shadow {
       position: absolute;
       left: 2rem;
@@ -350,7 +368,7 @@
       box-shadow: 
         0 0.875rem 1.75rem rgba(18, 25, 40, 0.12),
         0 0.25rem 0.625rem rgba(18, 25, 40, 0.06);
-      transition: opacity 0.35s var(--ease-webflow), right 0.18s var(--ease-webflow), border-radius 0.18s var(--ease-webflow);
+      transition: opacity 0.35s var(--ease-webflow), right 0.06s ease-out, border-radius 0.06s ease-out;
       z-index: 2;
     }
 
@@ -393,7 +411,7 @@
       bottom: -0.5rem;
     }
 
-    /* 3. CRISTAL LÍQUIDO (BLUR 8px BLINDADO SOBRE CERÁMICA) */
+    /* 3. CRISTAL LÍQUIDO (BLUR 3px OPTIMIZADO + CONTRACCIÓN 0.06s) */
     .glass-overlay {
       position: absolute;
       left: 2rem;
@@ -407,8 +425,8 @@
         rgba(255, 255, 255, 0.18) 55%, 
         rgba(255, 255, 255, 0.03) 100%
       );
-      backdrop-filter: blur(8px);
-      -webkit-backdrop-filter: blur(8px);
+      backdrop-filter: blur(3px);
+      -webkit-backdrop-filter: blur(3px);
       opacity: 0;
       pointer-events: none;
       overflow: hidden;
@@ -416,7 +434,7 @@
         0 0.5rem 1.5rem rgba(18, 25, 40, 0.06),
         inset 0.09375rem 0.125rem 0.1875rem rgba(255, 255, 255, 0.92),
         inset -0.09375rem -0.125rem 0.25rem rgba(18, 25, 40, 0.04);
-      transition: opacity 0.35s var(--ease-webflow), right 0.18s var(--ease-webflow), border-radius 0.18s var(--ease-webflow);
+      transition: opacity 0.35s var(--ease-webflow), right 0.06s ease-out, border-radius 0.06s ease-out;
       z-index: 5;
     }
 
@@ -565,7 +583,7 @@
       width: 2.8rem;
     }
 
-    /* ICONO "MÁS INFO" (3 BARRAS APILADAS) */
+    /* ICONO "MÁS INFO" (DESAPARICIÓN ULTRA-RÁPIDA EN 0.03s) */
     .more-info-icon {
       position: absolute;
       display: flex;
@@ -594,7 +612,7 @@
     .menu-item.expanded .more-info-icon {
       opacity: 0;
       transform: scale(0.6);
-      transition: opacity 0.06s ease-out, transform 0.06s ease-out;
+      transition: opacity 0.03s ease-out, transform 0.03s ease-out;
     }
 
     /* CUERPO DEL CARD */
@@ -635,7 +653,7 @@
       display: none;
     }
 
-    /* PISTA Y ESFERA BLANCA */
+    /* PISTA CON LÍNEA GUÍA OSCURA RESTAURADA */
     .card-scroll-track {
       position: absolute;
       right: 0.3rem;
@@ -643,6 +661,18 @@
       bottom: 2.6rem;
       width: 0.6rem;
       pointer-events: none;
+    }
+
+    .card-scroll-track::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      bottom: 0;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 0.10rem;
+      background-color: rgba(0, 0, 0, 0.14);
+      border-radius: 0.05rem;
     }
 
     .card-scroll-dot {
@@ -671,11 +701,11 @@
       max-width: 86%;
     }
 
-    /* PRECIO */
+    /* PRECIO (BAJADO 10px = bottom: calc(1.2rem - 10px)) */
     .card-price {
       position: absolute;
       right: 3.2rem;
-      bottom: 1.2rem;
+      bottom: calc(1.2rem - 10px);
       font-size: 2.10rem;
       font-family: var(--font-fredoka);
       font-variation-settings: "wdth" 105, "wght" 300;
@@ -697,9 +727,21 @@
 </head>
 <body>
 
+  <!-- Bloqueador visual para posición vertical (Landscape Warning) -->
+  <div id="orientationBlocker">
+    <svg viewBox="0 0 24 24" width="48" height="48" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-bottom:16px;">
+      <rect x="5" y="2" width="14" height="20" rx="2" ry="2"></rect>
+      <line x1="12" y1="18" x2="12.01" y2="18"></line>
+      <path d="M17 6h2a2 2 0 0 1 2 2v2"></path>
+      <path d="M7 6H5a2 2 0 0 0-2 2v2"></path>
+    </svg>
+    <div style="font-size:18px; font-weight:bold; margin-bottom:8px;">Gira tu dispositivo</div>
+    <div style="font-size:14px; opacity:0.8;">Por favor, coloca el teléfono en posición vertical para continuar.</div>
+  </div>
+
   <main class="app-container">
 
-    <!-- ZONA SUPERIOR: Visor 3D reservado + Botón AR + Flechas AR -->
+    <!-- ZONA SUPERIOR: Visor 3D dinámico + Botón AR + Flechas AR -->
     <section class="viewer-section" id="viewerSection">
       
       <!-- Flechas de navegación (idénticas a ar-world.html) -->
@@ -707,46 +749,26 @@
       <button id="nextDishBtn" class="ar-nav-arrow" style="right:12px;" aria-label="Plato siguiente">&#8250;</button>
 
       <!-- Slot dinámico para model-viewer -->
-      <div class="viewer-slot" id="viewerSlot">
-        <model-viewer
-          id="mv"
-          src="Plato_01.glb"
-          autoplay
-          auto-rotate
-          auto-rotate-delay="0"
-          rotation-per-second="17deg"
-          camera-orbit="0deg 70deg 45%"
-          min-camera-orbit="0deg 0deg 45%"
-          max-camera-orbit="360deg 90deg 45%"
-          camera-controls="false"
-          touch-action="none"
-          disable-pan
-          disable-zoom
-          interaction-prompt="none"
-          shadow-intensity="0.4"
-          exposure="0.80">
-        </model-viewer>
+      <div class="viewer-slot" id="viewerSlot"></div>
 
-        <!-- Icono flotante con animación suave de barrido -->
-        <div class="gesture-hint-overlay" id="gestureHint">
-          <svg viewBox="0 0 48 48" fill="none" class="gesture-hint-icon">
-            <path d="M19 16V9a3 3 0 0 1 6 0v12" stroke="#FFFFFF" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
-            <path d="M25 19a3 3 0 0 1 6 0v2" stroke="#FFFFFF" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
-            <path d="M31 20a3 3 0 0 1 6 0v4c0 7-5 13-12 13s-11-5-11-10v-5a3 3 0 0 1 6 0v-2" stroke="#FFFFFF" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
-            <path d="M12 28a16 16 0 0 1 24 0" stroke="#00e5ff" stroke-width="2" stroke-linecap="round" stroke-dasharray="2 3" opacity="0.85"/>
-          </svg>
-        </div>
+      <!-- Icono flotante con animación de barrido (-15% de escala) -->
+      <div class="gesture-hint-overlay" id="gestureHint">
+        <svg viewBox="0 0 48 48" fill="none" class="gesture-hint-icon">
+          <path d="M19 16V9a3 3 0 0 1 6 0v12" stroke="#FFFFFF" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+          <path d="M25 19a3 3 0 0 1 6 0v2" stroke="#FFFFFF" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+          <path d="M31 20a3 3 0 0 1 6 0v4c0 7-5 13-12 13s-11-5-11-10v-5a3 3 0 0 1 6 0v-2" stroke="#FFFFFF" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+          <path d="M12 28a16 16 0 0 1 24 0" stroke="#00e5ff" stroke-width="2" stroke-linecap="round" stroke-dasharray="2 3" opacity="0.85"/>
+        </svg>
       </div>
 
       <button type="button" class="btn-ar" id="btn-ar"><span>Ver en tu mesa</span></button>
     </section>
 
-    <!-- ZONA INFERIOR: Topografía Cerámica 3D y Menú -->
+    <!-- ZONA INFERIOR: Topografía Cerámica 3D (3 Capas al +5%) y Menú -->
     <section class="menu-section">
       
-      <!-- 4 Terrazas de Cerámica Concéntricas -->
+      <!-- 3 Terrazas de Cerámica Concéntricas -->
       <div class="ceramic-viewport" id="ceramic-viewport">
-        <div class="ceramic-layer layer-4"></div>
         <div class="ceramic-layer layer-3"></div>
         <div class="ceramic-layer layer-2"></div>
         <div class="ceramic-layer layer-1"></div>
@@ -1327,8 +1349,9 @@
       const prevDishBtn = document.getElementById('prevDishBtn');
       const nextDishBtn = document.getElementById('nextDishBtn');
       const viewerSection = document.getElementById('viewerSection');
+      const viewerSlot = document.getElementById('viewerSlot');
       const gestureHint = document.getElementById('gestureHint');
-      let mv = document.getElementById('mv');
+      let mv = null;
 
       // Modelos 3D disponibles
       const models = [
@@ -1338,16 +1361,33 @@
         "Plato_13.glb", "Plato_14.glb", "Plato_15.glb"
       ];
 
+      // Detección estricta de recarga (F5/Reload): resetea al Plato 01 y purga memoria de gestos
+      const isPageReload = (() => {
+        const navEntries = performance.getEntriesByType('navigation');
+        if (navEntries.length > 0) {
+          return navEntries[0].type === 'reload';
+        }
+        return performance.navigation.type === 1;
+      })();
+
+      if (isPageReload) {
+        sessionStorage.removeItem('modelo_actual');
+        sessionStorage.removeItem('mv_interacted');
+      }
+
       let currentIndex = 0;
+      const initialSaved = sessionStorage.getItem('modelo_actual');
+      if (initialSaved !== null && !isNaN(parseInt(initialSaved))) {
+        currentIndex = parseInt(initialSaved);
+      }
 
       // ======================================================================
-      // 1. CINEMÁTICA Y FÍSICA: ARRANQUE EN 225° + INERCIA PESADA (40% AZULADO)
+      // 1. CINEMÁTICA Y FÍSICA: 3 CAPAS AL +5% (ARRANQUE 225° + INERCIA PESADA)
       // ======================================================================
       const layerElements = [
         document.querySelector('.layer-1'),
         document.querySelector('.layer-2'),
-        document.querySelector('.layer-3'),
-        document.querySelector('.layer-4')
+        document.querySelector('.layer-3')
       ];
 
       const BASE_SPEED = 0.055;
@@ -1356,8 +1396,7 @@
       const layerConfigs = [
         { delay: 0,   twistPower: 0.42, twistDamp: 0.958, scaleDip: 0.958, parallaxK: 1.80 },
         { delay: 170, twistPower: 0.82, twistDamp: 0.955, scaleDip: 0.969, parallaxK: 1.28 },
-        { delay: 340, twistPower: 0.35, twistDamp: 0.962, scaleDip: 0.980, parallaxK: 0.72 },
-        { delay: 510, twistPower: 0.12, twistDamp: 0.968, scaleDip: 0.989, parallaxK: 0.20 }
+        { delay: 340, twistPower: 0.35, twistDamp: 0.962, scaleDip: 0.980, parallaxK: 0.72 }
       ];
 
       // Ángulo inicial 225°: arranque con iluminación superior
@@ -1474,14 +1513,75 @@
       });
 
       // ======================================================================
-      // 6. GESTIÓN DEL MODEL-VIEWER Y SINCRONIZACIÓN TRIDIRECCIONAL
+      // 6. SISTEMA VECINAL DE MODELOS Y RECREACIÓN LIMPIA DOM
       // ======================================================================
+      const prefetchedModels = new Set();
+
+      function preloadNeighborhood(currentIdx) {
+        const prevIdx = (currentIdx - 1 + models.length) % models.length;
+        const nextIdx = (currentIdx + 1) % models.length;
+        [prevIdx, nextIdx].forEach(idx => {
+          const url = models[idx];
+          if (!prefetchedModels.has(url)) {
+            prefetchedModels.add(url);
+            const link = document.createElement('link');
+            link.rel = 'prefetch';
+            link.as = 'fetch';
+            link.href = url;
+            link.crossOrigin = 'anonymous';
+            document.head.appendChild(link);
+          }
+        });
+      }
+
+      function destroyModelViewer() {
+        if (viewerSlot) {
+          viewerSlot.innerHTML = '';
+        }
+        mv = null;
+      }
+
+      function createModelViewer() {
+        destroyModelViewer();
+
+        const newMv = document.createElement('model-viewer');
+        newMv.id = 'mv';
+        newMv.setAttribute('src', models[currentIndex]);
+        newMv.setAttribute('autoplay', '');
+        newMv.setAttribute('auto-rotate', '');
+        newMv.setAttribute('auto-rotate-delay', '0');
+        newMv.setAttribute('rotation-per-second', '17deg');
+        newMv.setAttribute('camera-orbit', '0deg 70deg 45%');
+        newMv.setAttribute('min-camera-orbit', '0deg 0deg 45%');
+        newMv.setAttribute('max-camera-orbit', '360deg 90deg 45%');
+        newMv.setAttribute('camera-controls', 'false');
+        newMv.setAttribute('touch-action', 'none');
+        newMv.setAttribute('disable-pan', '');
+        newMv.setAttribute('disable-zoom', '');
+        newMv.setAttribute('interaction-prompt', 'none');
+        newMv.setAttribute('shadow-intensity', '0.4');
+        newMv.setAttribute('exposure', '0.80');
+        newMv.style.opacity = '0';
+
+        newMv.addEventListener('load', () => {
+          newMv.style.opacity = '1';
+          preloadNeighborhood(currentIndex);
+        }, { once: true });
+
+        viewerSlot.appendChild(newMv);
+        mv = newMv;
+      }
+
       function updateModelViewer() {
-        if (!mv) return;
+        if (!mv) {
+          createModelViewer();
+          return;
+        }
         mv.style.opacity = '0';
         mv.setAttribute('src', models[currentIndex]);
         mv.addEventListener('load', () => {
           mv.style.opacity = '1';
+          preloadNeighborhood(currentIndex);
         }, { once: true });
       }
 
@@ -1530,7 +1630,7 @@
       });
 
       // ======================================================================
-      // 7. GESTIÓN DEL ICONO FLOTANTE DE GESTOS CON MEMORIA PERSISTENTE
+      // 7. GESTIÓN DEL ICONO FLOTANTE DE GESTOS (TIEMPOS AJUSTADOS Y SESSION)
       // ======================================================================
       let hintTimer1 = null;
       let hintTimer2 = null;
@@ -1538,8 +1638,8 @@
       let hintTimer4 = null;
 
       function dismissGestureHint() {
-        if (localStorage.getItem('mv_interacted') === '1') return;
-        localStorage.setItem('mv_interacted', '1');
+        if (sessionStorage.getItem('mv_interacted') === '1') return;
+        sessionStorage.setItem('mv_interacted', '1');
         clearTimeout(hintTimer1);
         clearTimeout(hintTimer2);
         clearTimeout(hintTimer3);
@@ -1551,33 +1651,32 @@
       }
 
       function initGestureHint() {
-        if (localStorage.getItem('mv_interacted') === '1' || !gestureHint) {
+        if (sessionStorage.getItem('mv_interacted') === '1' || !gestureHint) {
           if (gestureHint) gestureHint.remove();
           return;
         }
 
-        // Ciclo 1: espera 3s -> visible 3s -> fade out
+        // Ciclo 1: espera 5s -> visible 3s -> fade out
         hintTimer1 = setTimeout(() => {
           gestureHint.classList.add('visible');
 
           hintTimer2 = setTimeout(() => {
             gestureHint.classList.remove('visible');
 
-            // Ciclo 2: espera 6s -> visible 3s -> fade out definitivo
+            // Ciclo 2: pausa 10s -> visible 3s -> fade out definitivo
             hintTimer3 = setTimeout(() => {
               gestureHint.classList.add('visible');
 
               hintTimer4 = setTimeout(() => {
                 gestureHint.classList.remove('visible');
-                localStorage.setItem('mv_interacted', '1');
+                sessionStorage.setItem('mv_interacted', '1');
                 setTimeout(() => gestureHint.remove(), 400);
               }, 3000);
-            }, 6000);
+            }, 10000);
           }, 3000);
-        }, 3000);
+        }, 5000);
       }
 
-      // Desactivación inmediata ante cualquier toque en el visor
       viewerSection.addEventListener('pointerdown', dismissGestureHint, { passive: true });
       viewerSection.addEventListener('touchstart', dismissGestureHint, { passive: true });
 
@@ -1644,17 +1743,14 @@
       });
 
       // ======================================================================
-      // 9. LANZAMIENTO HACIA AR Y RESTAURACIÓN AL VOLVER
+      // 9. LANZAMIENTO HACIA AR Y RESTAURACIÓN LIMPIA AL VOLVER (CERO GLITCHES)
       // ======================================================================
       btnAr.addEventListener('click', () => {
         sessionStorage.setItem('from_ar', '1');
         sessionStorage.setItem('modelo_actual', currentIndex);
 
-        // Liberación limpia de contexto WebGL antes de navegar
-        if (mv) {
-          mv.style.opacity = '0';
-          mv.removeAttribute('src');
-        }
+        // Destrucción total antes de navegar (libera VRAM y evita frame congelado)
+        destroyModelViewer();
 
         window.location.href = 'ar-world.html';
       });
@@ -1670,21 +1766,13 @@
           }
         }
 
-        if (mv) {
-          mv.setAttribute('src', models[currentIndex]);
-          mv.addEventListener('load', () => {
-            mv.style.opacity = '1';
-          }, { once: true });
-        }
-
+        // Siempre instanciar un elemento model-viewer limpio sin memoria de canvas previa
+        createModelViewer();
         selectDish(currentIndex, true);
       });
 
-      // Inicialización de arranque
-      const initialSaved = sessionStorage.getItem('modelo_actual');
-      if (initialSaved !== null && !isNaN(parseInt(initialSaved))) {
-        currentIndex = parseInt(initialSaved);
-      }
+      // Arranque inicial
+      createModelViewer();
       selectDish(currentIndex, false);
     });
   </script>
