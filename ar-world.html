@@ -1,9 +1,9 @@
-<!-- 9th_Design v5.00 (Dual-Lobe Specular System Locked / Multi-Select Photo Strip & Native Share / Gallery Backbutton Interception / 1-Tap Auto-Save / Landscape Warning Blocker / Permission Fix & Gesture Hint) -->
+<!-- 9th_Design v5.01 (Dual-Lobe Specular System Locked / Multi-Select Photo Strip & Native Share / Gallery Backbutton Interception / 1-Tap Auto-Save / Landscape Warning Blocker / Permission Fix & Gesture Hint / Damped Dish Switch / Prime Spinner / Docked AR Card) -->
 <html>
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no,viewport-fit=cover">
-  <title>9th_Design AR 5.00</title>
+  <title>9th_Design AR 5.01</title>
   <script crossorigin="anonymous" src="external/runtime/runtime.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@8thwall/engine-binary@1/dist/xr.js" async crossorigin="anonymous" data-preload-chunks="slam"></script>
   <script src="https://cdn.jsdelivr.net/npm/@8thwall/landing-page@1/dist/landing-page.js" crossorigin="anonymous"></script>
@@ -18,8 +18,8 @@
     style="position:fixed;top:10px;right:10px;z-index:1000000;background:rgba(0,0,0,0.9);color:#0f0;font-family:monospace;font-size:12px;padding:8px;border-radius:4px;cursor:pointer;line-height:1.3;border:1px solid #0f0;display:none;pointer-events:auto;">
     <div id="debugTitle">FPS: --</div>
     <div id="debugContent">
-      ar-world: v5.00<br>
-      bundle: v4.64<br>
+      ar-world: v5.01<br>
+      bundle: v5.01<br>
       <span id="envVerdictSpan" style="color:#0f0;">Entorno: ESPERANDO MESA...</span><br>
       <span id="telemetrySpan" style="color:#0f0;">P98: -- (/255) | Lum: -- (/255) | Cálido: --%</span><br>
       <span id="benchmarkSpan" style="color:#0f0;">Pre: --sec - Post: --sec</span><br>
@@ -32,7 +32,7 @@
     #debugLog.minimized #debugContent { display: none; }
   </style>
 
-  <!-- Bloqueador visual para posición vertical (v4.62) -->
+  <!-- Bloqueador visual para posición vertical -->
   <div id="orientationBlocker">
     <svg viewBox="0 0 24 24" width="48" height="48" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-bottom:16px;">
       <rect x="5" y="2" width="14" height="20" rx="2" ry="2"></rect>
@@ -44,12 +44,13 @@
     <div style="font-size:14px; opacity:0.8;">Por favor, coloca el teléfono en posición vertical para continuar la experiencia AR.</div>
   </div>
 
-  <!-- v5.00: Arranca inactivo (pointer-events:none y display:none) para permitir permisos de sistema en iOS y Android -->
+  <!-- Bloqueo táctil pre-Listo: arranca inactivo para permitir permisos de sistema en iOS y Android -->
   <div id="touchBlocker" style="position:fixed;inset:0;width:100vw;height:100vh;z-index:999990;pointer-events:none;display:none;background:transparent;"></div>
 
-  <!-- Disparador secreto permanente: bajo el cuadro debug (4 toques en < 1000ms en zona 200x200) -->
-  <div id="secretDebugTrigger" style="position:fixed;top:0;right:0;width:200px;height:200px;z-index:999995;pointer-events:auto;background:transparent;display:block;"></div>
+  <!-- Disparador secreto permanente (touch-action: manipulation previene zoom doble-tap en iOS) -->
+  <div id="secretDebugTrigger" style="position:fixed;top:0;right:0;width:200px;height:200px;z-index:999995;pointer-events:auto;background:transparent;display:block;touch-action:manipulation;"></div>
 
+  <!-- Prompt central: Apunta hacia la mesa -->
   <div id="readyPromptContainer" style="position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);z-index:999999;display:flex;flex-direction:column;align-items:center;pointer-events:none;opacity:0;transition:opacity 0.5s ease;">
     <div style="background:rgba(0,0,0,0.75);color:white;font-family:sans-serif;font-size:16px;font-weight:bold;padding:10px 22px;border-radius:22px;border:1px solid rgba(255,255,255,0.4);margin-bottom:14px;text-align:center;white-space:nowrap;">
       Apunta hacia la mesa
@@ -57,6 +58,12 @@
     <button id="readyBtn" style="pointer-events:auto !important;background:#00e5ff;color:#000;border:none;font-family:sans-serif;font-size:16px;font-weight:bold;padding:14px 40px;border-radius:28px;box-shadow:0 4px 20px rgba(0,229,255,0.7);cursor:pointer;letter-spacing:0.5px;">
       Listo
     </button>
+  </div>
+
+  <!-- Círculo de Carga AR estilo Prime Video (Cyan + Blanco fino) -->
+  <div id="primeSpinner">
+    <div class="prime-spinner-outer"></div>
+    <div class="prime-spinner-inner"></div>
   </div>
 
   <button id="envToggle"
@@ -82,7 +89,7 @@
   <button id="prevDishBtn" class="ar-clean-ui ar-nav-arrow" style="left:12px;">&#8249;</button>
   <button id="nextDishBtn" class="ar-nav-arrow" style="right:12px;">&#8250;</button>
 
-  <!-- v5.00: Icono flotante indicador de interacción táctil en AR -->
+  <!-- Icono flotante indicador de interacción táctil en AR (-15% = 49px) -->
   <div class="gesture-hint-overlay" id="arGestureHint">
     <svg viewBox="0 0 48 48" fill="none" class="gesture-hint-icon">
       <path d="M19 16V9a3 3 0 0 1 6 0v12" stroke="#FFFFFF" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
@@ -92,9 +99,9 @@
     </svg>
   </div>
 
-  <!-- Contenedor inferior de captura limpia -->
-  <div id="captureContainer" class="ar-clean-ui">
-    <!-- Miniatura de Galería (Oculta por defecto hasta tomar la 1ª foto) -->
+  <!-- Contenedor inferior de captura limpia y botón Info -->
+  <div id="captureContainer" class="ar-clean-ui" style="display:none; opacity:0; pointer-events:none; transition: opacity 0.35s ease;">
+    <!-- Miniatura de Galería -->
     <div id="galleryThumbnailBtn" style="display:none;">
       <img id="galleryThumbImg" src="" />
     </div>
@@ -103,6 +110,26 @@
     <button id="shutterBtn">
       <div id="shutterInner"></div>
     </button>
+
+    <!-- Botón Info ("i") a la derecha simétrico a Galería -->
+    <button id="infoDishBtn">
+      <span>i</span>
+    </button>
+  </div>
+
+  <!-- Card gastronómica anclada al extremo inferior en AR -->
+  <div id="arCardModal" class="ar-card-docked" style="display:none;">
+    <div class="ar-card-glass">
+      <div class="ar-card-header">
+        <span id="arCardNumber" class="ar-card-num">01</span>
+        <span id="arCardTitle" class="ar-card-name">Ensalada César</span>
+        <button id="closeArCardBtn" class="ar-card-close">&#10005;</button>
+      </div>
+      <div class="ar-card-body">
+        <p id="arCardDesc" class="ar-card-text"></p>
+      </div>
+      <div id="arCardPrice" class="ar-card-price">18€</div>
+    </div>
   </div>
 
   <!-- Destello sutil fotográfico y animación de fotograma viajero -->
@@ -139,14 +166,14 @@
   </div>
 
   <style>
-    /* v4.62: Bloqueador visual de orientación vertical (Landscape Warning Overlay) */
+    /* Bloqueador visual de orientación vertical */
     #orientationBlocker {
       display: none;
       position: fixed;
       inset: 0;
       width: 100vw;
       height: 100vh;
-      background: #000;
+      background: #040507;
       z-index: 1000005;
       flex-direction: column;
       align-items: center;
@@ -165,7 +192,49 @@
       }
     }
 
-    /* Estilos del Carrusel y Captura Limpia */
+    /* Spinner AR estilo Prime Video (Cyan + Blanco fino) */
+    #primeSpinner {
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      width: 58px;
+      height: 58px;
+      z-index: 999995;
+      pointer-events: none;
+      display: none;
+      opacity: 0;
+      transition: opacity 0.3s ease;
+    }
+    .prime-spinner-outer {
+      position: absolute;
+      inset: 0;
+      border-radius: 50%;
+      border: 2px solid transparent;
+      border-top-color: #00e5ff;
+      border-right-color: #00e5ff;
+      animation: primeSpin 0.9s linear infinite;
+      box-shadow: 0 0 10px rgba(0, 229, 255, 0.4);
+    }
+    .prime-spinner-inner {
+      position: absolute;
+      inset: 6px;
+      border-radius: 50%;
+      border: 1.5px solid transparent;
+      border-top-color: rgba(255, 255, 255, 0.85);
+      border-left-color: rgba(255, 255, 255, 0.4);
+      animation: primeSpinReverse 1.3s linear infinite;
+    }
+    @keyframes primeSpin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+    @keyframes primeSpinReverse {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(-360deg); }
+    }
+
+    /* Estilos del Carrusel y Navegación */
     .ar-nav-arrow {
       position: fixed;
       top: 50%;
@@ -194,7 +263,7 @@
     .ar-nav-arrow:disabled { opacity: 0.3; pointer-events: none !important; cursor: not-allowed; }
     .ar-nav-arrow.disabled { opacity: 0.3; pointer-events: none !important; }
 
-    /* v5.00: Icono flotante en AR */
+    /* Icono flotante en AR (-15% = 49px) */
     .gesture-hint-overlay {
       position: fixed;
       top: 50%;
@@ -212,16 +281,16 @@
       opacity: 1;
     }
     .gesture-hint-icon {
-      width: 58px;
-      height: 58px;
+      width: 49px;
+      height: 49px;
       filter: drop-shadow(0 2px 8px rgba(0,0,0,0.65));
       animation: gestureSweep 2.2s ease-in-out infinite;
     }
     @keyframes gestureSweep {
-      0% { transform: scale(0.92) translateX(-22px) rotate(-7deg); opacity: 0.85; }
+      0% { transform: scale(0.92) translateX(-19px) rotate(-7deg); opacity: 0.85; }
       40% { transform: scale(1.0) translateX(0px) rotate(0deg); opacity: 1; }
-      70% { transform: scale(0.98) translateX(22px) rotate(7deg); opacity: 0.95; }
-      100% { transform: scale(0.92) translateX(-22px) rotate(-7deg); opacity: 0.85; }
+      70% { transform: scale(0.98) translateX(19px) rotate(7deg); opacity: 0.95; }
+      100% { transform: scale(0.92) translateX(-19px) rotate(-7deg); opacity: 0.85; }
     }
 
     #captureContainer {
@@ -286,7 +355,115 @@
     }
     #shutterBtn:active #shutterInner { transform: scale(0.90); }
 
-    /* Destello sutil fotográfico (30% opacidad y 80ms) */
+    /* Botón Info ("i") a la derecha simétrico a Galería */
+    #infoDishBtn {
+      position: absolute;
+      right: 28px;
+      width: 50px;
+      height: 50px;
+      border-radius: 50%;
+      border: 2px solid white;
+      background: rgba(0, 0, 0, 0.4);
+      backdrop-filter: blur(4px);
+      -webkit-backdrop-filter: blur(4px);
+      color: white;
+      font-family: sans-serif;
+      font-size: 24px;
+      font-style: italic;
+      font-weight: 500;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      pointer-events: auto !important;
+      cursor: pointer;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+      -webkit-tap-highlight-color: transparent;
+      outline: none;
+      transition: transform 0.15s ease, opacity 0.3s ease;
+    }
+    #infoDishBtn:active { transform: scale(0.92); }
+
+    /* Card panorámica anclada al fondo de la pantalla en AR */
+    .ar-card-docked {
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      width: 100vw;
+      z-index: 1000000;
+      pointer-events: auto;
+      transform: translateY(100%);
+      transition: transform 0.35s cubic-bezier(0.25, 1, 0.5, 1);
+    }
+    .ar-card-docked.open {
+      transform: translateY(0);
+    }
+    .ar-card-glass {
+      position: relative;
+      background: rgba(10, 13, 18, 0.90);
+      backdrop-filter: blur(14px);
+      -webkit-backdrop-filter: blur(14px);
+      border-top: 1px solid rgba(255, 255, 255, 0.20);
+      border-radius: 20px 20px 0 0;
+      padding: 18px 22px 24px 24px;
+      box-shadow: 0 -8px 32px rgba(0, 0, 0, 0.7);
+    }
+    .ar-card-header {
+      display: flex;
+      align-items: center;
+      margin-bottom: 8px;
+    }
+    .ar-card-num {
+      font-size: 13px;
+      color: rgba(255,255,255,0.55);
+      margin-right: 12px;
+      font-family: sans-serif;
+    }
+    .ar-card-name {
+      font-size: 18px;
+      font-weight: bold;
+      color: #FFFFFF;
+      flex: 1;
+      font-family: sans-serif;
+    }
+    .ar-card-close {
+      background: rgba(255,255,255,0.18);
+      border: none;
+      color: white;
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      font-size: 14px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      outline: none;
+    }
+    .ar-card-body {
+      max-height: 26vh;
+      overflow-y: auto;
+      padding-right: 8px;
+      margin-bottom: 8px;
+      scrollbar-width: none;
+    }
+    .ar-card-body::-webkit-scrollbar { display: none; }
+    .ar-card-text {
+      font-size: 14px;
+      line-height: 1.45;
+      color: rgba(255,255,255,0.85);
+      font-family: sans-serif;
+      margin: 0;
+    }
+    .ar-card-price {
+      font-size: 24px;
+      font-weight: 300;
+      color: #00e5ff;
+      text-align: right;
+      font-family: sans-serif;
+    }
+
+    /* Destello sutil fotográfico */
     #captureFlash {
       position: fixed;
       inset: 0;
@@ -384,7 +561,7 @@
     #viewerPrevBtn { left: 12px; }
     #viewerNextBtn { right: 12px; }
 
-    /* Tira horizontal de miniaturas con selector */
+    /* Tira horizontal de miniaturas */
     #thumbnailStripWrapper {
       width: 100vw;
       overflow-x: auto;
@@ -492,7 +669,6 @@
       night_shadow_radius: 8.0,
       ground_opacity_fixed: 0.40,
 
-      // Presupuestos maestros consolidados (-10% día, -8% ambiente, +PMREM)
       day_total_energy: 4.68,
       day_pmrem_mult: 1.65,
       day_pedestal: 0.035,
@@ -549,14 +725,22 @@
       benchSpan.innerText = `Pre: ${preStr} - Post: ${postStr}`;
     };
 
+    let primerPlatoSpawnIniciado = false;
     window.notificarSpawnIniciado = function () {
       if (window._tListoClick && window._tPostDuration === null) {
         window._tPostDuration = ((performance.now() - window._tListoClick) / 1000).toFixed(2);
         window.actualizarHUDBenchmark();
       }
+
+      // Desvanecer el círculo de carga al iniciar el spawn del 1er plato
+      const spinner = document.getElementById('primeSpinner');
+      if (spinner) {
+        spinner.style.opacity = '0';
+        setTimeout(() => { spinner.style.display = 'none'; }, 300);
+      }
+      primerPlatoSpawnIniciado = true;
     };
 
-    // v5.00: Desbloqueo nativo (.disabled = false) y disparo del hint de interacción si procede
     window.notificarSpawnFinalizado = function () {
       const prevBtn = document.getElementById('prevDishBtn');
       const nextBtn = document.getElementById('nextDishBtn');
@@ -599,7 +783,6 @@
     let currentPedestal = LIGHTING_CONFIG.day_pedestal;
     let environmentFactor = 0.0;
 
-    // v4.53: Estado del modo especular (0: THIN, 1: WIDE, 2: BOTH por defecto)
     let currentSpecularMode = 2;
 
     const crearRanuraLuz = () => ({
@@ -899,6 +1082,13 @@
                 _renderer.toneMapping = nativeTHREE.ACESFilmicToneMapping;
                 _renderer.toneMappingExposure = 1.0;
 
+                // Forzar espacio de color sRGB compensado para pantallas Display P3 en iOS
+                if (nativeTHREE.SRGBColorSpace) {
+                  _renderer.outputColorSpace = nativeTHREE.SRGBColorSpace;
+                } else if (nativeTHREE.sRGBEncoding) {
+                  _renderer.outputEncoding = nativeTHREE.sRGBEncoding;
+                }
+
                 candidateDebounce.dir = new nativeTHREE.Vector3();
 
                 carruselSlots.forEach(slot => {
@@ -1101,7 +1291,7 @@
               readyPrompt.style.opacity = '1';
               readyPrompt.style.pointerEvents = 'auto';
 
-              // v5.00: Bloqueo de pantalla pre-Listo activado con cámara y SLAM activo
+              // Bloqueo de pantalla pre-Listo activado exclusivamente cuando la cámara ya transmite
               if (touchBlocker) {
                 touchBlocker.style.display = 'block';
                 touchBlocker.style.pointerEvents = 'auto';
@@ -1175,6 +1365,13 @@
 
                 window._tListoClick = performance.now();
 
+                // Activar spinner tipo Prime Video en cyan solo para el primer modelo tras pulsar Listo
+                const spinner = document.getElementById('primeSpinner');
+                if (spinner && !primerPlatoSpawnIniciado) {
+                  spinner.style.display = 'block';
+                  requestAnimationFrame(() => spinner.style.opacity = '1');
+                }
+
                 if (window.XR8 && window.XR8.XrController) {
                   try { window.XR8.XrController.recenter(); } catch (err) {}
                 }
@@ -1240,7 +1437,6 @@
                       if (py < minCoreY) minCoreY = py; if (py > maxCoreY) maxCoreY = py;
                     }
 
-                    // Evaluación de Calidez Global del píxel
                     const cb = -0.168736 * r - 0.331264 * g + 0.5 * b + 128;
                     const cr = 0.5 * r - 0.418688 * g - 0.081312 * b + 128;
                     if (lum >= 15 && cr > (cb + 4)) {
@@ -1345,7 +1541,6 @@
 
                       actualizarHUDTelemetria(verdict, avgP98, avgLumFinal, avgWarmRatio * 100);
 
-                      // Inyección post-calibración directa del pedestal actualizado sobre materiales existentes
                       if (_scene && window.aplicarAjustesSceneViewer) {
                         window.aplicarAjustesSceneViewer(_scene);
                       }
@@ -1410,7 +1605,18 @@
                         }
                       }
 
+                      // Liberar pantalla táctil al concluir calibración
                       if (touchBlocker) touchBlocker.style.display = 'none';
+
+                      // Desplegar contenedor de captura y botón Info con fade in tras la calibración
+                      const capContainer = document.getElementById('captureContainer');
+                      if (capContainer) {
+                        capContainer.style.display = 'flex';
+                        capContainer.style.pointerEvents = 'auto';
+                        requestAnimationFrame(() => {
+                          capContainer.style.opacity = '1';
+                        });
+                      }
                     }
                   }
 
@@ -1607,6 +1813,10 @@
               name: 'scene-capturer',
               parameters: {}
             };
+            // Desactivar solicitud parásita de audio en 8th Wall
+            if (obj.camera && obj.camera.xr) {
+              obj.camera.xr.audio = false;
+            }
           }
         }
         return _i.call(ecs.application, c);
@@ -1643,13 +1853,31 @@
     };
 
     // =========================================================================
-    // LÓGICA DE CARRUSEL, CAPTURA DE FOTOS Y VISOR MULTI-SELECT
+    // LÓGICA DE CARRUSEL, MODELOS Y DATOS GASTRONÓMICOS
     // =========================================================================
     const _modelsList = [
       "Plato_01.glb", "Plato_02.glb", "Plato_03.glb", "Plato_04.glb",
       "Plato_05.glb", "Plato_06.glb", "Plato_07.glb", "Plato_08.glb",
       "Plato_09.glb", "Plato_10.glb", "Plato_11.glb", "Plato_12.glb",
       "Plato_13.glb", "Plato_14.glb", "Plato_15.glb"
+    ];
+
+    const _dishesData = [
+      { num: "01", name: "Ensalada César", price: "18€", desc: "Delicada selección de lechugas tiernas combinadas con pechuga asada a baja temperatura, lascas de Parmigiano Reggiano curado 24 meses, crujientes dados de pan artesanal y un aliño tradicional emulsionado suavemente con toques de anchoa del Cantábrico y limón fresco." },
+      { num: "02", name: "Pizza Diávola", price: "18€", desc: "Masa madre de fermentación lenta horneada a la piedra, base de tomate San Marzano DOP, mozzarella fior di latte fundente y una cuidada selección de salame piccante calabrés, terminado con finas láminas de guindilla fresca." },
+      { num: "03", name: "Cheeseburger", price: "18€", desc: "Carne 100% de vaca madurada picada al momento, fundida con doble loncha de queso cheddar inglés curado, cebolla caramelizada lentamente, pepinillos encurtidos artesanos y salsa especial de la casa en pan brioche artesanal." },
+      { num: "04", name: "Burrata italiana", price: "18€", desc: "Corazón cremoso de burrata de Puglia acompañada de tomates cherry confitados en aceite virgen extra, pesto verde genovés elaborado al mortero, piñones tostados crujientes y una reducción aterciopelada de vinagre balsámico tradicional." },
+      { num: "05", name: "Pizza de la casa", price: "18€", desc: "Nuestra receta insignia con crema de trufa negra, setas silvestres salteadas al vino blanco, queso scamorza ahumado y prosciutto di Parma añadido al final del horneado para preservar todos sus matices aromáticos." },
+      { num: "06", name: "Ensalada Caprese", price: "18€", desc: "Láminas intercaladas de tomate corazón de buey de huerta y mozzarella de búfala campana, aderezadas con hojas frescas de albahaca morada, escamas de sal marina ahumada y aceite monovarietal de aceituna arbequina." },
+      { num: "07", name: "Pizza especial", price: "18€", desc: "Combinación gourmet de higos frescos de temporada, queso gorgonzola dulce, nueces pacanas tostadas y un ligero glaseado de miel de flores silvestres sobre una base blanca y crujiente de fermentación de 48 horas." },
+      { num: "08", name: "Ensalada César", price: "18€", desc: "Delicada selección de lechugas tiernas combinadas con pechuga asada a baja temperatura, lascas de Parmigiano Reggiano curado 24 meses, crujientes dados de pan artesanal y un aliño tradicional emulsionado suavemente." },
+      { num: "09", name: "Pizza Diávola", price: "18€", desc: "Masa madre de fermentación lenta horneada a la piedra, base de tomate San Marzano DOP, mozzarella fior di latte fundente y una cuidada selección de salame piccante calabrés, terminado con finas láminas de guindilla fresca." },
+      { num: "10", name: "Cheeseburger", price: "18€", desc: "Carne 100% de vaca madurada picada al momento, fundida con doble loncha de queso cheddar inglés curado, cebolla caramelizada lentamente, pepinillos encurtidos artesanos y salsa especial de la casa en pan brioche artesanal." },
+      { num: "11", name: "Burrata italiana", price: "18€", desc: "Corazón cremoso de burrata de Puglia acompañada de tomates cherry confitados en aceite virgen extra, pesto verde genovés elaborado al mortero, piñones tostados crujientes y una reducción aterciopelada de vinagre balsámico." },
+      { num: "12", name: "Pizza de la casa", price: "18€", desc: "Nuestra receta insignia con crema de trufa negra, setas silvestres salteadas al vino blanco, queso scamorza ahumado y prosciutto di Parma añadido al final del horneado para preservar todos sus matices aromáticos." },
+      { num: "13", name: "Ensalada Caprese", price: "18€", desc: "Láminas intercaladas de tomate corazón de buey de huerta y mozzarella de búfala campana, aderezadas con hojas frescas de albahaca morada, escamas de sal marina ahumada y aceite monovarietal de aceituna arbequina." },
+      { num: "14", name: "Pizza especial", price: "18€", desc: "Combinación gourmet de higos frescos de temporada, queso gorgonzola dulce, nueces pacanas tostadas y un ligero glaseado de miel de flores silvestres sobre una base blanca y crujiente de fermentación de 48 horas." },
+      { num: "15", name: "Pizza de la casa", price: "18€", desc: "Nuestra receta insignia con crema de trufa negra, setas silvestres salteadas al vino blanco, queso scamorza ahumado y prosciutto di Parma añadido al final del horneado para preservar todos sus matices aromáticos." }
     ];
 
     let currentDishIndex = 0;
@@ -1661,6 +1889,7 @@
     const prevDishBtn = document.getElementById('prevDishBtn');
     const nextDishBtn = document.getElementById('nextDishBtn');
 
+    // Desacoplamiento por rAF para liberar memoria VRAM en Safari iOS antes de instanciar nuevo GLB
     const cambiarPlatoAR = (direction) => {
       prevDishBtn.disabled = true;
       nextDishBtn.disabled = true;
@@ -1669,18 +1898,70 @@
       sessionStorage.setItem("modelo_actual", currentDishIndex);
       sessionStorage.setItem("from_ar", "1");
 
-      if (_ecsWorld) {
-        _ecsWorld.events.dispatch(_ecsWorld.events.globalId, "switch-dish-model", {
-          modelSrc: _modelsList[currentDishIndex]
-        });
-      }
+      actualizarDatosCardAR();
+
+      requestAnimationFrame(() => {
+        if (_ecsWorld) {
+          _ecsWorld.events.dispatch(_ecsWorld.events.globalId, "switch-dish-model", {
+            modelSrc: _modelsList[currentDishIndex]
+          });
+        }
+      });
     };
 
     prevDishBtn.addEventListener('click', () => cambiarPlatoAR(-1));
     nextDishBtn.addEventListener('click', () => cambiarPlatoAR(1));
 
     // =========================================================================
-    // v5.00: GESTIÓN DEL ICONO FLOTANTE DE GESTOS EN AR CON MEMORIA PERSISTENTE
+    // CARD GASTRONÓMICA PANORÁMICA ANCLADA AL FONDO EN AR
+    // =========================================================================
+    const arCardModal = document.getElementById('arCardModal');
+    const infoDishBtn = document.getElementById('infoDishBtn');
+    const closeArCardBtn = document.getElementById('closeArCardBtn');
+    const arCardNumber = document.getElementById('arCardNumber');
+    const arCardTitle = document.getElementById('arCardTitle');
+    const arCardDesc = document.getElementById('arCardDesc');
+    const arCardPrice = document.getElementById('arCardPrice');
+    const captureContainer = document.getElementById('captureContainer');
+
+    const actualizarDatosCardAR = () => {
+      const info = _dishesData[currentDishIndex] || _dishesData[0];
+      if (arCardNumber) arCardNumber.innerText = info.num;
+      if (arCardTitle) arCardTitle.innerText = info.name;
+      if (arCardDesc) arCardDesc.innerText = info.desc;
+      if (arCardPrice) arCardPrice.innerText = info.price;
+    };
+
+    const abrirCardAR = () => {
+      actualizarDatosCardAR();
+      arCardModal.style.display = 'block';
+      requestAnimationFrame(() => {
+        arCardModal.classList.add('open');
+      });
+      // Ocultar botones inferiores mientras la Card esté visible
+      if (captureContainer) {
+        captureContainer.style.opacity = '0';
+        captureContainer.style.pointerEvents = 'none';
+      }
+    };
+
+    const cerrarCardAR = () => {
+      arCardModal.classList.remove('open');
+      setTimeout(() => {
+        arCardModal.style.display = 'none';
+      }, 350);
+      // Restaurar visibilidad de botones inferiores
+      if (captureContainer) {
+        captureContainer.style.opacity = '1';
+        captureContainer.style.pointerEvents = 'auto';
+      }
+    };
+
+    if (infoDishBtn) infoDishBtn.addEventListener('click', abrirCardAR);
+    if (closeArCardBtn) closeArCardBtn.addEventListener('click', cerrarCardAR);
+
+    // =========================================================================
+    // GESTIÓN DEL ICONO FLOTANTE DE GESTOS EN AR CON MEMORIA DE SESIÓN
     // =========================================================================
     const arGestureHint = document.getElementById('arGestureHint');
     let arHintTimer1 = null;
@@ -1689,8 +1970,8 @@
     let arHintTimer4 = null;
 
     window.dismissARHint = function () {
-      if (localStorage.getItem('ar_interacted') === '1') return;
-      localStorage.setItem('ar_interacted', '1');
+      if (sessionStorage.getItem('ar_interacted') === '1') return;
+      sessionStorage.setItem('ar_interacted', '1');
       clearTimeout(arHintTimer1);
       clearTimeout(arHintTimer2);
       clearTimeout(arHintTimer3);
@@ -1702,7 +1983,7 @@
     };
 
     window.iniciarHintGestosAR = function () {
-      if (localStorage.getItem('ar_interacted') === '1' || !arGestureHint) {
+      if (sessionStorage.getItem('ar_interacted') === '1' || !arGestureHint) {
         if (arGestureHint) arGestureHint.remove();
         return;
       }
@@ -1720,7 +2001,7 @@
 
             arHintTimer4 = setTimeout(() => {
               arGestureHint.classList.remove('visible');
-              localStorage.setItem('ar_interacted', '1');
+              sessionStorage.setItem('ar_interacted', '1');
               setTimeout(() => arGestureHint.remove(), 400);
             }, 3000);
           }, 6000);
@@ -1728,10 +2009,8 @@
       }, 3000);
     };
 
-    // Desactivación inmediata ante interacción táctil con el modelo en AR
     window.addEventListener('touchstart', (e) => {
-      // Ignoramos toques sobre botones de UI para cancelar sólo al interactuar con la escena
-      if (e.target.closest('#shutterBtn, #galleryThumbnailBtn, #prevDishBtn, #nextDishBtn, #mediaViewerModal, #readyBtn')) {
+      if (e.target.closest('#shutterBtn, #galleryThumbnailBtn, #prevDishBtn, #nextDishBtn, #mediaViewerModal, #readyBtn, #infoDishBtn, #arCardModal')) {
         return;
       }
       if (isObjectPlaced) {
@@ -1740,7 +2019,7 @@
     }, { passive: true });
 
     // =========================================================================
-    // CAPTURA DIRECTA Y GUARDADO INSTANTÁNEO EN UN TOQUE
+    // CAPTURA BLINDADA POR BLOB (PREVIENE PANTALLA BLANCA EN SAFARI iOS)
     // =========================================================================
     const sessionCapturedMedia = [];
     const selectedIndices = new Set();
@@ -1816,24 +2095,29 @@
       ctx.drawImage(video, 0, 0, w, h);
       ctx.drawImage(threeCanvas, 0, 0, w, h);
 
-      const dataUrl = offCanvas.toDataURL('image/jpeg', 0.95);
-      const fileName = `Plato_AR_${Date.now()}.jpg`;
+      // Conversión asíncrona a Blob seguro para evitar sobrecarga de VRAM en WebKit
+      offCanvas.toBlob((blob) => {
+        if (!blob) return;
 
-      // 1. Descarga/Guardado directo e inmediato en el almacenamiento
-      const downloadAnchor = document.createElement('a');
-      downloadAnchor.href = dataUrl;
-      downloadAnchor.download = fileName;
-      document.body.appendChild(downloadAnchor);
-      downloadAnchor.click();
-      document.body.removeChild(downloadAnchor);
+        const blobUrl = URL.createObjectURL(blob);
+        const fileName = `Plato_AR_${Date.now()}.jpg`;
 
-      // 2. Registro en memoria
-      const newIdx = sessionCapturedMedia.length;
-      sessionCapturedMedia.push({ url: dataUrl, name: fileName });
-      selectedIndices.add(newIdx);
+        const downloadAnchor = document.createElement('a');
+        downloadAnchor.href = blobUrl;
+        downloadAnchor.download = fileName;
+        document.body.appendChild(downloadAnchor);
+        downloadAnchor.click();
+        document.body.removeChild(downloadAnchor);
 
-      // 3. Feedback visual
-      dispararAnimacionCaptura(dataUrl);
+        setTimeout(() => URL.revokeObjectURL(blobUrl), 2000);
+
+        const dataUrl = offCanvas.toDataURL('image/jpeg', 0.95);
+        const newIdx = sessionCapturedMedia.length;
+        sessionCapturedMedia.push({ url: dataUrl, name: fileName });
+        selectedIndices.add(newIdx);
+
+        dispararAnimacionCaptura(dataUrl);
+      }, 'image/jpeg', 0.95);
     };
 
     shutterBtn.addEventListener('click', capturarYGuardarFoto);
