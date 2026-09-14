@@ -1,4 +1,4 @@
-// 9th Wall v5.02
+// 9th Wall v5.04
 (() => {
   var e = {
     574() {
@@ -143,7 +143,7 @@
     const e = window.ecs;
 
     // [INMUTABLE - NO MODIFICAR BAJO NINGÚN CONCEPTO: ARRANQUE CINEMÁTICO INICIAL v4.53 / v5.00]
-    // v5.02: Spawner con hundimiento físico opaco, Contact AO garantizado, anclaje SLAM nativo, arranque sin retraso y purga total de VRAM
+    // v5.04: Spawner con hundimiento físico opaco, Contact AO garantizado, anclaje SLAM nativo, arranque sin retraso y purga total de VRAM
     e.registerComponent({
       name: "dish-spawner",
       schema: { prefab: "eid" },
@@ -258,7 +258,7 @@
                 m.needsUpdate = true;
               });
 
-              // Desbloqueo de las flechas únicamente al finalizar la cinemática completa
+              // Desbloqueo de las flechas y montaje de controles secundarios al finalizar la cinemática
               if (window.notificarSpawnFinalizado) {
                 window.notificarSpawnFinalizado();
               }
