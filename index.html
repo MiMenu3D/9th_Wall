@@ -1,4 +1,4 @@
-<!-- Versión: 9th_Design v5.01 -->
+<!-- Versión: 9th_Design v5.02 -->
 <!DOCTYPE html>
 <html lang="es">
 <head>
@@ -38,6 +38,7 @@
       --color-text-muted: #1A1D24;
       --font-fredoka: 'Fredoka', -apple-system, BlinkMacSystemFont, sans-serif;
       --ease-webflow: cubic-bezier(0.25, 1, 0.5, 1);
+      --parallax-y: 0px;
     }
 
     html, body {
@@ -51,6 +52,7 @@
       inset: 0;
       overscroll-behavior-x: none;
       touch-action: pan-y;
+      color-scheme: dark;
     }
 
     /* Bloqueador visual para posición vertical (Landscape Warning) */
@@ -132,19 +134,19 @@
       transition: opacity 0.4s ease;
     }
 
-    /* Flechas de navegación (Diseño idéntico a AR) */
+    /* Flechas de navegación (-10% = 36px × 36px, font 23px) */
     .ar-nav-arrow {
       position: absolute;
       top: 50%;
       transform: translateY(-50%);
-      width: 40px;
-      height: 40px;
+      width: 36px;
+      height: 36px;
       border-radius: 50%;
       background: rgba(255, 255, 255, 0.25);
       border: 1px solid rgba(255, 255, 255, 0.4);
       color: white;
       font-family: sans-serif;
-      font-size: 26px;
+      font-size: 23px;
       line-height: 1;
       display: flex;
       align-items: center;
@@ -162,7 +164,7 @@
       transform: translateY(-50%) scale(0.92);
     }
 
-    /* Icono flotante indicador de gestos (-15% de escala = 46px) */
+    /* Icono flotante indicador de gestos (-15% adicional = 39px) */
     .gesture-hint-overlay {
       position: absolute;
       inset: 0;
@@ -178,8 +180,8 @@
       opacity: 1;
     }
     .gesture-hint-icon {
-      width: 46px;
-      height: 46px;
+      width: 39px;
+      height: 39px;
       filter: drop-shadow(0 2px 8px rgba(0,0,0,0.6));
       animation: gestureSweep 2.2s ease-in-out infinite;
     }
@@ -315,7 +317,7 @@
     }
 
     /* ==========================================================================
-       5. LISTA DE PLATOS Y CARD FLUIDA (BLUR REDUCIDO 50% = 3px)
+       5. LISTA DE PLATOS Y CARD FLUIDA (BLUR RESTAURADO A 6px)
        ========================================================================== */
     .menu-list {
       position: relative;
@@ -394,7 +396,6 @@
       height: 1.6rem;
       border-radius: 50%;
       background: radial-gradient(ellipse at 50% 50%, rgba(255, 255, 255, 0.95) 0%, rgba(255, 255, 255, 0.60) 30%, rgba(255, 255, 255, 0.18) 60%, transparent 80%);
-      filter: blur(0.15rem);
       opacity: 0;
       pointer-events: none;
       transition: opacity 0.35s var(--ease-webflow), transform 0.35s var(--ease-webflow);
@@ -411,7 +412,7 @@
       bottom: -0.5rem;
     }
 
-    /* 3. CRISTAL LÍQUIDO (BLUR 3px OPTIMIZADO + CONTRACCIÓN 0.06s) */
+    /* 3. CRISTAL LÍQUIDO (BLUR RESTAURADO A 6px + CONTRACCIÓN 0.06s) */
     .glass-overlay {
       position: absolute;
       left: 2rem;
@@ -425,8 +426,8 @@
         rgba(255, 255, 255, 0.18) 55%, 
         rgba(255, 255, 255, 0.03) 100%
       );
-      backdrop-filter: blur(3px);
-      -webkit-backdrop-filter: blur(3px);
+      backdrop-filter: blur(6px);
+      -webkit-backdrop-filter: blur(6px);
       opacity: 0;
       pointer-events: none;
       overflow: hidden;
@@ -457,7 +458,6 @@
       height: 1.4rem;
       border-radius: 50%;
       background: radial-gradient(ellipse at 50% 50%, rgba(255, 255, 255, 0.85) 0%, rgba(255, 255, 255, 0.45) 35%, rgba(255, 255, 255, 0.12) 65%, transparent 85%);
-      filter: blur(0.12rem);
       opacity: 0.95;
       pointer-events: none;
     }
@@ -583,7 +583,7 @@
       width: 2.8rem;
     }
 
-    /* ICONO "MÁS INFO" (DESAPARICIÓN ULTRA-RÁPIDA EN 0.03s) */
+    /* ICONO "MÁS INFO" (ANIMACIÓN SIMÉTRICA REVERSIBLE EN 0.18s) */
     .more-info-icon {
       position: absolute;
       display: flex;
@@ -595,7 +595,8 @@
       height: 1.4rem;
       opacity: 0;
       pointer-events: none;
-      transition: opacity 0.18s ease-out, transform 0.18s ease-out;
+      transform: scale(1);
+      transition: opacity 0.18s var(--ease-webflow), transform 0.18s var(--ease-webflow);
     }
 
     .more-info-icon .bar {
@@ -607,12 +608,13 @@
 
     .menu-item.active .more-info-icon {
       opacity: 0.80;
+      transform: scale(1);
     }
 
     .menu-item.expanded .more-info-icon {
       opacity: 0;
       transform: scale(0.6);
-      transition: opacity 0.03s ease-out, transform 0.03s ease-out;
+      transition: opacity 0.18s var(--ease-webflow), transform 0.18s var(--ease-webflow);
     }
 
     /* CUERPO DEL CARD */
@@ -653,7 +655,7 @@
       display: none;
     }
 
-    /* PISTA CON LÍNEA GUÍA OSCURA RESTAURADA */
+    /* PISTA CON LÍNEA GUÍA OSCURA */
     .card-scroll-track {
       position: absolute;
       right: 0.3rem;
@@ -701,7 +703,7 @@
       max-width: 86%;
     }
 
-    /* PRECIO (BAJADO 10px = bottom: calc(1.2rem - 10px)) */
+    /* PRECIO */
     .card-price {
       position: absolute;
       right: 3.2rem;
@@ -744,14 +746,14 @@
     <!-- ZONA SUPERIOR: Visor 3D dinámico + Botón AR + Flechas AR -->
     <section class="viewer-section" id="viewerSection">
       
-      <!-- Flechas de navegación (idénticas a ar-world.html) -->
+      <!-- Flechas de navegación (-10% escala) -->
       <button id="prevDishBtn" class="ar-nav-arrow" style="left:12px;" aria-label="Plato anterior">&#8249;</button>
       <button id="nextDishBtn" class="ar-nav-arrow" style="right:12px;" aria-label="Plato siguiente">&#8250;</button>
 
       <!-- Slot dinámico para model-viewer -->
       <div class="viewer-slot" id="viewerSlot"></div>
 
-      <!-- Icono flotante con animación de barrido (-15% de escala) -->
+      <!-- Icono flotante con animación de barrido (-15% escala = 39px) -->
       <div class="gesture-hint-overlay" id="gestureHint">
         <svg viewBox="0 0 48 48" fill="none" class="gesture-hint-icon">
           <path d="M19 16V9a3 3 0 0 1 6 0v12" stroke="#FFFFFF" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
@@ -1361,24 +1363,17 @@
         "Plato_13.glb", "Plato_14.glb", "Plato_15.glb"
       ];
 
-      // Detección estricta de recarga (F5/Reload): resetea al Plato 01 y purga memoria de gestos
-      const isPageReload = (() => {
-        const navEntries = performance.getEntriesByType('navigation');
-        if (navEntries.length > 0) {
-          return navEntries[0].type === 'reload';
-        }
-        return performance.navigation.type === 1;
-      })();
-
-      if (isPageReload) {
-        sessionStorage.removeItem('modelo_actual');
-        sessionStorage.removeItem('mv_interacted');
-      }
-
+      // Detección estricta: solo restaura plato si viene explícitamente desde AR
+      const fromAR = sessionStorage.getItem('from_ar') === '1';
       let currentIndex = 0;
-      const initialSaved = sessionStorage.getItem('modelo_actual');
-      if (initialSaved !== null && !isNaN(parseInt(initialSaved))) {
-        currentIndex = parseInt(initialSaved);
+
+      if (fromAR) {
+        const saved = sessionStorage.getItem('modelo_actual');
+        if (saved !== null && !isNaN(parseInt(saved))) {
+          currentIndex = parseInt(saved);
+        }
+      } else {
+        sessionStorage.removeItem('modelo_actual');
       }
 
       // ======================================================================
@@ -1449,332 +1444,4 @@
           }
 
           // Rampa de escala viscoelástica
-          const lerpRate = layer.isCompressing ? 0.22 : 0.0275;
-          layer.scale += (layer.targetScale - layer.scale) * lerpRate;
-
-          // Micro-parallax diferencial
-          const layerY = currentParallaxY * conf.parallaxK;
-
-          // Renderizado final
-          layer.el.style.transform = `translate(-50%, calc(-50% + ${layerY}px)) rotate(${layer.angle}deg) scale(${layer.scale})`;
-        });
-
-        requestAnimationFrame(kineticLoop);
-      }
-
-      requestAnimationFrame(kineticLoop);
-
-      // ======================================================================
-      // 4. DISPARO DE REACCIÓN EN CADENA
-      // ======================================================================
-      function triggerChainReaction() {
-        currentDirection *= -1;
-
-        layers.forEach((layer) => {
-          if (layer.timeoutId) clearTimeout(layer.timeoutId);
-          if (layer.recoveryTimeoutId) clearTimeout(layer.recoveryTimeoutId);
-
-          layer.timeoutId = setTimeout(() => {
-            const conf = layer.config;
-            
-            layer.twistAcc = currentDirection * conf.twistPower;
-
-            layer.isCompressing = true;
-            layer.targetScale = conf.scaleDip;
-
-            layer.recoveryTimeoutId = setTimeout(() => {
-              layer.isCompressing = false;
-              layer.targetScale = 1.0;
-            }, 380);
-
-          }, layer.config.delay);
-        });
-      }
-
-      // ======================================================================
-      // 5. CONTROLADOR DE MICRO-ESFERA DE SCROLL EN CARD (0% A 100%)
-      // ======================================================================
-      function updateCardScrollDot(wrap) {
-        const container = wrap.closest('.card-scroll-container');
-        if (!container) return;
-        const track = container.querySelector('.card-scroll-track');
-        const dot = container.querySelector('.card-scroll-dot');
-        if (!track || !dot) return;
-
-        const maxScroll = wrap.scrollHeight - wrap.clientHeight;
-        const progress = maxScroll > 0 ? (wrap.scrollTop / maxScroll) : 0;
-        const maxTravel = track.clientHeight - dot.clientHeight;
-        const travel = Math.max(0, Math.min(progress * maxTravel, maxTravel));
-        dot.style.transform = `translate(-50%, ${travel}px)`;
-      }
-
-      document.querySelectorAll('.card-scroll-wrap').forEach((wrap) => {
-        wrap.addEventListener('scroll', () => updateCardScrollDot(wrap), { passive: true });
-      });
-
-      // ======================================================================
-      // 6. SISTEMA VECINAL DE MODELOS Y RECREACIÓN LIMPIA DOM
-      // ======================================================================
-      const prefetchedModels = new Set();
-
-      function preloadNeighborhood(currentIdx) {
-        const prevIdx = (currentIdx - 1 + models.length) % models.length;
-        const nextIdx = (currentIdx + 1) % models.length;
-        [prevIdx, nextIdx].forEach(idx => {
-          const url = models[idx];
-          if (!prefetchedModels.has(url)) {
-            prefetchedModels.add(url);
-            const link = document.createElement('link');
-            link.rel = 'prefetch';
-            link.as = 'fetch';
-            link.href = url;
-            link.crossOrigin = 'anonymous';
-            document.head.appendChild(link);
-          }
-        });
-      }
-
-      function destroyModelViewer() {
-        if (viewerSlot) {
-          viewerSlot.innerHTML = '';
-        }
-        mv = null;
-      }
-
-      function createModelViewer() {
-        destroyModelViewer();
-
-        const newMv = document.createElement('model-viewer');
-        newMv.id = 'mv';
-        newMv.setAttribute('src', models[currentIndex]);
-        newMv.setAttribute('autoplay', '');
-        newMv.setAttribute('auto-rotate', '');
-        newMv.setAttribute('auto-rotate-delay', '0');
-        newMv.setAttribute('rotation-per-second', '17deg');
-        newMv.setAttribute('camera-orbit', '0deg 70deg 45%');
-        newMv.setAttribute('min-camera-orbit', '0deg 0deg 45%');
-        newMv.setAttribute('max-camera-orbit', '360deg 90deg 45%');
-        newMv.setAttribute('camera-controls', 'false');
-        newMv.setAttribute('touch-action', 'none');
-        newMv.setAttribute('disable-pan', '');
-        newMv.setAttribute('disable-zoom', '');
-        newMv.setAttribute('interaction-prompt', 'none');
-        newMv.setAttribute('shadow-intensity', '0.4');
-        newMv.setAttribute('exposure', '0.80');
-        newMv.style.opacity = '0';
-
-        newMv.addEventListener('load', () => {
-          newMv.style.opacity = '1';
-          preloadNeighborhood(currentIndex);
-        }, { once: true });
-
-        viewerSlot.appendChild(newMv);
-        mv = newMv;
-      }
-
-      function updateModelViewer() {
-        if (!mv) {
-          createModelViewer();
-          return;
-        }
-        mv.style.opacity = '0';
-        mv.setAttribute('src', models[currentIndex]);
-        mv.addEventListener('load', () => {
-          mv.style.opacity = '1';
-          preloadNeighborhood(currentIndex);
-        }, { once: true });
-      }
-
-      function collapseAllCards() {
-        menuItems.forEach((i) => i.classList.remove('expanded'));
-        menuList.classList.remove('has-expanded');
-      }
-
-      function selectDish(index, shouldScroll = false) {
-        if (index < 0 || index >= models.length) return;
-        currentIndex = index;
-
-        sessionStorage.setItem('modelo_actual', currentIndex);
-
-        collapseAllCards();
-
-        menuItems.forEach((it, idx) => {
-          if (idx === currentIndex) {
-            it.classList.add('active');
-            if (shouldScroll) {
-              const listRect = menuList.getBoundingClientRect();
-              const itemRect = it.getBoundingClientRect();
-              if (itemRect.top < listRect.top || itemRect.bottom > listRect.bottom) {
-                it.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-              }
-            }
-          } else {
-            it.classList.remove('active');
-          }
-        });
-
-        updateModelViewer();
-        triggerChainReaction();
-      }
-
-      prevDishBtn.addEventListener('click', (e) => {
-        e.stopPropagation();
-        const nextIdx = (currentIndex - 1 + models.length) % models.length;
-        selectDish(nextIdx, true);
-      });
-
-      nextDishBtn.addEventListener('click', (e) => {
-        e.stopPropagation();
-        const nextIdx = (currentIndex + 1) % models.length;
-        selectDish(nextIdx, true);
-      });
-
-      // ======================================================================
-      // 7. GESTIÓN DEL ICONO FLOTANTE DE GESTOS (TIEMPOS AJUSTADOS Y SESSION)
-      // ======================================================================
-      let hintTimer1 = null;
-      let hintTimer2 = null;
-      let hintTimer3 = null;
-      let hintTimer4 = null;
-
-      function dismissGestureHint() {
-        if (sessionStorage.getItem('mv_interacted') === '1') return;
-        sessionStorage.setItem('mv_interacted', '1');
-        clearTimeout(hintTimer1);
-        clearTimeout(hintTimer2);
-        clearTimeout(hintTimer3);
-        clearTimeout(hintTimer4);
-        if (gestureHint) {
-          gestureHint.classList.remove('visible');
-          setTimeout(() => gestureHint.remove(), 400);
-        }
-      }
-
-      function initGestureHint() {
-        if (sessionStorage.getItem('mv_interacted') === '1' || !gestureHint) {
-          if (gestureHint) gestureHint.remove();
-          return;
-        }
-
-        // Ciclo 1: espera 5s -> visible 3s -> fade out
-        hintTimer1 = setTimeout(() => {
-          gestureHint.classList.add('visible');
-
-          hintTimer2 = setTimeout(() => {
-            gestureHint.classList.remove('visible');
-
-            // Ciclo 2: pausa 10s -> visible 3s -> fade out definitivo
-            hintTimer3 = setTimeout(() => {
-              gestureHint.classList.add('visible');
-
-              hintTimer4 = setTimeout(() => {
-                gestureHint.classList.remove('visible');
-                sessionStorage.setItem('mv_interacted', '1');
-                setTimeout(() => gestureHint.remove(), 400);
-              }, 3000);
-            }, 10000);
-          }, 3000);
-        }, 5000);
-      }
-
-      viewerSection.addEventListener('pointerdown', dismissGestureHint, { passive: true });
-      viewerSection.addEventListener('touchstart', dismissGestureHint, { passive: true });
-
-      initGestureHint();
-
-      // ======================================================================
-      // 8. GESTOS TÁCTILES Y SELECCIÓN EN LA LISTA
-      // ======================================================================
-      let touchStartY = 0;
-      let touchStartX = 0;
-      let isTouchDragging = false;
-
-      menuList.addEventListener('touchstart', (e) => {
-        touchStartY = e.touches[0].clientY;
-        touchStartX = e.touches[0].clientX;
-        isTouchDragging = false;
-      }, { passive: true });
-
-      menuList.addEventListener('touchmove', (e) => {
-        const deltaY = Math.abs(e.touches[0].clientY - touchStartY);
-        const deltaX = Math.abs(e.touches[0].clientX - touchStartX);
-        if (deltaY > 6 || deltaX > 6) {
-          isTouchDragging = true;
-        }
-      }, { passive: true });
-
-      menuItems.forEach((item, index) => {
-        item.addEventListener('click', () => {
-          if (isTouchDragging) return;
-
-          const isCurrentlyActive = item.classList.contains('active');
-          const isCurrentlyExpanded = item.classList.contains('expanded');
-
-          if (isCurrentlyActive) {
-            // SEGUNDO TOQUE: Alterna Card
-            if (isCurrentlyExpanded) {
-              collapseAllCards();
-            } else {
-              collapseAllCards();
-              
-              menuList.classList.add('has-expanded');
-
-              const targetScroll = item.offsetTop - 10;
-              menuList.scrollTo({
-                top: Math.max(0, targetScroll),
-                behavior: 'smooth'
-              });
-
-              setTimeout(() => {
-                item.classList.add('expanded');
-
-                const wrap = item.querySelector('.card-scroll-wrap');
-                if (wrap) {
-                  wrap.scrollTop = 0;
-                  updateCardScrollDot(wrap);
-                }
-              }, 110);
-            }
-          } else {
-            // PRIMER TOQUE: Selección simple y actualización de visor
-            selectDish(index, false);
-          }
-        });
-      });
-
-      // ======================================================================
-      // 9. LANZAMIENTO HACIA AR Y RESTAURACIÓN LIMPIA AL VOLVER (CERO GLITCHES)
-      // ======================================================================
-      btnAr.addEventListener('click', () => {
-        sessionStorage.setItem('from_ar', '1');
-        sessionStorage.setItem('modelo_actual', currentIndex);
-
-        // Destrucción total antes de navegar (libera VRAM y evita frame congelado)
-        destroyModelViewer();
-
-        window.location.href = 'ar-world.html';
-      });
-
-      window.addEventListener('pageshow', () => {
-        const fromAR = sessionStorage.getItem('from_ar') === '1';
-        sessionStorage.removeItem('from_ar');
-
-        if (fromAR) {
-          const saved = sessionStorage.getItem('modelo_actual');
-          if (saved !== null && !isNaN(parseInt(saved))) {
-            currentIndex = parseInt(saved);
-          }
-        }
-
-        // Siempre instanciar un elemento model-viewer limpio sin memoria de canvas previa
-        createModelViewer();
-        selectDish(currentIndex, true);
-      });
-
-      // Arranque inicial
-      createModelViewer();
-      selectDish(currentIndex, false);
-    });
-  </script>
-</body>
-</html>
+          c
