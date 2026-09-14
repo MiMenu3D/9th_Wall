@@ -1,11 +1,11 @@
-<!-- 9th_Design v5.02 (Dual-Lobe Specular System Locked / Multi-Select Photo Strip & Native Share / Gallery Backbutton Interception / 0ms Instant Photo-Save / Landscape Warning Blocker / Permission Fix & Transient Gesture Hint / Damped Dish Switch / Prime Spinner / Docked AR Card) -->
+<!-- 9th_Design v5.04 (Dual-Lobe Specular System Locked / Multi-Select Photo Strip & Native Share / Gallery Backbutton Interception / 0ms Instant Photo-Save / Landscape Warning Blocker / Permission Fix & Transient Gesture Hint / Damped Dish Switch / Prime Spinner Instant Drop / Deferred UI Mount / Docked AR Card) -->
 <html>
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no,viewport-fit=cover">
   <meta name="theme-color" content="#040507">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <title>9th_Design AR 5.02</title>
+  <title>9th_Design AR 5.04</title>
   <script crossorigin="anonymous" src="external/runtime/runtime.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@8thwall/engine-binary@1/dist/xr.js" async crossorigin="anonymous" data-preload-chunks="slam"></script>
   <script src="https://cdn.jsdelivr.net/npm/@8thwall/landing-page@1/dist/landing-page.js" crossorigin="anonymous"></script>
@@ -20,8 +20,8 @@
     style="position:fixed;top:10px;right:10px;z-index:1000000;background:rgba(0,0,0,0.9);color:#0f0;font-family:monospace;font-size:12px;padding:8px;border-radius:4px;cursor:pointer;line-height:1.3;border:1px solid #0f0;display:none;pointer-events:auto;">
     <div id="debugTitle">FPS: --</div>
     <div id="debugContent">
-      ar-world: v5.02<br>
-      bundle: v5.02<br>
+      ar-world: v5.04<br>
+      bundle: v5.04<br>
       <span id="envVerdictSpan" style="color:#0f0;">Entorno: ESPERANDO MESA...</span><br>
       <span id="telemetrySpan" style="color:#0f0;">P98: -- (/255) | Lum: -- (/255) | Cálido: --%</span><br>
       <span id="benchmarkSpan" style="color:#0f0;">Pre: --sec - Post: --sec</span><br>
@@ -87,7 +87,7 @@
   <!-- UI CLEAN: CARRUSEL AR, CAPTURA DE FOTOS LIMPIA Y VISOR MULTI-SELECT       -->
   <!-- ========================================================================= -->
 
-  <!-- Flechas laterales de cambio de plato (Disponibles en modo limpio y debug) -->
+  <!-- Flechas laterales de cambio de plato (-10% = 36px × 36px, font 23px) -->
   <button id="prevDishBtn" class="ar-nav-arrow" style="left:12px;">&#8249;</button>
   <button id="nextDishBtn" class="ar-nav-arrow" style="right:12px;">&#8250;</button>
 
@@ -206,7 +206,6 @@
       pointer-events: none;
       display: none;
       opacity: 0;
-      transition: opacity 0.3s ease;
     }
     .prime-spinner-outer {
       position: absolute;
@@ -236,19 +235,19 @@
       100% { transform: rotate(-360deg); }
     }
 
-    /* Estilos del Carrusel y Navegación */
+    /* Estilos del Carrusel y Navegación (-10% = 36px × 36px, font 23px) */
     .ar-nav-arrow {
       position: fixed;
       top: 50%;
       transform: translateY(-50%);
-      width: 40px;
-      height: 40px;
+      width: 36px;
+      height: 36px;
       border-radius: 50%;
       background: rgba(255, 255, 255, 0.25);
       border: 1px solid rgba(255, 255, 255, 0.4);
       color: white;
       font-family: sans-serif;
-      font-size: 26px;
+      font-size: 23px;
       line-height: 1;
       display: flex;
       align-items: center;
@@ -734,20 +733,31 @@
         window.actualizarHUDBenchmark();
       }
 
-      // Desvanecer el círculo de carga al iniciar el spawn del 1er plato
+      // v5.04: Desaparición instantánea de golpe (display:none) sin retrasos
       const spinner = document.getElementById('primeSpinner');
       if (spinner) {
+        spinner.style.display = 'none';
         spinner.style.opacity = '0';
-        setTimeout(() => { spinner.style.display = 'none'; }, 300);
       }
       primerPlatoSpawnIniciado = true;
     };
 
+    // v5.04: Montaje y activación de controles secundarios tras finalizar la cinemática
     window.notificarSpawnFinalizado = function () {
       const prevBtn = document.getElementById('prevDishBtn');
       const nextBtn = document.getElementById('nextDishBtn');
       if (prevBtn) prevBtn.disabled = false;
       if (nextBtn) nextBtn.disabled = false;
+
+      // Despliegue diferido del contenedor de captura y botón Info
+      const capContainer = document.getElementById('captureContainer');
+      if (capContainer) {
+        capContainer.style.display = 'flex';
+        capContainer.style.pointerEvents = 'auto';
+        requestAnimationFrame(() => {
+          capContainer.style.opacity = '1';
+        });
+      }
 
       if (window.iniciarHintGestosAR) {
         window.iniciarHintGestosAR();
@@ -1367,11 +1377,11 @@
 
                 window._tListoClick = performance.now();
 
-                // Activar spinner tipo Prime Video en cyan solo para el primer modelo tras pulsar Listo
+                // Activar spinner en cyan durante la calibración
                 const spinner = document.getElementById('primeSpinner');
                 if (spinner && !primerPlatoSpawnIniciado) {
                   spinner.style.display = 'block';
-                  requestAnimationFrame(() => spinner.style.opacity = '1');
+                  spinner.style.opacity = '1';
                 }
 
                 if (window.XR8 && window.XR8.XrController) {
@@ -1609,16 +1619,6 @@
 
                       // Liberar pantalla táctil al concluir calibración
                       if (touchBlocker) touchBlocker.style.display = 'none';
-
-                      // Desplegar contenedor de captura y botón Info con fade in tras la calibración
-                      const capContainer = document.getElementById('captureContainer');
-                      if (capContainer) {
-                        capContainer.style.display = 'flex';
-                        capContainer.style.pointerEvents = 'auto';
-                        requestAnimationFrame(() => {
-                          capContainer.style.opacity = '1';
-                        });
-                      }
                     }
                   }
 
