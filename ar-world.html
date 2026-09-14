@@ -1,11 +1,11 @@
-<!-- 9th_Design v5.04 (Dual-Lobe Specular System Locked / Multi-Select Photo Strip & Native Share / Gallery Backbutton Interception / 0ms Instant Photo-Save / Landscape Warning Blocker / Permission Fix & Transient Gesture Hint / Damped Dish Switch / Prime Spinner Instant Drop / Deferred UI Mount / Docked AR Card) -->
+<!-- 9th_Design v5.05 (Dual-Lobe Specular Human-Scale & Dynamic Scaling / PMREM sRGB & Alpha Fix / Upper-Half Penumbra Light Estimation / Saturation Guard / Fast AE Lerp / Delayed AR Nav Arrows / Multi-Select Photo Strip & Native Share / Gallery Backbutton Interception / 0ms Instant Photo-Save / Landscape Warning Blocker / Permission Fix & Transient Gesture Hint / Damped Dish Switch / Prime Spinner Instant Drop / Deferred UI Mount / Docked AR Card) -->
 <html>
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no,viewport-fit=cover">
   <meta name="theme-color" content="#040507">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <title>9th_Design AR 5.04</title>
+  <title>9th_Design AR 5.05</title>
   <script crossorigin="anonymous" src="external/runtime/runtime.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@8thwall/engine-binary@1/dist/xr.js" async crossorigin="anonymous" data-preload-chunks="slam"></script>
   <script src="https://cdn.jsdelivr.net/npm/@8thwall/landing-page@1/dist/landing-page.js" crossorigin="anonymous"></script>
@@ -20,8 +20,8 @@
     style="position:fixed;top:10px;right:10px;z-index:1000000;background:rgba(0,0,0,0.9);color:#0f0;font-family:monospace;font-size:12px;padding:8px;border-radius:4px;cursor:pointer;line-height:1.3;border:1px solid #0f0;display:none;pointer-events:auto;">
     <div id="debugTitle">FPS: --</div>
     <div id="debugContent">
-      ar-world: v5.04<br>
-      bundle: v5.04<br>
+      ar-world: v5.05<br>
+      bundle: v5.05<br>
       <span id="envVerdictSpan" style="color:#0f0;">Entorno: ESPERANDO MESA...</span><br>
       <span id="telemetrySpan" style="color:#0f0;">P98: -- (/255) | Lum: -- (/255) | Cálido: --%</span><br>
       <span id="benchmarkSpan" style="color:#0f0;">Pre: --sec - Post: --sec</span><br>
@@ -87,7 +87,7 @@
   <!-- UI CLEAN: CARRUSEL AR, CAPTURA DE FOTOS LIMPIA Y VISOR MULTI-SELECT       -->
   <!-- ========================================================================= -->
 
-  <!-- Flechas laterales de cambio de plato (-10% = 36px × 36px, font 23px) -->
+  <!-- Flechas laterales de cambio de plato (v5.05: Ocultas de inicio, se revelan al concluir spawn) -->
   <button id="prevDishBtn" class="ar-nav-arrow" style="left:12px;">&#8249;</button>
   <button id="nextDishBtn" class="ar-nav-arrow" style="right:12px;">&#8250;</button>
 
@@ -235,7 +235,7 @@
       100% { transform: rotate(-360deg); }
     }
 
-    /* Estilos del Carrusel y Navegación (-10% = 36px × 36px, font 23px) */
+    /* Estilos del Carrusel y Navegación (v5.05: Ocultas de inicio) */
     .ar-nav-arrow {
       position: fixed;
       top: 50%;
@@ -249,16 +249,17 @@
       font-family: sans-serif;
       font-size: 23px;
       line-height: 1;
-      display: flex;
+      display: none;
+      opacity: 0;
+      pointer-events: none;
       align-items: center;
       justify-content: center;
       z-index: 999980;
       backdrop-filter: blur(4px);
       cursor: pointer;
-      pointer-events: auto !important;
       -webkit-tap-highlight-color: transparent;
       outline: none;
-      transition: background 0.2s, transform 0.1s, opacity 0.2s;
+      transition: background 0.2s, transform 0.1s, opacity 0.35s ease;
     }
     .ar-nav-arrow:active { background: rgba(255, 255, 255, 0.45); transform: translateY(-50%) scale(0.92); }
     .ar-nav-arrow:disabled { opacity: 0.3; pointer-events: none !important; cursor: not-allowed; }
@@ -640,18 +641,17 @@
   </style>
 
   <script>
-    // [INMUTABLE - NO MODIFICAR BAJO NINGÚN CONCEPTO: CONSOLA DE ESPECULARES v4.53 CONSOLIDADA]
     // =========================================================================
-    // 2. CONSOLA DE ESPECULARES (Ajuste rápido de lóbulos Thin, Wide y Both - v4.53 Checkpoint)
+    // 2. CONSOLA DE ESPECULARES (v5.05: Escala Humana Inteligible: mayor valor = mayor área)
     // =========================================================================
     const SPECULAR_CONFIG = {
-      // Capa 1: Lóbulo THIN (Núcleo nítido puntual)
-      thin_intensity: 0.85,      // Multiplicador de brillo / energía del núcleo
-      thin_expansion: 0.90,      // Exponente de concentración (mayor = más fino/puntual)
+      // Capa 1: Lóbulo THIN (Núcleo nítido puntual - Escala Humana)
+      thin_intensity: 0.70,      // Multiplicador de brillo / energía del núcleo (-17% evita quemado falso)
+      thin_expansion: 0.54,      // Escala humana: 0.54 equivale a exponente 1.85 (núcleo pequeño y nítido)
 
-      // Capa 2: Lóbulo WIDE (Halo suave difuso)
-      wide_intensity: 0.50,      // Multiplicador de brillo / presencia del halo
-      wide_expansion: 0.70,      // Exponente de dispersión (menor = más extendido/sedoso)
+      // Capa 2: Lóbulo WIDE (Halo suave difuso - Escala Humana)
+      wide_intensity: 0.28,      // Multiplicador de brillo / presencia del halo (-44% velo sutil)
+      wide_expansion: 2.22,      // Escala humana: 2.22 equivale a exponente 0.45 (halo amplio y suave)
 
       // Atenuación difusa en modo BOTH (Equilibrio de energía Checkpoint vB1.03)
       both_diffuse_mult: 1.00
@@ -663,7 +663,7 @@
     const LIGHTING_CONFIG = {
       pmrem_resolution: 256,
       pmrem_interval_ms: 200,
-      scan_interval_ms: 300,
+      scan_interval_ms: 200,     // v5.05: Escaneo acelerado a 200ms para seguimiento inmediato de AE
       calibration_frames_target: 4,
       shadow_map_size: 512,
       day_shadow_radius: 4.0,
@@ -686,7 +686,7 @@
       exposure_mult: 1.80,
       transition_duration_ms: 800,
       out_of_frame_retention: 0.80,
-      smoothing_rate: 2.2,
+      smoothing_rate: 4.4,       // v5.05: Tasa de lerp duplicada a 4.4 (adaptación en ~0.4s)
 
       light_distance: 1.2,
       min_light_height: 0.20,
@@ -733,7 +733,6 @@
         window.actualizarHUDBenchmark();
       }
 
-      // v5.04: Desaparición instantánea de golpe (display:none) sin retrasos
       const spinner = document.getElementById('primeSpinner');
       if (spinner) {
         spinner.style.display = 'none';
@@ -742,12 +741,26 @@
       primerPlatoSpawnIniciado = true;
     };
 
-    // v5.04: Montaje y activación de controles secundarios tras finalizar la cinemática
+    // v5.05: Montaje y activación de flechas AR y controles secundarios al concluir spawn
     window.notificarSpawnFinalizado = function () {
       const prevBtn = document.getElementById('prevDishBtn');
       const nextBtn = document.getElementById('nextDishBtn');
-      if (prevBtn) prevBtn.disabled = false;
-      if (nextBtn) nextBtn.disabled = false;
+      if (prevBtn) {
+        prevBtn.style.display = 'flex';
+        prevBtn.disabled = false;
+        requestAnimationFrame(() => {
+          prevBtn.style.opacity = '1';
+          prevBtn.style.pointerEvents = 'auto';
+        });
+      }
+      if (nextBtn) {
+        nextBtn.style.display = 'flex';
+        nextBtn.disabled = false;
+        requestAnimationFrame(() => {
+          nextBtn.style.opacity = '1';
+          nextBtn.style.pointerEvents = 'auto';
+        });
+      }
 
       // Despliegue diferido del contenedor de captura y botón Info
       const capContainer = document.getElementById('captureContainer');
@@ -796,6 +809,24 @@
     let environmentFactor = 0.0;
 
     let currentSpecularMode = 2;
+    // v5.05: Nivel de especular modulado dinámicamente según luz ambiental (1.0 en Día / 0.40 en Penumbra)
+    let currentSpecularLevel = 1.0;
+
+    const actualizarNivelEspecularGlobal = (level) => {
+      currentSpecularLevel = level;
+      if (_scene) {
+        _scene.traverse((child) => {
+          if (child.isMesh && child.material && child.material.type !== 'ShadowMaterial') {
+            const mats = Array.isArray(child.material) ? child.material : [child.material];
+            mats.forEach(m => {
+              if (m.userData && m.userData.uSpecularLevel) {
+                m.userData.uSpecularLevel.value = currentSpecularLevel;
+              }
+            });
+          }
+        });
+      }
+    };
 
     const crearRanuraLuz = () => ({
       light: null,
@@ -854,7 +885,6 @@
 
     document.getElementById('envToggle').addEventListener('click', () => toggleEnv());
 
-    // [INMUTABLE - NO MODIFICAR BAJO NINGÚN CONCEPTO: CONMUTADOR ESPECULAR v4.53]
     const specToggleBtn = document.getElementById('specToggle');
     if (specToggleBtn) {
       specToggleBtn.addEventListener('click', () => {
@@ -962,10 +992,15 @@
       secretTrigger.addEventListener('pointerdown', procesarToqueSecreto);
     }
 
-    // [INMUTABLE - NO MODIFICAR BAJO NINGÚN CONCEPTO: INYECCIÓN PBR Y SHADERS v4.53]
+    // =========================================================================
+    // INYECCIÓN PBR Y SHADERS (v5.05: Inversión matemática a escala humana + uSpecularLevel)
+    // =========================================================================
     window.aplicarAjustesSceneViewer = function (targetNode) {
       const root = targetNode || _scene;
       if (!root) return;
+
+      const expThin = (1.0 / Math.max(0.01, SPECULAR_CONFIG.thin_expansion)).toFixed(3);
+      const expWide = (1.0 / Math.max(0.01, SPECULAR_CONFIG.wide_expansion)).toFixed(3);
 
       root.traverse((child) => {
         if (child.isMesh && child.material && child.material.type !== 'ShadowMaterial') {
@@ -977,9 +1012,11 @@
             if (!mat._specularHooked) {
               mat._specularHooked = true;
               mat.userData.uSpecularMode = { value: currentSpecularMode };
+              mat.userData.uSpecularLevel = { value: currentSpecularLevel };
 
               mat.onBeforeCompile = (shader) => {
                 shader.uniforms.uSpecularMode = mat.userData.uSpecularMode;
+                shader.uniforms.uSpecularLevel = mat.userData.uSpecularLevel;
 
                 shader.vertexShader = shader.vertexShader.replace(
                   '#include <common>',
@@ -1002,6 +1039,7 @@
                   #include <common>
                   varying vec3 vLocalPos;
                   uniform int uSpecularMode;
+                  uniform float uSpecularLevel;
                   `
                 );
 
@@ -1030,24 +1068,25 @@
                   `
                   #include <lights_fragment_end>
                   vec3 specBase = max(vec3(0.0), reflectedLight.directSpecular);
-                  vec3 specThin = pow(specBase, vec3(${SPECULAR_CONFIG.thin_expansion.toFixed(2)})) * ${SPECULAR_CONFIG.thin_intensity.toFixed(2)};
-                  vec3 specWide = pow(specBase, vec3(${SPECULAR_CONFIG.wide_expansion.toFixed(2)})) * ${SPECULAR_CONFIG.wide_intensity.toFixed(2)};
+                  vec3 specThin = pow(specBase, vec3(${expThin})) * ${SPECULAR_CONFIG.thin_intensity.toFixed(2)};
+                  vec3 specWide = pow(specBase, vec3(${expWide})) * ${SPECULAR_CONFIG.wide_intensity.toFixed(2)};
 
                   if (uSpecularMode == 0) {
-                    reflectedLight.directSpecular = specThin;
+                    reflectedLight.directSpecular = specThin * uSpecularLevel;
                   } else if (uSpecularMode == 1) {
-                    reflectedLight.directSpecular = specWide;
+                    reflectedLight.directSpecular = specWide * uSpecularLevel;
                   } else {
                     reflectedLight.directDiffuse *= ${SPECULAR_CONFIG.both_diffuse_mult.toFixed(2)};
-                    reflectedLight.directSpecular = specThin + specWide;
+                    reflectedLight.directSpecular = (specThin + specWide) * uSpecularLevel;
                   }
                   `
                 );
               };
 
               mat.onBeforeRender = () => {
-                if (mat.userData && mat.userData.uSpecularMode) {
-                  mat.userData.uSpecularMode.value = currentSpecularMode;
+                if (mat.userData) {
+                  if (mat.userData.uSpecularMode) mat.userData.uSpecularMode.value = currentSpecularMode;
+                  if (mat.userData.uSpecularLevel) mat.userData.uSpecularLevel.value = currentSpecularLevel;
                 }
               };
 
@@ -1319,7 +1358,8 @@
             const pmremCanvas = document.createElement('canvas');
             pmremCanvas.width = pmremSize;
             pmremCanvas.height = pmremSize;
-            const pmremCtx = pmremCanvas.getContext('2d', { willReadFrequently: true });
+            // v5.05: alpha: false para eliminar degradación del buffer y lavado lechoso
+            const pmremCtx = pmremCanvas.getContext('2d', { willReadFrequently: true, alpha: false });
 
             try {
               pmremCtx.drawImage(video, 0, 0, pmremSize, pmremSize);
@@ -1328,12 +1368,18 @@
 
             const envTexture = new THREE_INSTANCE.CanvasTexture(pmremCanvas);
             envTexture.mapping = THREE_INSTANCE.EquirectangularReflectionMapping;
-            if (THREE_INSTANCE.sRGBEncoding) envTexture.encoding = THREE_INSTANCE.sRGBEncoding;
+            // v5.05: Soporte estricto para SRGBColorSpace en Three.js r160 (elimina lavado a blanco)
+            if (THREE_INSTANCE.SRGBColorSpace) {
+              envTexture.colorSpace = THREE_INSTANCE.SRGBColorSpace;
+            } else if (THREE_INSTANCE.sRGBEncoding) {
+              envTexture.encoding = THREE_INSTANCE.sRGBEncoding;
+            }
 
             let smoothedBrightness = 128;
             let targetExposure = 0.45;
             let lastScanTime = 0;
             let lastPmremTime = 0;
+            let shouldDesaturatePMREM = false;
 
             const probeNDC = new THREE_INSTANCE.Vector3();
             const camWorldPos = new THREE_INSTANCE.Vector3();
@@ -1424,6 +1470,9 @@
                   let minCoreX = pmremSize, maxCoreX = 0, minCoreY = scanEmitterHeight, maxCoreY = 0;
                   let warmPixelsCount = 0;
 
+                  // v5.05: Acumulación de luz en la mitad superior para estimación en Penumbra
+                  let upperLumSum = 0, upperCount = 0;
+
                   const colorBins = new Int32Array(8);
                   const colorBinLumSumX = new Float32Array(8);
                   const colorBinLumSumY = new Float32Array(8);
@@ -1443,10 +1492,14 @@
 
                     if (lum > maxLum) { maxLum = lum; maxLumX = px; maxLumY = py; }
 
-                    if (py < scanEmitterHeight && lum >= LIGHTING_CONFIG.emitter_lum_threshold) {
-                      corePixelCount++; coreSumX += px; coreSumY += py;
-                      if (px < minCoreX) minCoreX = px; if (px > maxCoreX) maxCoreX = px;
-                      if (py < minCoreY) minCoreY = py; if (py > maxCoreY) maxCoreY = py;
+                    if (py < scanEmitterHeight) {
+                      upperLumSum += lum;
+                      upperCount++;
+                      if (lum >= LIGHTING_CONFIG.emitter_lum_threshold) {
+                        corePixelCount++; coreSumX += px; coreSumY += py;
+                        if (px < minCoreX) minCoreX = px; if (px > maxCoreX) maxCoreX = px;
+                        if (py < minCoreY) minCoreY = py; if (py > maxCoreY) maxCoreY = py;
+                      }
                     }
 
                     const cb = -0.168736 * r - 0.331264 * g + 0.5 * b + 128;
@@ -1463,6 +1516,8 @@
                   }
 
                   const avgLum = count > 0 ? (sumR * 0.299 + sumG * 0.587 + sumB * 0.114) / count : 0;
+                  const upperAvgLum = upperCount > 0 ? (upperLumSum / upperCount) : avgLum;
+
                   const temporalDrop = previousAvgLum - avgLum;
                   previousAvgLum = avgLum;
 
@@ -1479,6 +1534,14 @@
                   let dominantBin = 0, maxBinCount = 0;
                   for (let c = 0; c < 8; c++) {
                     if (colorBins[c] > maxBinCount) { maxBinCount = colorBins[c]; dominantBin = c; }
+                  }
+
+                  // v5.05: Protección ante mesas de color dominante saturado (>70% de píxeles)
+                  if (maxBinCount > (count * 0.70)) {
+                    const isSaturatedColor = (dominantBin !== 0 && dominantBin !== 7);
+                    shouldDesaturatePMREM = isSaturatedColor;
+                  } else {
+                    shouldDesaturatePMREM = false;
                   }
 
                   if (isCalibrating && !isCalibrated) {
@@ -1545,6 +1608,10 @@
                       currentDirectBudget = THREE_INSTANCE.MathUtils.lerp(LIGHTING_CONFIG.day_total_energy, LIGHTING_CONFIG.night_total_energy, environmentFactor);
                       currentPmremMult = THREE_INSTANCE.MathUtils.lerp(LIGHTING_CONFIG.day_pmrem_mult, LIGHTING_CONFIG.night_pmrem_mult, environmentFactor);
                       currentPedestal = THREE_INSTANCE.MathUtils.lerp(LIGHTING_CONFIG.day_pedestal, LIGHTING_CONFIG.night_pedestal, environmentFactor);
+
+                      // v5.05: Modulación continua y fluida de especulares (1.00 en Foco -> 0.40 en Penumbra)
+                      const specTargetLevel = Math.max(0.40, Math.min(1.0, 1.00 - (environmentFactor * 0.60)));
+                      actualizarNivelEspecularGlobal(specTargetLevel);
 
                       const currentShadowRadius = THREE_INSTANCE.MathUtils.lerp(LIGHTING_CONFIG.day_shadow_radius, LIGHTING_CONFIG.night_shadow_radius, environmentFactor);
                       if (_baseLight1 && _baseLight1.shadow) {
@@ -1622,7 +1689,10 @@
                     }
                   }
 
-                  const effectiveIlluminance = (avgLum * 0.70) + (p90Lum * 0.30);
+                  // v5.05: Si el entorno está en Penumbra, usamos la luz de la mitad superior (techo/paredes)
+                  // para iluminar el mapa difuso y la exposición, ignorando la mesa negra
+                  const lumCalculo = (environmentFactor >= 0.85) ? upperAvgLum : avgLum;
+                  const effectiveIlluminance = (lumCalculo * 0.70) + (p90Lum * 0.30);
                   smoothedBrightness = effectiveIlluminance;
                   const normalizedBrightness = Math.max(0.001, Math.min(1.0, smoothedBrightness / 255));
                   targetExposure = normalizedBrightness * currentPmremMult * LIGHTING_CONFIG.master_exposure_scale;
@@ -1731,9 +1801,17 @@
                 if (now - lastPmremTime >= LIGHTING_CONFIG.pmrem_interval_ms) {
                   lastPmremTime = now;
 
+                  // v5.05: Desaturación al 50% si hay dominancia cromática > 70%
+                  if (shouldDesaturatePMREM) {
+                    pmremCtx.filter = 'saturate(50%)';
+                  } else {
+                    pmremCtx.filter = 'none';
+                  }
+
                   pmremCtx.globalAlpha = LIGHTING_CONFIG.temporal_blend_alpha;
                   pmremCtx.drawImage(video, 0, 0, pmremSize, pmremSize);
                   pmremCtx.globalAlpha = 1.0;
+                  pmremCtx.filter = 'none';
 
                   envTexture.needsUpdate = true;
                   const oldRT = cameraRT;
@@ -1940,7 +2018,6 @@
       requestAnimationFrame(() => {
         arCardModal.classList.add('open');
       });
-      // Ocultar botones inferiores mientras la Card esté visible
       if (captureContainer) {
         captureContainer.style.opacity = '0';
         captureContainer.style.pointerEvents = 'none';
@@ -1952,7 +2029,6 @@
       setTimeout(() => {
         arCardModal.style.display = 'none';
       }, 350);
-      // Restaurar visibilidad de botones inferiores
       if (captureContainer) {
         captureContainer.style.opacity = '1';
         captureContainer.style.pointerEvents = 'auto';
@@ -1991,14 +2067,12 @@
         return;
       }
 
-      // Ciclo 1: espera 3s -> visible 3s -> fade out
       arHintTimer1 = setTimeout(() => {
         arGestureHint.classList.add('visible');
 
         arHintTimer2 = setTimeout(() => {
           arGestureHint.classList.remove('visible');
 
-          // Ciclo 2: espera 6s -> visible 3s -> fade out definitivo
           arHintTimer3 = setTimeout(() => {
             arGestureHint.classList.add('visible');
 
@@ -2098,7 +2172,6 @@
       ctx.drawImage(video, 0, 0, w, h);
       ctx.drawImage(threeCanvas, 0, 0, w, h);
 
-      // 1. Snapshot instantáneo para feedback visual en el milisegundo 0
       const dataUrl = offCanvas.toDataURL('image/jpeg', 0.85);
       const fileName = `Plato_AR_${Date.now()}.jpg`;
 
@@ -2106,10 +2179,8 @@
       sessionCapturedMedia.push({ url: dataUrl, name: fileName });
       selectedIndices.add(newIdx);
 
-      // Feedback visual inmediato en el frame actual (0ms)
       dispararAnimacionCaptura(dataUrl);
 
-      // 2. Guardado desacoplado por Blob (sin sobrecarga en WebKit iOS ni pantallas blancas)
       offCanvas.toBlob((blob) => {
         if (!blob) return;
         const blobUrl = URL.createObjectURL(blob);
