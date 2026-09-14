@@ -1,4 +1,4 @@
-<!-- Versión: 9th_Design v5.04 -->
+<!-- Versión: 9th_Design v5.05 -->
 <!DOCTYPE html>
 <html lang="es">
 <head>
@@ -8,7 +8,7 @@
   <meta name="theme-color" content="#040507">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   
-  <title>Menú 3D - Luxury Ceramic</title>
+  <title>Menú 3D - Development</title>
 
   <!-- Google Fonts: Fredoka Variable -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -130,7 +130,7 @@
       background: transparent;
       filter: saturate(0.87) contrast(0.88);
       opacity: 0;
-      transition: opacity 0.35s ease;
+      transition: opacity 0.4s ease;
     }
 
     /* Flechas de navegación (-10% = 36px × 36px, font 23px) */
@@ -317,7 +317,7 @@
     }
 
     /* ==========================================================================
-       5. LISTA DE PLATOS Y CARD FLUIDA (AISLADA EN GPU CON BLUR 6px)
+       5. LISTA DE PLATOS Y CARD FLUIDA (BLUR A 6px)
        ========================================================================== */
     .menu-list {
       position: relative;
@@ -348,8 +348,6 @@
       z-index: 10;
       margin: 0;
       transition: height 0.38s var(--ease-webflow);
-      transform: translateZ(0);
-      will-change: height;
     }
 
     /* CARD EXPANDIDA */
@@ -415,7 +413,7 @@
       bottom: -0.5rem;
     }
 
-    /* 3. CRISTAL LÍQUIDO (AISLADO EN GPU CON BLUR 6px + CONTRACCIÓN 0.06s) */
+    /* 3. CRISTAL LÍQUIDO (BLUR 6px + CONTRACCIÓN 0.06s) */
     .glass-overlay {
       position: absolute;
       left: 2rem;
@@ -434,8 +432,6 @@
       opacity: 0;
       pointer-events: none;
       overflow: hidden;
-      contain: paint;
-      transform: translateZ(0);
       box-shadow: 
         0 0.5rem 1.5rem rgba(18, 25, 40, 0.06),
         inset 0.09375rem 0.125rem 0.1875rem rgba(255, 255, 255, 0.92),
@@ -647,13 +643,14 @@
       height: 8.8rem;
     }
 
+    /* v5.05: Fade superior recortado a la mitad de altura (~6% arriba frente a 28% abajo) */
     .card-scroll-wrap {
       height: 100%;
       overflow-y: auto;
       padding-right: 1.6rem;
       padding-bottom: 2.6rem;
-      -webkit-mask-image: linear-gradient(to bottom, black 0%, black 72%, transparent 100%);
-      mask-image: linear-gradient(to bottom, black 0%, black 72%, transparent 100%);
+      -webkit-mask-image: linear-gradient(to bottom, transparent 0%, black 6%, black 72%, transparent 100%);
+      mask-image: linear-gradient(to bottom, transparent 0%, black 6%, black 72%, transparent 100%);
       scrollbar-width: none;
     }
 
@@ -668,7 +665,9 @@
       top: 0.2rem;
       bottom: 2.6rem;
       width: 0.6rem;
-      pointer-events: none;
+      pointer-events: auto;
+      touch-action: none;
+      cursor: pointer;
     }
 
     .card-scroll-track::before {
@@ -683,6 +682,7 @@
       border-radius: 0.05rem;
     }
 
+    /* v5.05: Bolita con área táctil ampliada al triple (~36px) mediante pseudo-elemento */
     .card-scroll-dot {
       width: 0.58rem;
       height: 0.58rem;
@@ -696,6 +696,20 @@
       left: 50%;
       transform: translate(-50%, 0);
       will-change: transform;
+      cursor: pointer;
+      pointer-events: auto;
+      touch-action: none;
+    }
+
+    .card-scroll-dot::after {
+      content: '';
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      width: 2.25rem;
+      height: 2.25rem;
+      border-radius: 50%;
     }
 
     /* TEXTO DESCRIPTIVO */
@@ -756,27 +770,8 @@
       <button id="prevDishBtn" class="ar-nav-arrow" style="left:12px;" aria-label="Plato anterior">&#8249;</button>
       <button id="nextDishBtn" class="ar-nav-arrow" style="right:12px;" aria-label="Plato siguiente">&#8250;</button>
 
-      <!-- Slot para model-viewer estático y ultra-fluido -->
-      <div class="viewer-slot" id="viewerSlot">
-        <model-viewer
-          id="mv"
-          src="Plato_01.glb"
-          autoplay
-          auto-rotate
-          auto-rotate-delay="0"
-          rotation-per-second="17deg"
-          camera-orbit="0deg 70deg 45%"
-          min-camera-orbit="0deg 0deg 45%"
-          max-camera-orbit="360deg 90deg 45%"
-          camera-controls="false"
-          touch-action="none"
-          disable-pan
-          disable-zoom
-          interaction-prompt="none"
-          shadow-intensity="0.4"
-          exposure="0.80">
-        </model-viewer>
-      </div>
+      <!-- Slot dinámico para model-viewer -->
+      <div class="viewer-slot" id="viewerSlot"></div>
 
       <!-- Icono flotante con animación de barrido (-15% escala = 39px) -->
       <div class="gesture-hint-overlay" id="gestureHint">
@@ -1376,8 +1371,9 @@
       const prevDishBtn = document.getElementById('prevDishBtn');
       const nextDishBtn = document.getElementById('nextDishBtn');
       const viewerSection = document.getElementById('viewerSection');
+      const viewerSlot = document.getElementById('viewerSlot');
       const gestureHint = document.getElementById('gestureHint');
-      const mv = document.getElementById('mv');
+      let mv = null;
 
       // Modelos 3D disponibles
       const models = [
@@ -1387,15 +1383,25 @@
         "Plato_13.glb", "Plato_14.glb", "Plato_15.glb"
       ];
 
-      // Detección inicial de plato preservado
+      // v5.05: Detección estricta: sólo restaura plato si proviene explícitamente de AR y no es una recarga manual
+      const navEntries = (window.performance && performance.getEntriesByType) ? performance.getEntriesByType('navigation') : [];
+      const isReload = navEntries.length > 0 && navEntries[0].type === 'reload';
+
+      const fromAR = sessionStorage.getItem('from_ar') === '1';
       let currentIndex = 0;
-      const initialSaved = sessionStorage.getItem('modelo_actual');
-      if (initialSaved !== null && !isNaN(parseInt(initialSaved))) {
-        currentIndex = parseInt(initialSaved);
+
+      if (fromAR && !isReload) {
+        const saved = sessionStorage.getItem('modelo_actual');
+        if (saved !== null && !isNaN(parseInt(saved))) {
+          currentIndex = parseInt(saved);
+        }
+      } else {
+        sessionStorage.removeItem('modelo_actual');
+        sessionStorage.removeItem('from_ar');
       }
 
       // ======================================================================
-      // 1. CINEMÁTICA Y FÍSICA: 3 CAPAS AL +5% (DIP +40%, TWIST +20%)
+      // 1. CINEMÁTICA Y FÍSICA: 3 CAPAS AL +5% (ARRANQUE 225° + INERCIA PESADA)
       // ======================================================================
       const layerElements = [
         document.querySelector('.layer-1'),
@@ -1406,11 +1412,11 @@
       const BASE_SPEED = 0.055;
       let currentDirection = 1;
 
-      // v5.04: scaleDip con compresión +40% y twistPower con impulso +20%
+      // v5.05: +10% en compresión de escala (scaleDip) y +25% en giro (twistPower)
       const layerConfigs = [
-        { delay: 0,   twistPower: 0.50, twistDamp: 0.958, scaleDip: 0.941, parallaxK: 1.80 },
-        { delay: 170, twistPower: 0.98, twistDamp: 0.955, scaleDip: 0.956, parallaxK: 1.28 },
-        { delay: 340, twistPower: 0.42, twistDamp: 0.962, scaleDip: 0.972, parallaxK: 0.72 }
+        { delay: 0,   twistPower: 0.525, twistDamp: 0.958, scaleDip: 0.9538, parallaxK: 1.80 },
+        { delay: 170, twistPower: 1.025, twistDamp: 0.955, scaleDip: 0.9659, parallaxK: 1.28 },
+        { delay: 340, twistPower: 0.4375, twistDamp: 0.962, scaleDip: 0.9780, parallaxK: 0.72 }
       ];
 
       // Ángulo inicial 225°: arranque con iluminación superior
@@ -1506,7 +1512,7 @@
       }
 
       // ======================================================================
-      // 5. CONTROLADOR DE MICRO-ESFERA DE SCROLL EN CARD (0% A 100%)
+      // 5. CONTROLADOR DE MICRO-ESFERA DE SCROLL EN CARD (0% A 100% Y TÁCTIL)
       // ======================================================================
       function updateCardScrollDot(wrap) {
         const container = wrap.closest('.card-scroll-container');
@@ -1524,17 +1530,138 @@
 
       document.querySelectorAll('.card-scroll-wrap').forEach((wrap) => {
         wrap.addEventListener('scroll', () => updateCardScrollDot(wrap), { passive: true });
+
+        // v5.05: Interacción táctil en la bolita (arrastre abajo = contenido desciende)
+        const container = wrap.closest('.card-scroll-container');
+        if (!container) return;
+        const track = container.querySelector('.card-scroll-track');
+        const dot = container.querySelector('.card-scroll-dot');
+        if (!track || !dot) return;
+
+        let isDraggingDot = false;
+        let startPointerY = 0;
+        let startScrollTop = 0;
+
+        const onPointerDown = (e) => {
+          e.stopPropagation();
+          isDraggingDot = true;
+          dot.setPointerCapture(e.pointerId);
+          startPointerY = e.clientY;
+          startScrollTop = wrap.scrollTop;
+        };
+
+        const onPointerMove = (e) => {
+          if (!isDraggingDot) return;
+          e.stopPropagation();
+          e.preventDefault();
+
+          const maxScroll = wrap.scrollHeight - wrap.clientHeight;
+          const maxTravel = track.clientHeight - dot.clientHeight;
+          if (maxTravel <= 0 || maxScroll <= 0) return;
+
+          const deltaY = e.clientY - startPointerY;
+          const ratio = maxScroll / maxTravel;
+          wrap.scrollTop = Math.max(0, Math.min(startScrollTop + deltaY * ratio, maxScroll));
+        };
+
+        const onPointerUp = (e) => {
+          if (!isDraggingDot) return;
+          isDraggingDot = false;
+          try {
+            dot.releasePointerCapture(e.pointerId);
+          } catch (err) {}
+        };
+
+        dot.addEventListener('pointerdown', onPointerDown);
+        dot.addEventListener('pointermove', onPointerMove);
+        dot.addEventListener('pointerup', onPointerUp);
+        dot.addEventListener('pointercancel', onPointerUp);
+
+        // Salto rápido al pulsar sobre la pista
+        track.addEventListener('pointerdown', (e) => {
+          if (e.target === dot) return;
+          e.stopPropagation();
+          const trackRect = track.getBoundingClientRect();
+          const maxTravel = track.clientHeight - dot.clientHeight;
+          const maxScroll = wrap.scrollHeight - wrap.clientHeight;
+          if (maxTravel <= 0 || maxScroll <= 0) return;
+
+          const clickY = e.clientY - trackRect.top - (dot.clientHeight / 2);
+          const progress = Math.max(0, Math.min(clickY / maxTravel, 1));
+          wrap.scrollTop = progress * maxScroll;
+        });
       });
 
       // ======================================================================
-      // 6. GESTIÓN NATIVA Y ULTRA-SUAVE DE MODEL-VIEWER (ESTILO v5.00)
+      // 6. PRECARGA VECINAL Y RECREACIÓN LIMPIA DOM
       // ======================================================================
+      const prefetchedModels = new Set();
+
+      function preloadNeighborhood(currIdx) {
+        const prevIdx = (currIdx - 1 + models.length) % models.length;
+        const nextIdx = (currIdx + 1) % models.length;
+        [prevIdx, nextIdx].forEach(idx => {
+          const url = models[idx];
+          if (!prefetchedModels.has(url)) {
+            prefetchedModels.add(url);
+            const link = document.createElement('link');
+            link.rel = 'prefetch';
+            link.as = 'fetch';
+            link.href = url;
+            link.crossOrigin = 'anonymous';
+            document.head.appendChild(link);
+          }
+        });
+      }
+
+      function destroyModelViewer() {
+        if (viewerSlot) {
+          viewerSlot.innerHTML = '';
+        }
+        mv = null;
+      }
+
+      function createModelViewer() {
+        destroyModelViewer();
+
+        const newMv = document.createElement('model-viewer');
+        newMv.id = 'mv';
+        newMv.setAttribute('src', models[currentIndex]);
+        newMv.setAttribute('autoplay', '');
+        newMv.setAttribute('auto-rotate', '');
+        newMv.setAttribute('auto-rotate-delay', '0');
+        newMv.setAttribute('rotation-per-second', '17deg');
+        newMv.setAttribute('camera-orbit', '0deg 70deg 45%');
+        newMv.setAttribute('min-camera-orbit', '0deg 0deg 45%');
+        newMv.setAttribute('max-camera-orbit', '360deg 90deg 45%');
+        newMv.setAttribute('camera-controls', 'false');
+        newMv.setAttribute('touch-action', 'none');
+        newMv.setAttribute('disable-pan', '');
+        newMv.setAttribute('disable-zoom', '');
+        newMv.setAttribute('interaction-prompt', 'none');
+        newMv.setAttribute('shadow-intensity', '0.4');
+        newMv.setAttribute('exposure', '0.80');
+        newMv.style.opacity = '0';
+
+        newMv.addEventListener('load', () => {
+          newMv.style.opacity = '1';
+          preloadNeighborhood(currentIndex);
+        }, { once: true });
+
+        viewerSlot.appendChild(newMv);
+        mv = newMv;
+      }
+
       function updateModelViewer() {
-        if (!mv) return;
+        if (!mv) {
+          createModelViewer();
+          return;
+        }
         mv.style.opacity = '0';
         mv.setAttribute('src', models[currentIndex]);
         mv.addEventListener('load', () => {
           mv.style.opacity = '1';
+          preloadNeighborhood(currentIndex);
         }, { once: true });
       }
 
@@ -1697,31 +1824,36 @@
       });
 
       // ======================================================================
-      // 9. LANZAMIENTO A AR Y REFRESCO TOTAL AL VOLVER (PURGA TOTAL VRAM EN iOS)
+      // 9. LANZAMIENTO HACIA AR Y RESTAURACIÓN LIMPIA AL VOLVER (CERO GLITCHES)
       // ======================================================================
       btnAr.addEventListener('click', () => {
         sessionStorage.setItem('from_ar', '1');
         sessionStorage.setItem('modelo_actual', currentIndex);
 
+        // Destrucción total antes de navegar (libera VRAM y evita frame congelado)
+        destroyModelViewer();
+
         window.location.href = 'ar-world.html';
       });
 
-      // Al volver desde la AR (Backbutton / pageshow), ejecutamos un reload total del navegador
-      window.addEventListener('pageshow', (event) => {
-        if (event.persisted || sessionStorage.getItem('from_ar') === '1') {
-          sessionStorage.removeItem('from_ar');
-          window.location.reload();
-          return;
+      window.addEventListener('pageshow', () => {
+        const navigatedFromAR = sessionStorage.getItem('from_ar') === '1';
+        sessionStorage.removeItem('from_ar');
+
+        if (navigatedFromAR) {
+          const saved = sessionStorage.getItem('modelo_actual');
+          if (saved !== null && !isNaN(parseInt(saved))) {
+            currentIndex = parseInt(saved);
+          }
         }
+
+        // Siempre instanciar un elemento model-viewer limpio sin memoria de canvas previa
+        createModelViewer();
+        selectDish(currentIndex, true);
       });
 
       // Arranque inicial
-      if (mv) {
-        mv.setAttribute('src', models[currentIndex]);
-        mv.addEventListener('load', () => {
-          mv.style.opacity = '1';
-        }, { once: true });
-      }
+      createModelViewer();
       selectDish(currentIndex, false);
     });
   </script>
