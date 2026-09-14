@@ -1,11 +1,11 @@
-<!-- 9th_Design v5.06 (Stepped Specular Limiter / Human-Scale Lobes / PMREM Crisp sRGB / Differential Dark-Table Guard / Dominant Color Desaturator / Fast AE Lerp / Delayed AR Nav Arrows / Multi-Select Photo Strip & Native Share / Gallery Backbutton Interception / 0ms Instant Photo-Save / Landscape Warning Blocker / Permission Fix & Transient Gesture Hint / Damped Dish Switch / Prime Spinner Instant Drop / Deferred UI Mount / Docked AR Card) -->
+<!-- 9th_Design v5.07 (Stepped Specular Limiter / Human-Scale Lobes / PMREM Crisp sRGB / Differential Dark-Table Guard / Dominant Color Desaturator / Fast AE Lerp / Delayed AR Nav Arrows / Multi-Select Photo Strip & Native Share / Gallery Backbutton Interception / 0ms Instant Photo-Save / Landscape Warning Blocker / Permission Fix & Transient Gesture Hint / Damped Dish Switch / Prime Spinner Instant Drop / Deferred UI Mount / Docked AR Card) -->
 <html>
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no,viewport-fit=cover">
   <meta name="theme-color" content="#040507">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <title>9th_Design AR 5.06</title>
+  <title>9th_Design AR 5.07</title>
   <script crossorigin="anonymous" src="external/runtime/runtime.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@8thwall/engine-binary@1/dist/xr.js" async crossorigin="anonymous" data-preload-chunks="slam"></script>
   <script src="https://cdn.jsdelivr.net/npm/@8thwall/landing-page@1/dist/landing-page.js" crossorigin="anonymous"></script>
@@ -20,8 +20,8 @@
     style="position:fixed;top:10px;right:10px;z-index:1000000;background:rgba(0,0,0,0.9);color:#0f0;font-family:monospace;font-size:12px;padding:8px;border-radius:4px;cursor:pointer;line-height:1.3;border:1px solid #0f0;display:none;pointer-events:auto;">
     <div id="debugTitle">FPS: --</div>
     <div id="debugContent">
-      ar-world: v5.06<br>
-      bundle: v5.05<br>
+      ar-world: v5.07<br>
+      bundle: v5.07<br>
       <span id="envVerdictSpan" style="color:#0f0;">Entorno: ESPERANDO MESA...</span><br>
       <span id="telemetrySpan" style="color:#0f0;">P98: -- (/255) | Lum: -- (/255) | Cálido: --%</span><br>
       <span id="benchmarkSpan" style="color:#0f0;">Pre: --sec - Post: --sec</span><br>
@@ -642,16 +642,16 @@
 
   <script>
     // =========================================================================
-    // 2. CONSOLA DE ESPECULARES (v5.06: Escala Humana: mayor valor = mayor área)
+    // 2. CONSOLA DE ESPECULARES (v5.07: Escala Humana / Halo sin lavado blanco)
     // =========================================================================
     const SPECULAR_CONFIG = {
       // Capa 1: Lóbulo THIN (Núcleo nítido y puntual - Calibración v5.06)
       thin_intensity: 0.55,      // Intensidad sutil y controlada (evita quemados)
       thin_expansion: 0.80,      // Grosor intermedio equilibrado (exponente ~1.25)
 
-      // Capa 2: Lóbulo WIDE (Halo suave envolvente - Calibración v5.06)
-      wide_intensity: 0.56,      // Doble de presencia difusa en el halo
-      wide_expansion: 2.22,      // Halo amplio, sedoso y envolvente (exponente ~0.45)
+      // Capa 2: Lóbulo WIDE (Halo suave envolvente - Calibración v5.07: contraste optimizado)
+      wide_intensity: 0.42,      // Halo con presencia equilibrada y sedosa
+      wide_expansion: 1.45,      // Halo ceñido sin velo blanco lechoso (exponente ~0.69)
 
       // Atenuación difusa en modo BOTH (Equilibrio de energía Checkpoint vB1.03)
       both_diffuse_mult: 1.00
@@ -807,7 +807,7 @@
     let environmentFactor = 0.0;
 
     let currentSpecularMode = 2;
-    // v5.06: Limitador escalonado de especulares directos según veredicto lumínico
+    // v5.07: Limitador escalonado de especulares directos según veredicto lumínico
     let currentSpecularLevel = 1.0;
 
     const actualizarNivelEspecularGlobal = (level) => {
@@ -1608,15 +1608,15 @@
                       currentPmremMult = THREE_INSTANCE.MathUtils.lerp(LIGHTING_CONFIG.day_pmrem_mult, LIGHTING_CONFIG.night_pmrem_mult, environmentFactor);
                       currentPedestal = THREE_INSTANCE.MathUtils.lerp(LIGHTING_CONFIG.day_pedestal, LIGHTING_CONFIG.night_pedestal, environmentFactor);
 
-                      // Limitador de especulares escalonado según veredicto lumínico
+                      // Limitador de especulares escalonado según veredicto lumínico (v5.07: -10% en Suave y Penumbra)
                       if (verdict === "DIRECCIONAL_FUERTE") {
                         currentSpecularLevel = 1.00;
                       } else if (verdict === "DIA_NORMAL") {
                         currentSpecularLevel = 0.80;
                       } else if (verdict === "AMBIENTE_SUAVE") {
-                        currentSpecularLevel = 0.55;
+                        currentSpecularLevel = 0.50;
                       } else {
-                        currentSpecularLevel = 0.30;
+                        currentSpecularLevel = 0.27;
                       }
                       actualizarNivelEspecularGlobal(currentSpecularLevel);
 
