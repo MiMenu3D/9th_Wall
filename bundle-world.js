@@ -1,4 +1,4 @@
-// 9th Wall v5.04
+// 9th Wall v5.05
 (() => {
   var e = {
     574() {
@@ -143,7 +143,7 @@
     const e = window.ecs;
 
     // [INMUTABLE - NO MODIFICAR BAJO NINGÚN CONCEPTO: ARRANQUE CINEMÁTICO INICIAL v4.53 / v5.00]
-    // v5.04: Spawner con hundimiento físico opaco, Contact AO garantizado, anclaje SLAM nativo, arranque sin retraso y purga total de VRAM
+    // v5.05: Spawner con reloj desacoplado desde frame 0 real, hundimiento físico opaco, Contact AO, anclaje SLAM nativo y purga total de VRAM
     e.registerComponent({
       name: "dish-spawner",
       schema: { prefab: "eid" },
@@ -220,10 +220,14 @@
             });
           }
 
-          let spawnStartTime = performance.now();
+          // v5.05: Reloj desacoplado (inicia estrictamente en el primer fotograma dibujado tras la compilación de shaders)
+          let spawnStartTime = null;
 
-          const animarSpawnCompleto = () => {
-            const elapsed = performance.now() - spawnStartTime;
+          const animarSpawnCompleto = (now) => {
+            if (!spawnStartTime) {
+              spawnStartTime = now || performance.now();
+            }
+            const elapsed = (now || performance.now()) - spawnStartTime;
 
             // 1. Cinemática de Escala (2000ms - Quadratic Ease-Out)
             const progressScale = Math.min(1.0, elapsed / scaleDuration);
@@ -268,7 +272,7 @@
         };
 
         i("initial").initial()
-          // Arranque inmediato restaurado a v5.00 (sin retrasos de sondeo)
+          // Arranque inmediato desacoplado v5.05 (sin saltos temporales)
           .listen(t.events.globalId, "auto-place-dish", ev => {
             if (isPlaced) return;
             if (!ev.data || !ev.data.worldPosition) return;
