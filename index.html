@@ -1,4 +1,4 @@
-<!-- Versión: 9th_Design v5.03 -->
+<!-- Versión: 9th_Design v5.04 -->
 <!DOCTYPE html>
 <html lang="es">
 <head>
@@ -8,7 +8,7 @@
   <meta name="theme-color" content="#040507">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   
-  <title>Menú 3D - Development</title>
+  <title>Menú 3D - Luxury Ceramic</title>
 
   <!-- Google Fonts: Fredoka Variable -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -130,7 +130,7 @@
       background: transparent;
       filter: saturate(0.87) contrast(0.88);
       opacity: 0;
-      transition: opacity 0.4s ease;
+      transition: opacity 0.35s ease;
     }
 
     /* Flechas de navegación (-10% = 36px × 36px, font 23px) */
@@ -317,7 +317,7 @@
     }
 
     /* ==========================================================================
-       5. LISTA DE PLATOS Y CARD FLUIDA (BLUR A 6px)
+       5. LISTA DE PLATOS Y CARD FLUIDA (AISLADA EN GPU CON BLUR 6px)
        ========================================================================== */
     .menu-list {
       position: relative;
@@ -348,6 +348,8 @@
       z-index: 10;
       margin: 0;
       transition: height 0.38s var(--ease-webflow);
+      transform: translateZ(0);
+      will-change: height;
     }
 
     /* CARD EXPANDIDA */
@@ -413,7 +415,7 @@
       bottom: -0.5rem;
     }
 
-    /* 3. CRISTAL LÍQUIDO (BLUR 6px + CONTRACCIÓN 0.06s) */
+    /* 3. CRISTAL LÍQUIDO (AISLADO EN GPU CON BLUR 6px + CONTRACCIÓN 0.06s) */
     .glass-overlay {
       position: absolute;
       left: 2rem;
@@ -432,6 +434,8 @@
       opacity: 0;
       pointer-events: none;
       overflow: hidden;
+      contain: paint;
+      transform: translateZ(0);
       box-shadow: 
         0 0.5rem 1.5rem rgba(18, 25, 40, 0.06),
         inset 0.09375rem 0.125rem 0.1875rem rgba(255, 255, 255, 0.92),
@@ -752,8 +756,27 @@
       <button id="prevDishBtn" class="ar-nav-arrow" style="left:12px;" aria-label="Plato anterior">&#8249;</button>
       <button id="nextDishBtn" class="ar-nav-arrow" style="right:12px;" aria-label="Plato siguiente">&#8250;</button>
 
-      <!-- Slot dinámico para model-viewer -->
-      <div class="viewer-slot" id="viewerSlot"></div>
+      <!-- Slot para model-viewer estático y ultra-fluido -->
+      <div class="viewer-slot" id="viewerSlot">
+        <model-viewer
+          id="mv"
+          src="Plato_01.glb"
+          autoplay
+          auto-rotate
+          auto-rotate-delay="0"
+          rotation-per-second="17deg"
+          camera-orbit="0deg 70deg 45%"
+          min-camera-orbit="0deg 0deg 45%"
+          max-camera-orbit="360deg 90deg 45%"
+          camera-controls="false"
+          touch-action="none"
+          disable-pan
+          disable-zoom
+          interaction-prompt="none"
+          shadow-intensity="0.4"
+          exposure="0.80">
+        </model-viewer>
+      </div>
 
       <!-- Icono flotante con animación de barrido (-15% escala = 39px) -->
       <div class="gesture-hint-overlay" id="gestureHint">
@@ -1353,9 +1376,8 @@
       const prevDishBtn = document.getElementById('prevDishBtn');
       const nextDishBtn = document.getElementById('nextDishBtn');
       const viewerSection = document.getElementById('viewerSection');
-      const viewerSlot = document.getElementById('viewerSlot');
       const gestureHint = document.getElementById('gestureHint');
-      let mv = null;
+      const mv = document.getElementById('mv');
 
       // Modelos 3D disponibles
       const models = [
@@ -1365,21 +1387,15 @@
         "Plato_13.glb", "Plato_14.glb", "Plato_15.glb"
       ];
 
-      // Detección estricta: solo restaura plato si viene explícitamente desde AR
-      const fromAR = sessionStorage.getItem('from_ar') === '1';
+      // Detección inicial de plato preservado
       let currentIndex = 0;
-
-      if (fromAR) {
-        const saved = sessionStorage.getItem('modelo_actual');
-        if (saved !== null && !isNaN(parseInt(saved))) {
-          currentIndex = parseInt(saved);
-        }
-      } else {
-        sessionStorage.removeItem('modelo_actual');
+      const initialSaved = sessionStorage.getItem('modelo_actual');
+      if (initialSaved !== null && !isNaN(parseInt(initialSaved))) {
+        currentIndex = parseInt(initialSaved);
       }
 
       // ======================================================================
-      // 1. CINEMÁTICA Y FÍSICA: 3 CAPAS AL +5% (ARRANQUE 225° + INERCIA PESADA)
+      // 1. CINEMÁTICA Y FÍSICA: 3 CAPAS AL +5% (DIP +40%, TWIST +20%)
       // ======================================================================
       const layerElements = [
         document.querySelector('.layer-1'),
@@ -1390,10 +1406,11 @@
       const BASE_SPEED = 0.055;
       let currentDirection = 1;
 
+      // v5.04: scaleDip con compresión +40% y twistPower con impulso +20%
       const layerConfigs = [
-        { delay: 0,   twistPower: 0.42, twistDamp: 0.958, scaleDip: 0.958, parallaxK: 1.80 },
-        { delay: 170, twistPower: 0.82, twistDamp: 0.955, scaleDip: 0.969, parallaxK: 1.28 },
-        { delay: 340, twistPower: 0.35, twistDamp: 0.962, scaleDip: 0.980, parallaxK: 0.72 }
+        { delay: 0,   twistPower: 0.50, twistDamp: 0.958, scaleDip: 0.941, parallaxK: 1.80 },
+        { delay: 170, twistPower: 0.98, twistDamp: 0.955, scaleDip: 0.956, parallaxK: 1.28 },
+        { delay: 340, twistPower: 0.42, twistDamp: 0.962, scaleDip: 0.972, parallaxK: 0.72 }
       ];
 
       // Ángulo inicial 225°: arranque con iluminación superior
@@ -1510,75 +1527,14 @@
       });
 
       // ======================================================================
-      // 6. PRECARGA VECINAL Y RECREACIÓN LIMPIA DOM
+      // 6. GESTIÓN NATIVA Y ULTRA-SUAVE DE MODEL-VIEWER (ESTILO v5.00)
       // ======================================================================
-      const prefetchedModels = new Set();
-
-      function preloadNeighborhood(currIdx) {
-        const prevIdx = (currIdx - 1 + models.length) % models.length;
-        const nextIdx = (currIdx + 1) % models.length;
-        [prevIdx, nextIdx].forEach(idx => {
-          const url = models[idx];
-          if (!prefetchedModels.has(url)) {
-            prefetchedModels.add(url);
-            const link = document.createElement('link');
-            link.rel = 'prefetch';
-            link.as = 'fetch';
-            link.href = url;
-            link.crossOrigin = 'anonymous';
-            document.head.appendChild(link);
-          }
-        });
-      }
-
-      function destroyModelViewer() {
-        if (viewerSlot) {
-          viewerSlot.innerHTML = '';
-        }
-        mv = null;
-      }
-
-      function createModelViewer() {
-        destroyModelViewer();
-
-        const newMv = document.createElement('model-viewer');
-        newMv.id = 'mv';
-        newMv.setAttribute('src', models[currentIndex]);
-        newMv.setAttribute('autoplay', '');
-        newMv.setAttribute('auto-rotate', '');
-        newMv.setAttribute('auto-rotate-delay', '0');
-        newMv.setAttribute('rotation-per-second', '17deg');
-        newMv.setAttribute('camera-orbit', '0deg 70deg 45%');
-        newMv.setAttribute('min-camera-orbit', '0deg 0deg 45%');
-        newMv.setAttribute('max-camera-orbit', '360deg 90deg 45%');
-        newMv.setAttribute('camera-controls', 'false');
-        newMv.setAttribute('touch-action', 'none');
-        newMv.setAttribute('disable-pan', '');
-        newMv.setAttribute('disable-zoom', '');
-        newMv.setAttribute('interaction-prompt', 'none');
-        newMv.setAttribute('shadow-intensity', '0.4');
-        newMv.setAttribute('exposure', '0.80');
-        newMv.style.opacity = '0';
-
-        newMv.addEventListener('load', () => {
-          newMv.style.opacity = '1';
-          preloadNeighborhood(currentIndex);
-        }, { once: true });
-
-        viewerSlot.appendChild(newMv);
-        mv = newMv;
-      }
-
       function updateModelViewer() {
-        if (!mv) {
-          createModelViewer();
-          return;
-        }
+        if (!mv) return;
         mv.style.opacity = '0';
         mv.setAttribute('src', models[currentIndex]);
         mv.addEventListener('load', () => {
           mv.style.opacity = '1';
-          preloadNeighborhood(currentIndex);
         }, { once: true });
       }
 
@@ -1741,36 +1697,31 @@
       });
 
       // ======================================================================
-      // 9. LANZAMIENTO HACIA AR Y RESTAURACIÓN LIMPIA AL VOLVER (CERO GLITCHES)
+      // 9. LANZAMIENTO A AR Y REFRESCO TOTAL AL VOLVER (PURGA TOTAL VRAM EN iOS)
       // ======================================================================
       btnAr.addEventListener('click', () => {
         sessionStorage.setItem('from_ar', '1');
         sessionStorage.setItem('modelo_actual', currentIndex);
 
-        // Destrucción total antes de navegar (libera VRAM y evita frame congelado)
-        destroyModelViewer();
-
         window.location.href = 'ar-world.html';
       });
 
-      window.addEventListener('pageshow', () => {
-        const navigatedFromAR = sessionStorage.getItem('from_ar') === '1';
-        sessionStorage.removeItem('from_ar');
-
-        if (navigatedFromAR) {
-          const saved = sessionStorage.getItem('modelo_actual');
-          if (saved !== null && !isNaN(parseInt(saved))) {
-            currentIndex = parseInt(saved);
-          }
+      // Al volver desde la AR (Backbutton / pageshow), ejecutamos un reload total del navegador
+      window.addEventListener('pageshow', (event) => {
+        if (event.persisted || sessionStorage.getItem('from_ar') === '1') {
+          sessionStorage.removeItem('from_ar');
+          window.location.reload();
+          return;
         }
-
-        // Siempre instanciar un elemento model-viewer limpio sin memoria de canvas previa
-        createModelViewer();
-        selectDish(currentIndex, true);
       });
 
       // Arranque inicial
-      createModelViewer();
+      if (mv) {
+        mv.setAttribute('src', models[currentIndex]);
+        mv.addEventListener('load', () => {
+          mv.style.opacity = '1';
+        }, { once: true });
+      }
       selectDish(currentIndex, false);
     });
   </script>
