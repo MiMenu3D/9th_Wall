@@ -1,4 +1,4 @@
-﻿// 9th Wall v4.64
+// 9th Wall v5.02
 (() => {
   var e = {
     574() {
@@ -142,8 +142,8 @@
     a(574);
     const e = window.ecs;
 
-    // [INMUTABLE - NO MODIFICAR BAJO NINGÚN CONCEPTO: ARRANQUE CINEMÁTICO INICIAL v4.53]
-    // v4.64: Spawner con hundimiento físico opaco, Contact AO garantizado, anclaje SLAM nativo y purga total de VRAM
+    // [INMUTABLE - NO MODIFICAR BAJO NINGÚN CONCEPTO: ARRANQUE CINEMÁTICO INICIAL v4.53 / v5.00]
+    // v5.02: Spawner con hundimiento físico opaco, Contact AO garantizado, anclaje SLAM nativo, arranque sin retraso y purga total de VRAM
     e.registerComponent({
       name: "dish-spawner",
       schema: { prefab: "eid" },
@@ -192,7 +192,7 @@
         };
 
         const dispararCinematicaSpawn = (rootTarget, baseRotY = 0, targetScale = 1.0) => {
-          // v4.53: Notificación de inicio de animación para el cronómetro Post-Listo
+          // Notificación de inicio de animación para el cronómetro Post-Listo y desvanecimiento de spinner
           if (window.notificarSpawnIniciado) {
             window.notificarSpawnIniciado();
           }
@@ -258,7 +258,7 @@
                 m.needsUpdate = true;
               });
 
-              // v4.64: Desbloqueo de las flechas únicamente al finalizar la cinemática completa
+              // Desbloqueo de las flechas únicamente al finalizar la cinemática completa
               if (window.notificarSpawnFinalizado) {
                 window.notificarSpawnFinalizado();
               }
@@ -268,6 +268,7 @@
         };
 
         i("initial").initial()
+          // Arranque inmediato restaurado a v5.00 (sin retrasos de sondeo)
           .listen(t.events.globalId, "auto-place-dish", ev => {
             if (isPlaced) return;
             if (!ev.data || !ev.data.worldPosition) return;
@@ -288,34 +289,13 @@
             e.Scale.set(t, spawnedEid, { x: 0.001, y: 0.001, z: 0.001 });
             d.set(e.Quaternion, e.math.quat.yRadians(baseRotY));
 
-            let animationStarted = false;
+            if (window.aplicarAjustesSceneViewer && t.three && t.three.scene) {
+              window.aplicarAjustesSceneViewer(t.three.scene);
+            }
 
-            // Sondeo directo v4.53: asegura la aplicación de shaders y arranca la cinemática sin bloqueos
-            const comprobarMallaLista = () => {
-              if (animationStarted) return;
-              let encontrada = false;
-
-              if (t.three && t.three.scene) {
-                t.three.scene.traverse((child) => {
-                  if (child.isMesh && child.geometry && child.geometry.attributes && child.geometry.attributes.position && child.geometry.attributes.position.count > 0 && child.name !== "Ground" && child.name !== "Hider" && (!child.material || (child.material.type !== 'ShadowMaterial' && child.material.colorWrite !== false))) {
-                    encontrada = true;
-                  }
-                });
-              }
-
-              if (encontrada) {
-                animationStarted = true;
-                if (window.aplicarAjustesSceneViewer) {
-                  window.aplicarAjustesSceneViewer(t.three.scene);
-                }
-                dispararCinematicaSpawn(spawnedEid, baseRotY, 1.0);
-              } else {
-                requestAnimationFrame(comprobarMallaLista);
-              }
-            };
-            requestAnimationFrame(comprobarMallaLista);
+            dispararCinematicaSpawn(spawnedEid, baseRotY, 1.0);
           })
-          // v4.64: Hundimiento opaco, anclaje SLAM, sombras Contact AO y purga exhaustiva de VRAM
+          // Hundimiento opaco, anclaje SLAM, sombras Contact AO y purga exhaustiva de VRAM
           .listen(t.events.globalId, "switch-dish-model", ev => {
             if (!isPlaced || !spawnedEid || isTransitioning || !ev.data || !ev.data.modelSrc || !window.THREE) return;
             isTransitioning = true;
@@ -406,7 +386,7 @@
                     newModel.rotation.set(0, 0, 0);
                     newModel.scale.set(1, 1, 1);
 
-                    // v4.64: Asegurar que el nuevo modelo proyecte sombras sobre Ground (Contact AO)
+                    // Asegurar que el nuevo modelo proyecte sombras sobre Ground (Contact AO)
                     newModel.traverse((c) => {
                       if (c.isMesh) {
                         c.castShadow = true;
@@ -473,7 +453,7 @@
         reticleLocalCenterZ = 0,
         bboxCalculated = false;
 
-        // v4.58: Medición de dimensiones estricta v4.53 con filtrado riguroso por nombre y tipo de material
+        // Medición de dimensiones estricta v4.53 con filtrado riguroso por nombre y tipo de material
         const actualizarBoundingBox = (THREE_INSTANCE) => {
           if (bboxCalculated || !t.three || !t.three.scene) return;
 
@@ -531,7 +511,7 @@
             unifiedBox.getCenter(ctr);
 
             if (sz.x > 0.05 && sz.z > 0.05 && sz.x < 2.5 && sz.z < 2.5) {
-              // v4.53: Ajuste ceñido exacto (+1.2cm holgura periférica real)
+              // Ajuste ceñido exacto (+1.2cm holgura periférica real)
               bboxSizeX = sz.x + 0.012;
               bboxSizeZ = sz.z + 0.012;
               reticleLocalCenterX = ctr.x;
@@ -541,7 +521,7 @@
           }
         };
 
-        // v4.58: Sincronización ultraligera 60 FPS en GPU con offsetRotated v4.53
+        // Sincronización ultraligera 60 FPS en GPU con offsetRotated v4.53
         const sincronizarTransformReticula = (ret, THREE_INSTANCE) => {
           if (!ret || !THREE_INSTANCE) return;
 
@@ -563,7 +543,7 @@
           ret.scale.set(currentScale, currentScale, currentScale);
         };
 
-        // v4.53: Obtención con caché estable: creación única por gesto y actualización por matrices continuas
+        // Obtención con caché estable: creación única por gesto y actualización por matrices continuas
         const obtenerReticula = (THREE_INSTANCE, scene) => {
           if (reticleMesh) {
             sincronizarTransformReticula(reticleMesh, THREE_INSTANCE);
@@ -633,7 +613,7 @@
               return;
             }
 
-            // v4.53: Invalidación limpia al inicio del toque para recalcular medidas frescas sin impacto durante el arrastre
+            // Invalidación limpia al inicio del toque para recalcular medidas frescas sin impacto durante el arrastre
             if (reticleMesh && t.three && t.three.scene) {
               t.three.scene.remove(reticleMesh);
               if (reticleMesh.geometry) reticleMesh.geometry.dispose();
@@ -709,7 +689,7 @@
                 const rInstance = window.THREE;
 
                 if (rInstance) {
-                  // v4.53: Caída vertical y bamboleo físico con elevación de seguridad de 8mm (+0.008) anti-clipping
+                  // Caída vertical y bamboleo físico con elevación de seguridad de 8mm (+0.008) anti-clipping
                   const wobbleDuration = 1200;
                   const wobbleStartTime = performance.now();
                   const startY = n.y;
