@@ -1,11 +1,11 @@
-<!-- 9th_Design v5.05 (Dual-Lobe Specular Human-Scale & Dynamic Scaling / PMREM sRGB & Alpha Fix / Upper-Half Penumbra Light Estimation / Saturation Guard / Fast AE Lerp / Delayed AR Nav Arrows / Multi-Select Photo Strip & Native Share / Gallery Backbutton Interception / 0ms Instant Photo-Save / Landscape Warning Blocker / Permission Fix & Transient Gesture Hint / Damped Dish Switch / Prime Spinner Instant Drop / Deferred UI Mount / Docked AR Card) -->
+<!-- 9th_Design v5.06 (Stepped Specular Limiter / Human-Scale Lobes / PMREM Crisp sRGB / Differential Dark-Table Guard / Dominant Color Desaturator / Fast AE Lerp / Delayed AR Nav Arrows / Multi-Select Photo Strip & Native Share / Gallery Backbutton Interception / 0ms Instant Photo-Save / Landscape Warning Blocker / Permission Fix & Transient Gesture Hint / Damped Dish Switch / Prime Spinner Instant Drop / Deferred UI Mount / Docked AR Card) -->
 <html>
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no,viewport-fit=cover">
   <meta name="theme-color" content="#040507">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <title>9th_Design AR 5.05</title>
+  <title>9th_Design AR 5.06</title>
   <script crossorigin="anonymous" src="external/runtime/runtime.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@8thwall/engine-binary@1/dist/xr.js" async crossorigin="anonymous" data-preload-chunks="slam"></script>
   <script src="https://cdn.jsdelivr.net/npm/@8thwall/landing-page@1/dist/landing-page.js" crossorigin="anonymous"></script>
@@ -20,7 +20,7 @@
     style="position:fixed;top:10px;right:10px;z-index:1000000;background:rgba(0,0,0,0.9);color:#0f0;font-family:monospace;font-size:12px;padding:8px;border-radius:4px;cursor:pointer;line-height:1.3;border:1px solid #0f0;display:none;pointer-events:auto;">
     <div id="debugTitle">FPS: --</div>
     <div id="debugContent">
-      ar-world: v5.05<br>
+      ar-world: v5.06<br>
       bundle: v5.05<br>
       <span id="envVerdictSpan" style="color:#0f0;">Entorno: ESPERANDO MESA...</span><br>
       <span id="telemetrySpan" style="color:#0f0;">P98: -- (/255) | Lum: -- (/255) | Cálido: --%</span><br>
@@ -87,7 +87,7 @@
   <!-- UI CLEAN: CARRUSEL AR, CAPTURA DE FOTOS LIMPIA Y VISOR MULTI-SELECT       -->
   <!-- ========================================================================= -->
 
-  <!-- Flechas laterales de cambio de plato (v5.05: Ocultas de inicio, se revelan al concluir spawn) -->
+  <!-- Flechas laterales de cambio de plato (Ocultas de inicio, se revelan al concluir spawn) -->
   <button id="prevDishBtn" class="ar-nav-arrow" style="left:12px;">&#8249;</button>
   <button id="nextDishBtn" class="ar-nav-arrow" style="right:12px;">&#8250;</button>
 
@@ -235,7 +235,7 @@
       100% { transform: rotate(-360deg); }
     }
 
-    /* Estilos del Carrusel y Navegación (v5.05: Ocultas de inicio) */
+    /* Estilos del Carrusel y Navegación */
     .ar-nav-arrow {
       position: fixed;
       top: 50%;
@@ -642,16 +642,16 @@
 
   <script>
     // =========================================================================
-    // 2. CONSOLA DE ESPECULARES (v5.05: Escala Humana Inteligible: mayor valor = mayor área)
+    // 2. CONSOLA DE ESPECULARES (v5.06: Escala Humana: mayor valor = mayor área)
     // =========================================================================
     const SPECULAR_CONFIG = {
-      // Capa 1: Lóbulo THIN (Núcleo nítido puntual - Escala Humana)
-      thin_intensity: 0.70,      // Multiplicador de brillo / energía del núcleo (-17% evita quemado falso)
-      thin_expansion: 0.54,      // Escala humana: 0.54 equivale a exponente 1.85 (núcleo pequeño y nítido)
+      // Capa 1: Lóbulo THIN (Núcleo nítido y puntual - Calibración v5.06)
+      thin_intensity: 0.55,      // Intensidad sutil y controlada (evita quemados)
+      thin_expansion: 0.80,      // Grosor intermedio equilibrado (exponente ~1.25)
 
-      // Capa 2: Lóbulo WIDE (Halo suave difuso - Escala Humana)
-      wide_intensity: 0.28,      // Multiplicador de brillo / presencia del halo (-44% velo sutil)
-      wide_expansion: 2.22,      // Escala humana: 2.22 equivale a exponente 0.45 (halo amplio y suave)
+      // Capa 2: Lóbulo WIDE (Halo suave envolvente - Calibración v5.06)
+      wide_intensity: 0.56,      // Doble de presencia difusa en el halo
+      wide_expansion: 2.22,      // Halo amplio, sedoso y envolvente (exponente ~0.45)
 
       // Atenuación difusa en modo BOTH (Equilibrio de energía Checkpoint vB1.03)
       both_diffuse_mult: 1.00
@@ -663,7 +663,7 @@
     const LIGHTING_CONFIG = {
       pmrem_resolution: 256,
       pmrem_interval_ms: 200,
-      scan_interval_ms: 200,     // v5.05: Escaneo acelerado a 200ms para seguimiento inmediato de AE
+      scan_interval_ms: 200,     // Escaneo acelerado a 200ms para seguimiento de AE
       calibration_frames_target: 4,
       shadow_map_size: 512,
       day_shadow_radius: 4.0,
@@ -686,7 +686,7 @@
       exposure_mult: 1.80,
       transition_duration_ms: 800,
       out_of_frame_retention: 0.80,
-      smoothing_rate: 4.4,       // v5.05: Tasa de lerp duplicada a 4.4 (adaptación en ~0.4s)
+      smoothing_rate: 4.4,       // Tasa de lerp duplicada para respuesta inmediata
 
       light_distance: 1.2,
       min_light_height: 0.20,
@@ -741,7 +741,6 @@
       primerPlatoSpawnIniciado = true;
     };
 
-    // v5.05: Montaje y activación de flechas AR y controles secundarios al concluir spawn
     window.notificarSpawnFinalizado = function () {
       const prevBtn = document.getElementById('prevDishBtn');
       const nextBtn = document.getElementById('nextDishBtn');
@@ -762,7 +761,6 @@
         });
       }
 
-      // Despliegue diferido del contenedor de captura y botón Info
       const capContainer = document.getElementById('captureContainer');
       if (capContainer) {
         capContainer.style.display = 'flex';
@@ -809,7 +807,7 @@
     let environmentFactor = 0.0;
 
     let currentSpecularMode = 2;
-    // v5.05: Nivel de especular modulado dinámicamente según luz ambiental (1.0 en Día / 0.40 en Penumbra)
+    // v5.06: Limitador escalonado de especulares directos según veredicto lumínico
     let currentSpecularLevel = 1.0;
 
     const actualizarNivelEspecularGlobal = (level) => {
@@ -993,7 +991,7 @@
     }
 
     // =========================================================================
-    // INYECCIÓN PBR Y SHADERS (v5.05: Inversión matemática a escala humana + uSpecularLevel)
+    // INYECCIÓN PBR Y SHADERS (Escala humana: mayor expansión = mayor área)
     // =========================================================================
     window.aplicarAjustesSceneViewer = function (targetNode) {
       const root = targetNode || _scene;
@@ -1133,7 +1131,6 @@
                 _renderer.toneMapping = nativeTHREE.ACESFilmicToneMapping;
                 _renderer.toneMappingExposure = 1.0;
 
-                // Forzar espacio de color sRGB compensado para pantallas Display P3 en iOS
                 if (nativeTHREE.SRGBColorSpace) {
                   _renderer.outputColorSpace = nativeTHREE.SRGBColorSpace;
                 } else if (nativeTHREE.sRGBEncoding) {
@@ -1342,7 +1339,6 @@
               readyPrompt.style.opacity = '1';
               readyPrompt.style.pointerEvents = 'auto';
 
-              // Bloqueo de pantalla pre-Listo activado exclusivamente cuando la cámara ya transmite
               if (touchBlocker) {
                 touchBlocker.style.display = 'block';
                 touchBlocker.style.pointerEvents = 'auto';
@@ -1358,7 +1354,7 @@
             const pmremCanvas = document.createElement('canvas');
             pmremCanvas.width = pmremSize;
             pmremCanvas.height = pmremSize;
-            // v5.05: alpha: false para eliminar degradación del buffer y lavado lechoso
+            // Buffer sin canal alfa para evitar degradación y lavado blanquecino
             const pmremCtx = pmremCanvas.getContext('2d', { willReadFrequently: true, alpha: false });
 
             try {
@@ -1368,7 +1364,6 @@
 
             const envTexture = new THREE_INSTANCE.CanvasTexture(pmremCanvas);
             envTexture.mapping = THREE_INSTANCE.EquirectangularReflectionMapping;
-            // v5.05: Soporte estricto para SRGBColorSpace en Three.js r160 (elimina lavado a blanco)
             if (THREE_INSTANCE.SRGBColorSpace) {
               envTexture.colorSpace = THREE_INSTANCE.SRGBColorSpace;
             } else if (THREE_INSTANCE.sRGBEncoding) {
@@ -1423,7 +1418,6 @@
 
                 window._tListoClick = performance.now();
 
-                // Activar spinner en cyan durante la calibración
                 const spinner = document.getElementById('primeSpinner');
                 if (spinner && !primerPlatoSpawnIniciado) {
                   spinner.style.display = 'block';
@@ -1470,8 +1464,9 @@
                   let minCoreX = pmremSize, maxCoreX = 0, minCoreY = scanEmitterHeight, maxCoreY = 0;
                   let warmPixelsCount = 0;
 
-                  // v5.05: Acumulación de luz en la mitad superior para estimación en Penumbra
+                  // Segmentación de encuadre para protección diferencial ante mesa negra
                   let upperLumSum = 0, upperCount = 0;
+                  let lowerLumSum = 0, lowerCount = 0;
 
                   const colorBins = new Int32Array(8);
                   const colorBinLumSumX = new Float32Array(8);
@@ -1500,6 +1495,9 @@
                         if (px < minCoreX) minCoreX = px; if (px > maxCoreX) maxCoreX = px;
                         if (py < minCoreY) minCoreY = py; if (py > maxCoreY) maxCoreY = py;
                       }
+                    } else {
+                      lowerLumSum += lum;
+                      lowerCount++;
                     }
 
                     const cb = -0.168736 * r - 0.331264 * g + 0.5 * b + 128;
@@ -1517,6 +1515,7 @@
 
                   const avgLum = count > 0 ? (sumR * 0.299 + sumG * 0.587 + sumB * 0.114) / count : 0;
                   const upperAvgLum = upperCount > 0 ? (upperLumSum / upperCount) : avgLum;
+                  const lowerAvgLum = lowerCount > 0 ? (lowerLumSum / lowerCount) : avgLum;
 
                   const temporalDrop = previousAvgLum - avgLum;
                   previousAvgLum = avgLum;
@@ -1536,7 +1535,7 @@
                     if (colorBins[c] > maxBinCount) { maxBinCount = colorBins[c]; dominantBin = c; }
                   }
 
-                  // v5.05: Protección ante mesas de color dominante saturado (>70% de píxeles)
+                  // Protección ante Mesa Roja: desaturación al 50% si domina >70% de color saturado
                   if (maxBinCount > (count * 0.70)) {
                     const isSaturatedColor = (dominantBin !== 0 && dominantBin !== 7);
                     shouldDesaturatePMREM = isSaturatedColor;
@@ -1609,9 +1608,17 @@
                       currentPmremMult = THREE_INSTANCE.MathUtils.lerp(LIGHTING_CONFIG.day_pmrem_mult, LIGHTING_CONFIG.night_pmrem_mult, environmentFactor);
                       currentPedestal = THREE_INSTANCE.MathUtils.lerp(LIGHTING_CONFIG.day_pedestal, LIGHTING_CONFIG.night_pedestal, environmentFactor);
 
-                      // v5.05: Modulación continua y fluida de especulares (1.00 en Foco -> 0.40 en Penumbra)
-                      const specTargetLevel = Math.max(0.40, Math.min(1.0, 1.00 - (environmentFactor * 0.60)));
-                      actualizarNivelEspecularGlobal(specTargetLevel);
+                      // Limitador de especulares escalonado según veredicto lumínico
+                      if (verdict === "DIRECCIONAL_FUERTE") {
+                        currentSpecularLevel = 1.00;
+                      } else if (verdict === "DIA_NORMAL") {
+                        currentSpecularLevel = 0.80;
+                      } else if (verdict === "AMBIENTE_SUAVE") {
+                        currentSpecularLevel = 0.55;
+                      } else {
+                        currentSpecularLevel = 0.30;
+                      }
+                      actualizarNivelEspecularGlobal(currentSpecularLevel);
 
                       const currentShadowRadius = THREE_INSTANCE.MathUtils.lerp(LIGHTING_CONFIG.day_shadow_radius, LIGHTING_CONFIG.night_shadow_radius, environmentFactor);
                       if (_baseLight1 && _baseLight1.shadow) {
@@ -1620,6 +1627,7 @@
 
                       actualizarHUDTelemetria(verdict, avgP98, avgLumFinal, avgWarmRatio * 100);
 
+                      // Orden estricto v5.04: inyección previa al despacho de colocación
                       if (_scene && window.aplicarAjustesSceneViewer) {
                         window.aplicarAjustesSceneViewer(_scene);
                       }
@@ -1684,14 +1692,14 @@
                         }
                       }
 
-                      // Liberar pantalla táctil al concluir calibración
                       if (touchBlocker) touchBlocker.style.display = 'none';
                     }
                   }
 
-                  // v5.05: Si el entorno está en Penumbra, usamos la luz de la mitad superior (techo/paredes)
-                  // para iluminar el mapa difuso y la exposición, ignorando la mesa negra
-                  const lumCalculo = (environmentFactor >= 0.85) ? upperAvgLum : avgLum;
+                  // Protección diferencial: sólo ignora la mesa si la superficie inferior es oscura (<65) y la superior está iluminada (>inf + 25)
+                  const isDarkTableInLitRoom = (lowerAvgLum < 65) && (upperAvgLum > (lowerAvgLum + 25));
+                  const lumCalculo = isDarkTableInLitRoom ? upperAvgLum : avgLum;
+
                   const effectiveIlluminance = (lumCalculo * 0.70) + (p90Lum * 0.30);
                   smoothedBrightness = effectiveIlluminance;
                   const normalizedBrightness = Math.max(0.001, Math.min(1.0, smoothedBrightness / 255));
@@ -1801,7 +1809,6 @@
                 if (now - lastPmremTime >= LIGHTING_CONFIG.pmrem_interval_ms) {
                   lastPmremTime = now;
 
-                  // v5.05: Desaturación al 50% si hay dominancia cromática > 70%
                   if (shouldDesaturatePMREM) {
                     pmremCtx.filter = 'saturate(50%)';
                   } else {
@@ -1893,7 +1900,6 @@
               name: 'scene-capturer',
               parameters: {}
             };
-            // Desactivar solicitud parásita de audio en 8th Wall
             if (obj.camera && obj.camera.xr) {
               obj.camera.xr.audio = false;
             }
@@ -1969,7 +1975,6 @@
     const prevDishBtn = document.getElementById('prevDishBtn');
     const nextDishBtn = document.getElementById('nextDishBtn');
 
-    // Desacoplamiento por rAF para liberar memoria VRAM en Safari iOS antes de instanciar nuevo GLB
     const cambiarPlatoAR = (direction) => {
       prevDishBtn.disabled = true;
       nextDishBtn.disabled = true;
