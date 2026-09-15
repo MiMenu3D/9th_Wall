@@ -1,4 +1,4 @@
-// 9th Wall v5.07
+// 9th Wall v5.08
 (() => {
   var e = {
     574() {
@@ -79,7 +79,7 @@
     const cornersOuter = [
       { cx: sx - r, cz: -sz + r, startAngle: -Math.PI / 2, endAngle: 0 },
       { cx: sx - r, cz: sz - r, startAngle: 0, endAngle: Math.PI / 2 },
-      { cx: -sx + r, cz: sz - r, startAngle: 0, endAngle: Math.PI / 2 },
+      { cx: -sx + r, cz: sz - r, startAngle: Math.PI / 2, endAngle: Math.PI },
       { cx: -sx + r, cz: -sz + r, startAngle: Math.PI, endAngle: (3 * Math.PI) / 2 }
     ];
 
@@ -143,7 +143,7 @@
     const e = window.ecs;
 
     // [INMUTABLE - NO MODIFICAR BAJO NINGÚN CONCEPTO: ARRANQUE CINEMÁTICO INICIAL v4.53 / v5.00]
-    // v5.07: Spawner con sondeo de malla nativo v4.64, sincronización 100% de SceneViewer, hundimiento físico opaco, Contact AO y purga total de VRAM
+    // v5.08: Spawner con sondeo de malla nativo v4.64, sincronización 100% de SceneViewer, hundimiento físico opaco, Contact AO y purga total de VRAM
     e.registerComponent({
       name: "dish-spawner",
       schema: { prefab: "eid" },
