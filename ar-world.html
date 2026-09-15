@@ -1,11 +1,11 @@
-<!-- 9th_Design v5.07 (Stepped Specular Limiter / Human-Scale Lobes / PMREM Crisp sRGB / Differential Dark-Table Guard / Dominant Color Desaturator / Fast AE Lerp / Delayed AR Nav Arrows / Multi-Select Photo Strip & Native Share / Gallery Backbutton Interception / 0ms Instant Photo-Save / Landscape Warning Blocker / Permission Fix & Transient Gesture Hint / Damped Dish Switch / Prime Spinner Instant Drop / Deferred UI Mount / Docked AR Card) -->
+<!-- 9th_Design v5.08 (Clean Reticle / Stepped Specular / Human-Scale Lobes / PMREM Crisp sRGB / Differential Dark-Table Guard / Dominant Color Desaturator / Fast AE Lerp / Delayed AR Nav Arrows / Multi-Select Photo Strip & Native Share / Gallery Backbutton Interception / 0ms Instant Photo-Save / Landscape Warning Blocker / Permission Fix & Transient Gesture Hint / Damped Dish Switch / Prime Spinner Instant Drop / Deferred UI Mount / Docked AR Card) -->
 <html>
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no,viewport-fit=cover">
   <meta name="theme-color" content="#040507">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <title>9th_Design AR 5.07</title>
+  <title>9th_Design AR 5.08</title>
   <script crossorigin="anonymous" src="external/runtime/runtime.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@8thwall/engine-binary@1/dist/xr.js" async crossorigin="anonymous" data-preload-chunks="slam"></script>
   <script src="https://cdn.jsdelivr.net/npm/@8thwall/landing-page@1/dist/landing-page.js" crossorigin="anonymous"></script>
@@ -20,8 +20,8 @@
     style="position:fixed;top:10px;right:10px;z-index:1000000;background:rgba(0,0,0,0.9);color:#0f0;font-family:monospace;font-size:12px;padding:8px;border-radius:4px;cursor:pointer;line-height:1.3;border:1px solid #0f0;display:none;pointer-events:auto;">
     <div id="debugTitle">FPS: --</div>
     <div id="debugContent">
-      ar-world: v5.07<br>
-      bundle: v5.07<br>
+      ar-world: v5.08<br>
+      bundle: v5.08<br>
       <span id="envVerdictSpan" style="color:#0f0;">Entorno: ESPERANDO MESA...</span><br>
       <span id="telemetrySpan" style="color:#0f0;">P98: -- (/255) | Lum: -- (/255) | Cálido: --%</span><br>
       <span id="benchmarkSpan" style="color:#0f0;">Pre: --sec - Post: --sec</span><br>
@@ -62,7 +62,7 @@
     </button>
   </div>
 
-  <!-- Círculo de Carga AR estilo Prime Video (Cyan + Blanco fino) -->
+  <!-- Círculo de Carga AR estilo Prime Video (Cyan + Blanco fino, sin sombras, +30% grosor) -->
   <div id="primeSpinner">
     <div class="prime-spinner-outer"></div>
     <div class="prime-spinner-inner"></div>
@@ -87,13 +87,19 @@
   <!-- UI CLEAN: CARRUSEL AR, CAPTURA DE FOTOS LIMPIA Y VISOR MULTI-SELECT       -->
   <!-- ========================================================================= -->
 
-  <!-- Flechas laterales de cambio de plato (Ocultas de inicio, se revelan al concluir spawn) -->
+  <!-- Flechas laterales de cambio de plato (Ocultas de inicio, se revelan tras el spawn) -->
   <button id="prevDishBtn" class="ar-nav-arrow" style="left:12px;">&#8249;</button>
   <button id="nextDishBtn" class="ar-nav-arrow" style="right:12px;">&#8250;</button>
 
-  <!-- Icono flotante indicador de interacción táctil en AR (-15% = 42px) -->
+  <!-- Icono flotante indicador de interacción táctil en AR con filete oscuro nativo -->
   <div class="gesture-hint-overlay" id="arGestureHint">
     <svg viewBox="0 0 48 48" fill="none" class="gesture-hint-icon">
+      <!-- Filete oscuro vectorial para asegurar contraste en manteles blancos -->
+      <path d="M19 16V9a3 3 0 0 1 6 0v12" stroke="#000000" stroke-width="4.5" stroke-linecap="round" stroke-linejoin="round"/>
+      <path d="M25 19a3 3 0 0 1 6 0v2" stroke="#000000" stroke-width="4.5" stroke-linecap="round" stroke-linejoin="round"/>
+      <path d="M31 20a3 3 0 0 1 6 0v4c0 7-5 13-12 13s-11-5-11-10v-5a3 3 0 0 1 6 0v-2" stroke="#000000" stroke-width="4.5" stroke-linecap="round" stroke-linejoin="round"/>
+      <path d="M12 28a16 16 0 0 1 24 0" stroke="#000000" stroke-width="3.8" stroke-linecap="round"/>
+      <!-- Trazos principales blanco y cyan -->
       <path d="M19 16V9a3 3 0 0 1 6 0v12" stroke="#FFFFFF" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
       <path d="M25 19a3 3 0 0 1 6 0v2" stroke="#FFFFFF" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
       <path d="M31 20a3 3 0 0 1 6 0v4c0 7-5 13-12 13s-11-5-11-10v-5a3 3 0 0 1 6 0v-2" stroke="#FFFFFF" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
@@ -119,7 +125,7 @@
     </button>
   </div>
 
-  <!-- Card gastronómica anclada al extremo inferior en AR -->
+  <!-- Card gastronómica anclada al extremo inferior en AR (sólido negro pulido sin blur ni sombra) -->
   <div id="arCardModal" class="ar-card-docked" style="display:none;">
     <div class="ar-card-glass">
       <div class="ar-card-header">
@@ -194,7 +200,7 @@
       }
     }
 
-    /* Spinner AR estilo Prime Video (Cyan + Blanco fino) */
+    /* Spinner AR estilo Prime Video (Cyan + Blanco fino, sin sombras, +30% grosor) */
     #primeSpinner {
       position: fixed;
       top: 50%;
@@ -211,17 +217,16 @@
       position: absolute;
       inset: 0;
       border-radius: 50%;
-      border: 2px solid transparent;
+      border: 2.6px solid transparent;
       border-top-color: #00e5ff;
       border-right-color: #00e5ff;
       animation: primeSpin 0.9s linear infinite;
-      box-shadow: 0 0 10px rgba(0, 229, 255, 0.4);
     }
     .prime-spinner-inner {
       position: absolute;
       inset: 6px;
       border-radius: 50%;
-      border: 1.5px solid transparent;
+      border: 2.0px solid transparent;
       border-top-color: rgba(255, 255, 255, 0.85);
       border-left-color: rgba(255, 255, 255, 0.4);
       animation: primeSpinReverse 1.3s linear infinite;
@@ -282,10 +287,15 @@
     .gesture-hint-overlay.visible {
       opacity: 1;
     }
+    .gesture-hint-overlay:not(.visible) .gesture-hint-icon {
+      animation-play-state: paused;
+    }
+    .gesture-hint-overlay.visible .gesture-hint-icon {
+      animation-play-state: running;
+    }
     .gesture-hint-icon {
       width: 42px;
       height: 42px;
-      filter: drop-shadow(0 2px 8px rgba(0,0,0,0.65));
       animation: gestureSweep 2.2s ease-in-out infinite;
     }
     @keyframes gestureSweep {
@@ -385,7 +395,7 @@
     }
     #infoDishBtn:active { transform: scale(0.92); }
 
-    /* Card panorámica anclada al fondo de la pantalla en AR */
+    /* Card panorámica anclada al fondo de la pantalla en AR (Sólido negro pulido sin blur ni sombras) */
     .ar-card-docked {
       position: fixed;
       bottom: 0;
@@ -402,13 +412,11 @@
     }
     .ar-card-glass {
       position: relative;
-      background: rgba(10, 13, 18, 0.90);
-      backdrop-filter: blur(14px);
-      -webkit-backdrop-filter: blur(14px);
+      background: #0a0d12;
       border-top: 1px solid rgba(255, 255, 255, 0.20);
       border-radius: 20px 20px 0 0;
       padding: 18px 22px 24px 24px;
-      box-shadow: 0 -8px 32px rgba(0, 0, 0, 0.7);
+      box-shadow: none;
     }
     .ar-card-header {
       display: flex;
@@ -641,15 +649,18 @@
   </style>
 
   <script>
+    // Detección de entorno iOS para compensación de color y saturación
+    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+
     // =========================================================================
-    // 2. CONSOLA DE ESPECULARES (v5.07: Escala Humana / Halo sin lavado blanco)
+    // 2. CONSOLA DE ESPECULARES (v5.08: Escala Humana / Halo sin lavado blanco)
     // =========================================================================
     const SPECULAR_CONFIG = {
-      // Capa 1: Lóbulo THIN (Núcleo nítido y puntual - Calibración v5.06)
-      thin_intensity: 0.55,      // Intensidad sutil y controlada (evita quemados)
+      // Capa 1: Lóbulo THIN (Núcleo nítido y puntual)
+      thin_intensity: 0.55,      // Intensidad sutil y controlada
       thin_expansion: 0.80,      // Grosor intermedio equilibrado (exponente ~1.25)
 
-      // Capa 2: Lóbulo WIDE (Halo suave envolvente - Calibración v5.07: contraste optimizado)
+      // Capa 2: Lóbulo WIDE (Halo suave envolvente)
       wide_intensity: 0.42,      // Halo con presencia equilibrada y sedosa
       wide_expansion: 1.45,      // Halo ceñido sin velo blanco lechoso (exponente ~0.69)
 
@@ -686,7 +697,7 @@
       exposure_mult: 1.80,
       transition_duration_ms: 800,
       out_of_frame_retention: 0.80,
-      smoothing_rate: 4.4,       // Tasa de lerp duplicada para respuesta inmediata
+      smoothing_rate: 4.4,       // Tasa de lerp acelerada para adaptación fluida
 
       light_distance: 1.2,
       min_light_height: 0.20,
@@ -733,6 +744,7 @@
         window.actualizarHUDBenchmark();
       }
 
+      // Desaparición instantánea y seca del spinner
       const spinner = document.getElementById('primeSpinner');
       if (spinner) {
         spinner.style.display = 'none';
@@ -741,38 +753,50 @@
       primerPlatoSpawnIniciado = true;
     };
 
+    // Control de pausa de regeneración PMREM durante cambios de modelo
+    let isDishSwitching = false;
+
+    // v5.08: Margen de seguridad de 400ms tras el fin del spawn antes del fade-in suave de la UI
     window.notificarSpawnFinalizado = function () {
-      const prevBtn = document.getElementById('prevDishBtn');
-      const nextBtn = document.getElementById('nextDishBtn');
-      if (prevBtn) {
-        prevBtn.style.display = 'flex';
-        prevBtn.disabled = false;
-        requestAnimationFrame(() => {
-          prevBtn.style.opacity = '1';
-          prevBtn.style.pointerEvents = 'auto';
-        });
-      }
-      if (nextBtn) {
-        nextBtn.style.display = 'flex';
-        nextBtn.disabled = false;
-        requestAnimationFrame(() => {
-          nextBtn.style.opacity = '1';
-          nextBtn.style.pointerEvents = 'auto';
-        });
-      }
+      isDishSwitching = false;
 
-      const capContainer = document.getElementById('captureContainer');
-      if (capContainer) {
-        capContainer.style.display = 'flex';
-        capContainer.style.pointerEvents = 'auto';
-        requestAnimationFrame(() => {
-          capContainer.style.opacity = '1';
-        });
-      }
+      setTimeout(() => {
+        const prevBtn = document.getElementById('prevDishBtn');
+        const nextBtn = document.getElementById('nextDishBtn');
+        const capContainer = document.getElementById('captureContainer');
 
-      if (window.iniciarHintGestosAR) {
-        window.iniciarHintGestosAR();
-      }
+        if (prevBtn) {
+          prevBtn.style.display = 'flex';
+          requestAnimationFrame(() => { prevBtn.style.opacity = '1'; });
+        }
+        if (nextBtn) {
+          nextBtn.style.display = 'flex';
+          requestAnimationFrame(() => { nextBtn.style.opacity = '1'; });
+        }
+        if (capContainer) {
+          capContainer.style.display = 'flex';
+          requestAnimationFrame(() => { capContainer.style.opacity = '1'; });
+        }
+
+        // Habilitar pulsación e interactividad únicamente al concluir el fundido suave (350ms)
+        setTimeout(() => {
+          if (prevBtn) {
+            prevBtn.disabled = false;
+            prevBtn.style.pointerEvents = 'auto';
+          }
+          if (nextBtn) {
+            nextBtn.disabled = false;
+            nextBtn.style.pointerEvents = 'auto';
+          }
+          if (capContainer) {
+            capContainer.style.pointerEvents = 'auto';
+          }
+        }, 350);
+
+        if (window.iniciarHintGestosAR) {
+          window.iniciarHintGestosAR();
+        }
+      }, 400);
     };
 
     let lastTime = performance.now();
@@ -807,7 +831,6 @@
     let environmentFactor = 0.0;
 
     let currentSpecularMode = 2;
-    // v5.07: Limitador escalonado de especulares directos según veredicto lumínico
     let currentSpecularLevel = 1.0;
 
     const actualizarNivelEspecularGlobal = (level) => {
@@ -970,9 +993,11 @@
       });
     }
 
+    // v5.08: Intercepción mediante touchstart con e.preventDefault() para anular el Smart Zoom de Safari iOS
     if (secretTrigger) {
       let secretTaps = [];
-      const procesarToqueSecreto = () => {
+      const procesarToqueSecreto = (e) => {
+        if (e && e.cancelable) e.preventDefault();
         const now = performance.now();
         secretTaps.push(now);
         secretTaps = secretTaps.filter(t => (now - t) <= 1000);
@@ -987,11 +1012,14 @@
           }
         }
       };
-      secretTrigger.addEventListener('pointerdown', procesarToqueSecreto);
+      secretTrigger.addEventListener('touchstart', procesarToqueSecreto, { passive: false });
+      secretTrigger.addEventListener('pointerdown', (e) => {
+        if (e.pointerType === 'mouse') procesarToqueSecreto(e);
+      });
     }
 
     // =========================================================================
-    // INYECCIÓN PBR Y SHADERS (Escala humana: mayor expansión = mayor área)
+    // INYECCIÓN PBR Y SHADERS (Escala humana + Pedestal sagrado + Saturación nativa iOS)
     // =========================================================================
     window.aplicarAjustesSceneViewer = function (targetNode) {
       const root = targetNode || _scene;
@@ -1096,16 +1124,20 @@
               mat.roughness = LIGHTING_CONFIG.min_material_roughness;
             }
 
+            // Pedestal lumínico sagrado intacto
             if (mat.emissive !== undefined) {
               const p = currentPedestal;
               mat.emissive.setRGB(p, p, p);
             }
 
+            // v5.08: En iOS se anula la reducción del 15% para devolver la riqueza de color nativa del GLTF
             if (mat.color && !mat._desaturated) {
-              const hsl = { h: 0, s: 0, l: 0 };
-              mat.color.getHSL(hsl);
-              hsl.s = Math.max(0.0, hsl.s * (1.0 - LIGHTING_CONFIG.albedo_desaturation));
-              mat.color.setHSL(hsl.h, hsl.s, hsl.l);
+              if (!isIOS) {
+                const hsl = { h: 0, s: 0, l: 0 };
+                mat.color.getHSL(hsl);
+                hsl.s = Math.max(0.0, hsl.s * (1.0 - LIGHTING_CONFIG.albedo_desaturation));
+                mat.color.setHSL(hsl.h, hsl.s, hsl.l);
+              }
               mat._desaturated = true;
             }
           });
@@ -1130,12 +1162,6 @@
                 _renderer.shadowMap.enabled = true;
                 _renderer.toneMapping = nativeTHREE.ACESFilmicToneMapping;
                 _renderer.toneMappingExposure = 1.0;
-
-                if (nativeTHREE.SRGBColorSpace) {
-                  _renderer.outputColorSpace = nativeTHREE.SRGBColorSpace;
-                } else if (nativeTHREE.sRGBEncoding) {
-                  _renderer.outputEncoding = nativeTHREE.sRGBEncoding;
-                }
 
                 candidateDebounce.dir = new nativeTHREE.Vector3();
 
@@ -1354,7 +1380,6 @@
             const pmremCanvas = document.createElement('canvas');
             pmremCanvas.width = pmremSize;
             pmremCanvas.height = pmremSize;
-            // Buffer sin canal alfa para evitar degradación y lavado blanquecino
             const pmremCtx = pmremCanvas.getContext('2d', { willReadFrequently: true, alpha: false });
 
             try {
@@ -1364,11 +1389,6 @@
 
             const envTexture = new THREE_INSTANCE.CanvasTexture(pmremCanvas);
             envTexture.mapping = THREE_INSTANCE.EquirectangularReflectionMapping;
-            if (THREE_INSTANCE.SRGBColorSpace) {
-              envTexture.colorSpace = THREE_INSTANCE.SRGBColorSpace;
-            } else if (THREE_INSTANCE.sRGBEncoding) {
-              envTexture.encoding = THREE_INSTANCE.sRGBEncoding;
-            }
 
             let smoothedBrightness = 128;
             let targetExposure = 0.45;
@@ -1464,7 +1484,6 @@
                   let minCoreX = pmremSize, maxCoreX = 0, minCoreY = scanEmitterHeight, maxCoreY = 0;
                   let warmPixelsCount = 0;
 
-                  // Segmentación de encuadre para protección diferencial ante mesa negra
                   let upperLumSum = 0, upperCount = 0;
                   let lowerLumSum = 0, lowerCount = 0;
 
@@ -1535,7 +1554,6 @@
                     if (colorBins[c] > maxBinCount) { maxBinCount = colorBins[c]; dominantBin = c; }
                   }
 
-                  // Protección ante Mesa Roja: desaturación al 50% si domina >70% de color saturado
                   if (maxBinCount > (count * 0.70)) {
                     const isSaturatedColor = (dominantBin !== 0 && dominantBin !== 7);
                     shouldDesaturatePMREM = isSaturatedColor;
@@ -1608,7 +1626,6 @@
                       currentPmremMult = THREE_INSTANCE.MathUtils.lerp(LIGHTING_CONFIG.day_pmrem_mult, LIGHTING_CONFIG.night_pmrem_mult, environmentFactor);
                       currentPedestal = THREE_INSTANCE.MathUtils.lerp(LIGHTING_CONFIG.day_pedestal, LIGHTING_CONFIG.night_pedestal, environmentFactor);
 
-                      // Limitador de especulares escalonado según veredicto lumínico (v5.07: -10% en Suave y Penumbra)
                       if (verdict === "DIRECCIONAL_FUERTE") {
                         currentSpecularLevel = 1.00;
                       } else if (verdict === "DIA_NORMAL") {
@@ -1627,7 +1644,6 @@
 
                       actualizarHUDTelemetria(verdict, avgP98, avgLumFinal, avgWarmRatio * 100);
 
-                      // Orden estricto v5.04: inyección previa al despacho de colocación
                       if (_scene && window.aplicarAjustesSceneViewer) {
                         window.aplicarAjustesSceneViewer(_scene);
                       }
@@ -1696,7 +1712,6 @@
                     }
                   }
 
-                  // Protección diferencial: sólo ignora la mesa si la superficie inferior es oscura (<65) y la superior está iluminada (>inf + 25)
                   const isDarkTableInLitRoom = (lowerAvgLum < 65) && (upperAvgLum > (lowerAvgLum + 25));
                   const lumCalculo = isDarkTableInLitRoom ? upperAvgLum : avgLum;
 
@@ -1806,10 +1821,14 @@
                   }
                 }
 
-                if (now - lastPmremTime >= LIGHTING_CONFIG.pmrem_interval_ms) {
+                // v5.08: Pausa de regeneración PMREM durante el cambio de modelo para liberar ancho de banda GPU
+                if (!isDishSwitching && (now - lastPmremTime >= LIGHTING_CONFIG.pmrem_interval_ms)) {
                   lastPmremTime = now;
 
-                  if (shouldDesaturatePMREM) {
+                  // Compensación cromática anti-amarillo para iOS y filtro de saturación
+                  if (isIOS) {
+                    pmremCtx.filter = shouldDesaturatePMREM ? 'saturate(50%) hue-rotate(-7deg)' : 'hue-rotate(-7deg)';
+                  } else if (shouldDesaturatePMREM) {
                     pmremCtx.filter = 'saturate(50%)';
                   } else {
                     pmremCtx.filter = 'none';
@@ -1975,9 +1994,25 @@
     const prevDishBtn = document.getElementById('prevDishBtn');
     const nextDishBtn = document.getElementById('nextDishBtn');
 
+    // Desaparición inmediata en seco de flechas y controles al cambiar de plato + pausa de PMREM
     const cambiarPlatoAR = (direction) => {
       prevDishBtn.disabled = true;
       nextDishBtn.disabled = true;
+      prevDishBtn.style.pointerEvents = 'none';
+      nextDishBtn.style.pointerEvents = 'none';
+      prevDishBtn.style.display = 'none';
+      nextDishBtn.style.display = 'none';
+      prevDishBtn.style.opacity = '0';
+      nextDishBtn.style.opacity = '0';
+
+      const capContainer = document.getElementById('captureContainer');
+      if (capContainer) {
+        capContainer.style.display = 'none';
+        capContainer.style.opacity = '0';
+        capContainer.style.pointerEvents = 'none';
+      }
+
+      isDishSwitching = true;
 
       currentDishIndex = (currentDishIndex + direction + _modelsList.length) % _modelsList.length;
       sessionStorage.setItem("modelo_actual", currentDishIndex);
