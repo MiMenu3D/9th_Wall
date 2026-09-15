@@ -1,4 +1,4 @@
-<!-- Versión: 9th_Design v5.05 -->
+<!-- Versión: 9th_Design v5.08 -->
 <!DOCTYPE html>
 <html lang="es">
 <head>
@@ -94,6 +94,8 @@
       display: flex;
       flex-direction: column;
       background-color: var(--color-bg-base);
+      touch-action: pan-y;
+      overscroll-behavior-x: none;
     }
 
     /* ==========================================================================
@@ -111,6 +113,8 @@
       background: radial-gradient(circle at 50% 60%, #171920 0%, #060709 88%);
       border-bottom: 0.0625rem solid rgba(0, 0, 0, 0.12);
       box-shadow: 0 0.25rem 1.25rem rgba(0, 0, 0, 0.18);
+      touch-action: pan-y;
+      overscroll-behavior-x: none;
     }
 
     .viewer-slot {
@@ -328,6 +332,8 @@
       list-style: none;
       padding: 0.8rem 0 0.8rem 0;
       scrollbar-width: none;
+      touch-action: pan-y;
+      overscroll-behavior-x: none;
     }
 
     .menu-list::-webkit-scrollbar {
@@ -1383,14 +1389,18 @@
         "Plato_13.glb", "Plato_14.glb", "Plato_15.glb"
       ];
 
-      // v5.05: Detección estricta: sólo restaura plato si proviene explícitamente de AR y no es una recarga manual
-      const navEntries = (window.performance && performance.getEntriesByType) ? performance.getEntriesByType('navigation') : [];
-      const isReload = navEntries.length > 0 && navEntries[0].type === 'reload';
-
+      // v5.08: Protocolo bidireccional BFCache para purga total de VRAM sin pérdida del plato
+      const isFromArReload = sessionStorage.getItem('from_ar_reload') === '1';
       const fromAR = sessionStorage.getItem('from_ar') === '1';
       let currentIndex = 0;
 
-      if (fromAR && !isReload) {
+      if (isFromArReload) {
+        sessionStorage.removeItem('from_ar_reload');
+        const saved = sessionStorage.getItem('modelo_actual');
+        if (saved !== null && !isNaN(parseInt(saved))) {
+          currentIndex = parseInt(saved);
+        }
+      } else if (fromAR) {
         const saved = sessionStorage.getItem('modelo_actual');
         if (saved !== null && !isNaN(parseInt(saved))) {
           currentIndex = parseInt(saved);
@@ -1836,15 +1846,19 @@
         window.location.href = 'ar-world.html';
       });
 
+      // v5.08: Purga absoluta de VRAM en Safari iOS (BFCache Hard Reload sin perder el plato)
       window.addEventListener('pageshow', () => {
         const navigatedFromAR = sessionStorage.getItem('from_ar') === '1';
-        sessionStorage.removeItem('from_ar');
-
         if (navigatedFromAR) {
-          const saved = sessionStorage.getItem('modelo_actual');
-          if (saved !== null && !isNaN(parseInt(saved))) {
-            currentIndex = parseInt(saved);
-          }
+          sessionStorage.removeItem('from_ar');
+          sessionStorage.setItem('from_ar_reload', '1');
+          window.location.reload();
+          return;
+        }
+
+        const saved = sessionStorage.getItem('modelo_actual');
+        if (saved !== null && !isNaN(parseInt(saved))) {
+          currentIndex = parseInt(saved);
         }
 
         // Siempre instanciar un elemento model-viewer limpio sin memoria de canvas previa
