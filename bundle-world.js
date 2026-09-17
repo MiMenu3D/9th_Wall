@@ -1,4 +1,4 @@
-// 9th Wall v5.08
+// 9th Wall v5.09
 (() => {
   var e = {
     574() {
@@ -143,7 +143,7 @@
     const e = window.ecs;
 
     // [INMUTABLE - NO MODIFICAR BAJO NINGÚN CONCEPTO: ARRANQUE CINEMÁTICO INICIAL v4.53 / v5.00]
-    // v5.08: Spawner con sondeo de malla nativo v4.64, sincronización 100% de SceneViewer, hundimiento físico opaco, Contact AO y purga total de VRAM
+    // v5.09: Spawner con sondeo de malla nativo v4.64, sincronización 100% de SceneViewer, hundimiento físico opaco, Contact AO, purga total de VRAM y frame limpio intermedio anti-desbordamiento Metal
     e.registerComponent({
       name: "dish-spawner",
       schema: { prefab: "eid" },
@@ -380,67 +380,76 @@
               if (progress < 1.0) {
                 requestAnimationFrame(animarHundimiento);
               } else {
-                if (loader) {
-                  loader.load(ev.data.modelSrc, (gltf) => {
-                    // API Oficial 8th Wall ECS: Obtener el Object3D de la entidad
-                    const entityObj = (t.three && t.three.entityToObject) ? t.three.entityToObject.get(spawnedEid) : null;
+                // v5.09: Destrucción inmediata del modelo previo ANTES de cargar el nuevo para erradicar la coexistencia en VRAM
+                const entityObj = (t.three && t.three.entityToObject) ? t.three.entityToObject.get(spawnedEid) : null;
 
-                    // Limpieza profunda de los hijos de la entidad anterior (VRAM = 0)
-                    if (entityObj) {
-                      while (entityObj.children.length > 0) {
-                        const childNode = entityObj.children[0];
-                        destruirMallaProfunda(childNode);
-                      }
-                    } else if (t.three && t.three.scene) {
-                      const nodosBorrar = [];
-                      t.three.scene.traverse((child) => {
-                        if (child.name === "Model" || (child.isMesh && child.name !== "Ground" && child.name !== "Hider" && (!child.material || (child.material.type !== 'ShadowMaterial' && child.material.colorWrite !== false)))) {
-                          nodosBorrar.push(child);
+                if (entityObj) {
+                  while (entityObj.children.length > 0) {
+                    const childNode = entityObj.children[0];
+                    destruirMallaProfunda(childNode);
+                  }
+                } else if (t.three && t.three.scene) {
+                  const nodosBorrar = [];
+                  t.three.scene.traverse((child) => {
+                    if (child.name === "Model" || (child.isMesh && child.name !== "Ground" && child.name !== "Hider" && (!child.material || (child.material.type !== 'ShadowMaterial' && child.material.colorWrite !== false)))) {
+                      nodosBorrar.push(child);
+                    }
+                  });
+                  nodosBorrar.forEach(n => destruirMallaProfunda(n));
+                }
+
+                // v5.09: Purgar listas de renderizado activas de Three.js para liberar referencias huérfanas en WebGL
+                if (t.three && t.three.renderer && t.three.renderer.renderLists) {
+                  try {
+                    t.three.renderer.renderLists.dispose();
+                  } catch (err) {}
+                }
+
+                // v5.09: Dejar 1 frame limpio en blanco en la GPU para que el recolector de basura de Metal libere la memoria
+                requestAnimationFrame(() => {
+                  if (loader) {
+                    loader.load(ev.data.modelSrc, (gltf) => {
+                      const newModel = gltf.scene;
+                      newModel.name = "Model";
+                      newModel.position.set(0, 0, 0);
+                      newModel.rotation.set(0, 0, 0);
+                      newModel.scale.set(1, 1, 1);
+
+                      // Asegurar que el nuevo modelo proyecte sombras sobre Ground (Contact AO)
+                      newModel.traverse((c) => {
+                        if (c.isMesh) {
+                          c.castShadow = true;
                         }
                       });
-                      nodosBorrar.forEach(n => destruirMallaProfunda(n));
-                    }
 
-                    const newModel = gltf.scene;
-                    newModel.name = "Model";
-                    newModel.position.set(0, 0, 0);
-                    newModel.rotation.set(0, 0, 0);
-                    newModel.scale.set(1, 1, 1);
-
-                    // Asegurar que el nuevo modelo proyecte sombras sobre Ground (Contact AO)
-                    newModel.traverse((c) => {
-                      if (c.isMesh) {
-                        c.castShadow = true;
+                      // Emparentamiento directo en el Object3D de la entidad ECS
+                      if (entityObj) {
+                        entityObj.add(newModel);
+                      } else if (t.three && t.three.scene) {
+                        t.three.scene.add(newModel);
                       }
+
+                      // Reposicionar la entidad ECS en la superficie
+                      t.transform.setWorldPosition(spawnedEid, { x: dishPos.x, y: 0.001, z: dishPos.z });
+                      e.Scale.set(t, spawnedEid, { x: 0.001, y: 0.001, z: 0.001 });
+                      t.getEntity(spawnedEid).set(e.Quaternion, e.math.quat.yRadians(currentRotY));
+
+                      t.events.dispatch(spawnedEid, "recalc-bounding-box");
+
+                      if (window.aplicarAjustesSceneViewer) {
+                        window.aplicarAjustesSceneViewer(t.three.scene);
+                      }
+
+                      dispararCinematicaSpawn(spawnedEid, currentRotY, currentScale);
+                    }, undefined, () => {
+                      isTransitioning = false;
+                      if (window.notificarSpawnFinalizado) window.notificarSpawnFinalizado();
                     });
-
-                    // Emparentamiento directo en el Object3D de la entidad ECS
-                    if (entityObj) {
-                      entityObj.add(newModel);
-                    } else if (t.three && t.three.scene) {
-                      t.three.scene.add(newModel);
-                    }
-
-                    // Reposicionar la entidad ECS en la superficie
-                    t.transform.setWorldPosition(spawnedEid, { x: dishPos.x, y: 0.001, z: dishPos.z });
-                    e.Scale.set(t, spawnedEid, { x: 0.001, y: 0.001, z: 0.001 });
-                    t.getEntity(spawnedEid).set(e.Quaternion, e.math.quat.yRadians(currentRotY));
-
-                    t.events.dispatch(spawnedEid, "recalc-bounding-box");
-
-                    if (window.aplicarAjustesSceneViewer) {
-                      window.aplicarAjustesSceneViewer(t.three.scene);
-                    }
-
-                    dispararCinematicaSpawn(spawnedEid, currentRotY, currentScale);
-                  }, undefined, () => {
+                  } else {
                     isTransitioning = false;
                     if (window.notificarSpawnFinalizado) window.notificarSpawnFinalizado();
-                  });
-                } else {
-                  isTransitioning = false;
-                  if (window.notificarSpawnFinalizado) window.notificarSpawnFinalizado();
-                }
+                  }
+                });
               }
             };
             requestAnimationFrame(animarHundimiento);
