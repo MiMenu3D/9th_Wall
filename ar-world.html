@@ -1,11 +1,11 @@
-<!-- 9th_Design v5.09 (Clean Reticle / Stepped Specular / Human-Scale Lobes / PMREM Crisp sRGB / Differential Dark-Table Guard / Dominant Color Desaturator / Fast AE Lerp / Delayed AR Nav Arrows / Multi-Select Photo Strip & Native Share / Gallery Backbutton Interception / 0ms Instant Photo-Save / Landscape Warning Blocker / Permission Fix & Transient Gesture Hint / Damped Dish Switch / Prime Spinner Instant Drop / Deferred UI Mount / Docked AR Card / iOS Contrast & Memory Guard / Dual-Stage Camera Watchdog) -->
+<!-- 9th_Design v5.10 (Clean Reticle / Stepped Specular / Human-Scale Lobes / PMREM Crisp sRGB / Differential Dark-Table Guard / Dominant Color Desaturator / Fast AE Lerp / Delayed AR Nav Arrows / Multi-Select Photo Strip & Native Share / Gallery Backbutton Interception / 0ms Instant Photo-Save / Landscape Warning Blocker / Permission Fix & Transient Gesture Hint / Damped Dish Switch / Prime Spinner Instant Drop / Deferred UI Mount / Docked AR Card / iOS Contrast & Memory Guard / Dual-Stage Camera Watchdog / Paint-Holding AR Freeze Exit) -->
 <html>
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no,viewport-fit=cover">
   <meta name="theme-color" content="#040507">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <title>9th_Design AR 5.09</title>
+  <title>9th_Design AR 5.10</title>
   <script crossorigin="anonymous" src="external/runtime/runtime.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@8thwall/engine-binary@1/dist/xr.js" async crossorigin="anonymous" data-preload-chunks="slam"></script>
   <script src="https://cdn.jsdelivr.net/npm/@8thwall/landing-page@1/dist/landing-page.js" crossorigin="anonymous"></script>
@@ -20,8 +20,8 @@
     style="position:fixed;top:10px;right:10px;z-index:1000000;background:rgba(0,0,0,0.9);color:#0f0;font-family:monospace;font-size:12px;padding:8px;border-radius:4px;cursor:pointer;line-height:1.3;border:1px solid #0f0;display:none;pointer-events:auto;">
     <div id="debugTitle">FPS: --</div>
     <div id="debugContent">
-      ar-world: v5.09<br>
-      bundle: v5.09<br>
+      ar-world: v5.10<br>
+      bundle: v5.10<br>
       <span id="envVerdictSpan" style="color:#0f0;">Entorno: ESPERANDO MESA...</span><br>
       <span id="telemetrySpan" style="color:#0f0;">P98: -- (/255) | Lum: -- (/255) | Cálido: --%</span><br>
       <span id="benchmarkSpan" style="color:#0f0;">Pre: --sec - Post: --sec</span><br>
@@ -1100,7 +1100,7 @@
                   fp = fp * fp * (3.0 - 2.0 * fp);
 
                   vec3 h0 = fract(sin(vec3(dot(ip, vec3(127.1, 311.7, 74.7)), dot(ip + vec3(1.0, 0.0, 0.0), vec3(127.1, 311.7, 74.7)), dot(ip + vec3(0.0, 1.0, 0.0), vec3(127.1, 311.7, 74.7)))) * 43758.5453);
-                  vec3 h1 = fract(sin(vec3(dot(ip + vec3(1.0, 1.0, 0.0), vec3(127.1, 311.7, 74.7)), dot(ip + vec3(0.0, 0.0, 1.0), vec3(127.1, 311.7, 74.7)), dot(ip + vec3(0.0, 1.0, 1.0), vec3(127.1, 311.7, 74.7)))) * 43758.5453);
+                  vec3 h1 = fract(sin(vec3(dot(ip + vec3(1.0, 1.0, 0.0), vec3(127.1, 311.7, 74.7)), dot(ip + vec3(0.0, 0.0, 1.0), vec3(127.1, 311.7, 74.7)), dot(ip + vec3(1.0, 0.0, 1.0), vec3(127.1, 311.7, 74.7)))) * 43758.5453);
 
                   float nVal = mix(mix(h0.x, h0.y, fp.x), mix(h0.z, h1.x, fp.x), fp.y);
                   float nValZ = mix(mix(h1.y, h1.z, fp.x), mix(h0.x, h0.y, fp.x), fp.z);
@@ -2393,10 +2393,64 @@
     galleryThumbnailBtn.addEventListener('click', abrirVisorFotos);
     closeViewerBtn.addEventListener('click', cerrarVisorFotos);
 
+    // =========================================================================
+    // v5.10: INTERCEPCIÓN DE BOTÓN ATRÁS Y SALIDA CONGELADA (PAINT-HOLDING AR FREEZE)
+    // =========================================================================
+    history.pushState({ inAR: true }, '');
+
     window.addEventListener('popstate', (e) => {
-      if (mediaViewerModal.style.display === 'flex') {
+      // 1. Si el visor de fotos está abierto, cerrar únicamente el visor
+      if (mediaViewerModal && mediaViewerModal.style.display === 'flex') {
         mediaViewerModal.style.display = 'none';
+        return;
       }
+
+      // 2. Si la Card gastronómica está abierta, cerrar únicamente la Card
+      if (arCardModal && arCardModal.classList.contains('open')) {
+        cerrarCardAR();
+        history.pushState({ inAR: true }, '');
+        return;
+      }
+
+      // 3. Salida de AR hacia el Menú: Congelación instantánea en foto fija del frame actual
+      const video = document.querySelector('video');
+      const threeCanvas = _renderer ? _renderer.domElement : null;
+
+      if (video && threeCanvas && freezeTravelCard) {
+        try {
+          const off = document.createElement('canvas');
+          off.width = window.innerWidth;
+          off.height = window.innerHeight;
+          const ctx = off.getContext('2d');
+          ctx.drawImage(video, 0, 0, off.width, off.height);
+          ctx.drawImage(threeCanvas, 0, 0, off.width, off.height);
+
+          freezeTravelCard.style.backgroundImage = `url(${off.toDataURL('image/jpeg', 0.90)})`;
+          freezeTravelCard.style.transition = 'none';
+          freezeTravelCard.style.top = '0px';
+          freezeTravelCard.style.left = '0px';
+          freezeTravelCard.style.width = '100vw';
+          freezeTravelCard.style.height = '100vh';
+          freezeTravelCard.style.borderRadius = '0px';
+          freezeTravelCard.style.opacity = '1';
+          freezeTravelCard.style.display = 'block';
+          freezeTravelCard.style.zIndex = '9999999';
+        } catch (err) {}
+      }
+
+      // Detener video y liberar tracks de cámara inmediatamente
+      if (video) {
+        try { video.pause(); } catch (err) {}
+        if (video.srcObject) {
+          try { video.srcObject.getTracks().forEach(t => t.stop()); } catch (err) {}
+        }
+      }
+
+      sessionStorage.setItem('from_ar', '1');
+      sessionStorage.setItem('modelo_actual', currentDishIndex);
+
+      // Transición limpia sin cortes negros: Paint Holding retiene la foto fija de AR hasta cargar el Menú
+      window.location.replace('index.html');
     });
 
     viewerPrevBtn.addEventListener('click', () => {
