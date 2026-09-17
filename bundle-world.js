@@ -1,4 +1,4 @@
-// 9th Wall v5.09
+// 9th Wall v5.10
 (() => {
   var e = {
     574() {
@@ -143,7 +143,7 @@
     const e = window.ecs;
 
     // [INMUTABLE - NO MODIFICAR BAJO NINGÚN CONCEPTO: ARRANQUE CINEMÁTICO INICIAL v4.53 / v5.00]
-    // v5.09: Spawner con sondeo de malla nativo v4.64, sincronización 100% de SceneViewer, hundimiento físico opaco, Contact AO, purga total de VRAM y frame limpio intermedio anti-desbordamiento Metal
+    // v5.10: Spawner con sondeo nativo v4.64, sincronización SceneViewer, purga quirúrgica de mapas propios (cero impacto a envMap) y frame limpio anti-coexistencia
     e.registerComponent({
       name: "dish-spawner",
       schema: { prefab: "eid" },
@@ -157,7 +157,7 @@
         const opacityDuration = 800;   // v4.47: 800ms Opacidad rápida con presencia inmediata
         const totalSpinAngle = -Math.PI * 3; // -540° (1.5 vueltas completas en sentido horario)
 
-        // Destrucción profunda de mallas, buffers y texturas PBR (VRAM = 0)
+        // v5.10: Purga quirúrgica de geometrías y mapas propios del modelo (map, normalMap, roughnessMap) sin tocar envMap de escena
         const destruirMallaProfunda = (meshNode) => {
           if (!meshNode) return;
           meshNode.traverse((child) => {
@@ -166,21 +166,9 @@
               if (child.material) {
                 const mats = Array.isArray(child.material) ? child.material : [child.material];
                 mats.forEach((m) => {
-                  const textureKeys = [
-                    'map', 'normalMap', 'roughnessMap', 'metalnessMap',
-                    'aoMap', 'emissiveMap', 'lightMap', 'bumpMap',
-                    'displacementMap', 'alphaMap', 'envMap'
-                  ];
-                  textureKeys.forEach(k => {
-                    if (m[k] && m[k].isTexture) {
-                      m[k].dispose();
-                    }
-                  });
-                  for (const key in m) {
-                    if (m[key] && m[key].isTexture) {
-                      m[key].dispose();
-                    }
-                  }
+                  if (m.map && m.map.isTexture) m.map.dispose();
+                  if (m.normalMap && m.normalMap.isTexture) m.normalMap.dispose();
+                  if (m.roughnessMap && m.roughnessMap.isTexture) m.roughnessMap.dispose();
                   m.dispose();
                 });
               }
@@ -380,7 +368,7 @@
               if (progress < 1.0) {
                 requestAnimationFrame(animarHundimiento);
               } else {
-                // v5.09: Destrucción inmediata del modelo previo ANTES de cargar el nuevo para erradicar la coexistencia en VRAM
+                // v5.10: Destrucción inmediata del modelo previo ANTES de cargar el nuevo para erradicar la coexistencia en VRAM
                 const entityObj = (t.three && t.three.entityToObject) ? t.three.entityToObject.get(spawnedEid) : null;
 
                 if (entityObj) {
@@ -398,14 +386,7 @@
                   nodosBorrar.forEach(n => destruirMallaProfunda(n));
                 }
 
-                // v5.09: Purgar listas de renderizado activas de Three.js para liberar referencias huérfanas en WebGL
-                if (t.three && t.three.renderer && t.three.renderer.renderLists) {
-                  try {
-                    t.three.renderer.renderLists.dispose();
-                  } catch (err) {}
-                }
-
-                // v5.09: Dejar 1 frame limpio en blanco en la GPU para que el recolector de basura de Metal libere la memoria
+                // v5.10: 1 frame limpio en blanco en la GPU para recolección de basura sin desestabilizar renderLists
                 requestAnimationFrame(() => {
                   if (loader) {
                     loader.load(ev.data.modelSrc, (gltf) => {
