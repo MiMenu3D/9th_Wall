@@ -1,4 +1,4 @@
-<!-- Versión: 9th_Design v5.09 -->
+<!-- Versión: 9th_Design v5.10 -->
 <!DOCTYPE html>
 <html lang="es">
 <head>
@@ -805,7 +805,7 @@
       <div class="fade-top"></div>
       <div class="fade-bottom"></div>
 
-      <!-- Lista completa de 15 platos (v5.09: Clase active asignada dinámicamente para erradicar el parpadeo 4-1-4) -->
+      <!-- Lista completa de 15 platos (v5.10: Sin clase active fija para renderizado limpio inmediato sin parpadeo) -->
       <ul class="menu-list" id="menu-list">
         
         <li class="menu-item" data-index="01">
@@ -1388,25 +1388,20 @@
         "Plato_13.glb", "Plato_14.glb", "Plato_15.glb"
       ];
 
-      // Detección infalible de SO (Blindaje de entorno)
-      const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
-
-      // v5.09: Detección estricta de tipo de navegación y persistencia selectiva
+      // v5.10: Detección estricta de tipo de navegación y persistencia selectiva
       const navEntries = performance.getEntriesByType('navigation');
       const isReload = navEntries.length > 0 && navEntries[0].type === 'reload';
-      const isFromArReload = sessionStorage.getItem('from_ar_reload') === '1';
       const fromAR = sessionStorage.getItem('from_ar') === '1';
       let currentIndex = 0;
 
-      if (isReload && !isFromArReload) {
+      if (isReload && !fromAR) {
         // Recarga manual por el usuario: reseteo estricto a Plato 01
         sessionStorage.removeItem('modelo_actual');
         sessionStorage.removeItem('from_ar');
-        sessionStorage.removeItem('from_ar_reload');
         currentIndex = 0;
-      } else if (isFromArReload || fromAR) {
-        // Retorno legítimo desde AR: recuperación exacta del plato seleccionado
-        sessionStorage.removeItem('from_ar_reload');
+      } else if (fromAR) {
+        // Retorno legítimo desde AR (Paint Holding): recuperación exacta del plato seleccionado
+        sessionStorage.removeItem('from_ar');
         const saved = sessionStorage.getItem('modelo_actual');
         if (saved !== null && !isNaN(parseInt(saved, 10))) {
           currentIndex = parseInt(saved, 10);
@@ -1667,7 +1662,7 @@
         menuList.classList.remove('has-expanded');
       }
 
-      function selectDish(index, shouldScroll = false) {
+      function selectDish(index, shouldScroll = false, triggerReaction = true) {
         if (index < 0 || index >= models.length) return;
         currentIndex = index;
 
@@ -1690,20 +1685,30 @@
           }
         });
 
+        // v5.10: Posicionamiento inicial instantáneo sin animaciones parásitas
+        if (!shouldScroll && currentIndex > 0) {
+          const targetItem = menuItems[currentIndex];
+          if (targetItem) {
+            menuList.scrollTop = Math.max(0, targetItem.offsetTop - 10);
+          }
+        }
+
         updateModelViewer();
-        triggerChainReaction();
+        if (triggerReaction) {
+          triggerChainReaction();
+        }
       }
 
       prevDishBtn.addEventListener('click', (e) => {
         e.stopPropagation();
         const nextIdx = (currentIndex - 1 + models.length) % models.length;
-        selectDish(nextIdx, true);
+        selectDish(nextIdx, true, true);
       });
 
       nextDishBtn.addEventListener('click', (e) => {
         e.stopPropagation();
         const nextIdx = (currentIndex + 1) % models.length;
-        selectDish(nextIdx, true);
+        selectDish(nextIdx, true, true);
       });
 
       // ======================================================================
@@ -1815,7 +1820,7 @@
             }
           } else {
             // PRIMER TOQUE: Selección simple y actualización de visor
-            selectDish(index, false);
+            selectDish(index, false, true);
           }
         });
       });
@@ -1827,47 +1832,24 @@
         sessionStorage.setItem('from_ar', '1');
         sessionStorage.setItem('modelo_actual', currentIndex);
 
-        // v5.09: Navegación continua sin destruir el visor para erradicar el corte negro previo
+        // v5.10: Navegación continua sin destruir el visor para erradicar el corte negro previo
         window.location.href = 'ar-world.html';
       });
 
-      // v5.09: Restauración reactiva en pageshow según sistema operativo
+      // Fallback defensivo en caso de restauración BFCache aislada
       window.addEventListener('pageshow', (e) => {
-        const navigatedFromAR = sessionStorage.getItem('from_ar') === '1';
-        if (navigatedFromAR) {
-          sessionStorage.removeItem('from_ar');
-          if (isIOS) {
-            // Sacred Rule 6: Purga absoluta de VRAM en Safari iOS
-            sessionStorage.setItem('from_ar_reload', '1');
-            window.location.reload();
-            return;
-          }
-
-          // En Android: sin recarga forzada, preservamos el flujo nativo fluido
-          const saved = sessionStorage.getItem('modelo_actual');
-          if (saved !== null && !isNaN(parseInt(saved, 10))) {
-            currentIndex = parseInt(saved, 10);
-          }
-          if (mv) {
-            mv.style.opacity = '0';
-          }
-          selectDish(currentIndex, true);
-          return;
-        }
-
-        // Restauración limpia en retroceso ordinario de historial (BFCache)
         if (e.persisted) {
           const saved = sessionStorage.getItem('modelo_actual');
           if (saved !== null && !isNaN(parseInt(saved, 10))) {
             currentIndex = parseInt(saved, 10);
           }
-          selectDish(currentIndex, false);
+          selectDish(currentIndex, false, false);
         }
       });
 
-      // Arranque inicial
+      // Arranque inicial limpio (síncrono y posicionado directamente en el plato correspondiente)
       createModelViewer();
-      selectDish(currentIndex, false);
+      selectDish(currentIndex, false, false);
     });
   </script>
 </body>
