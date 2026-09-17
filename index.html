@@ -1,4 +1,4 @@
-<!-- Versión: 9th_Design v5.08 -->
+<!-- Versión: 9th_Design v5.09 -->
 <!DOCTYPE html>
 <html lang="es">
 <head>
@@ -127,14 +127,13 @@
       overflow: hidden;
     }
 
-    /* Estilo del visor 3D */
+    /* Estilo del visor 3D (v5.09: Filtros de desaturación CSS suprimidos para fidelidad cromática) */
     model-viewer {
       width: 100%;
       height: 100%;
       background: transparent;
-      filter: saturate(0.87) contrast(0.88);
       opacity: 0;
-      transition: opacity 0.4s ease;
+      transition: opacity 0.35s ease;
     }
 
     /* Flechas de navegación (-10% = 36px × 36px, font 23px) */
@@ -806,10 +805,10 @@
       <div class="fade-top"></div>
       <div class="fade-bottom"></div>
 
-      <!-- Lista completa de 15 platos -->
+      <!-- Lista completa de 15 platos (v5.09: Clase active asignada dinámicamente para erradicar el parpadeo 4-1-4) -->
       <ul class="menu-list" id="menu-list">
         
-        <li class="menu-item active" data-index="01">
+        <li class="menu-item" data-index="01">
           <div class="glass-shadow"></div>
           <div class="caustic-bg"></div>
           <div class="glass-overlay">
@@ -1389,25 +1388,34 @@
         "Plato_13.glb", "Plato_14.glb", "Plato_15.glb"
       ];
 
-      // v5.08: Protocolo bidireccional BFCache para purga total de VRAM sin pérdida del plato
+      // Detección infalible de SO (Blindaje de entorno)
+      const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+
+      // v5.09: Detección estricta de tipo de navegación y persistencia selectiva
+      const navEntries = performance.getEntriesByType('navigation');
+      const isReload = navEntries.length > 0 && navEntries[0].type === 'reload';
       const isFromArReload = sessionStorage.getItem('from_ar_reload') === '1';
       const fromAR = sessionStorage.getItem('from_ar') === '1';
       let currentIndex = 0;
 
-      if (isFromArReload) {
-        sessionStorage.removeItem('from_ar_reload');
-        const saved = sessionStorage.getItem('modelo_actual');
-        if (saved !== null && !isNaN(parseInt(saved))) {
-          currentIndex = parseInt(saved);
-        }
-      } else if (fromAR) {
-        const saved = sessionStorage.getItem('modelo_actual');
-        if (saved !== null && !isNaN(parseInt(saved))) {
-          currentIndex = parseInt(saved);
-        }
-      } else {
+      if (isReload && !isFromArReload) {
+        // Recarga manual por el usuario: reseteo estricto a Plato 01
         sessionStorage.removeItem('modelo_actual');
         sessionStorage.removeItem('from_ar');
+        sessionStorage.removeItem('from_ar_reload');
+        currentIndex = 0;
+      } else if (isFromArReload || fromAR) {
+        // Retorno legítimo desde AR: recuperación exacta del plato seleccionado
+        sessionStorage.removeItem('from_ar_reload');
+        const saved = sessionStorage.getItem('modelo_actual');
+        if (saved !== null && !isNaN(parseInt(saved, 10))) {
+          currentIndex = parseInt(saved, 10);
+        }
+      } else {
+        // Apertura inicial limpia
+        sessionStorage.removeItem('modelo_actual');
+        sessionStorage.removeItem('from_ar');
+        currentIndex = 0;
       }
 
       // ======================================================================
@@ -1603,27 +1611,8 @@
       });
 
       // ======================================================================
-      // 6. PRECARGA VECINAL Y RECREACIÓN LIMPIA DOM
+      // 6. INSTANCIACIÓN Y GESTIÓN LIMPIA DEL VISOR 3D
       // ======================================================================
-      const prefetchedModels = new Set();
-
-      function preloadNeighborhood(currIdx) {
-        const prevIdx = (currIdx - 1 + models.length) % models.length;
-        const nextIdx = (currIdx + 1) % models.length;
-        [prevIdx, nextIdx].forEach(idx => {
-          const url = models[idx];
-          if (!prefetchedModels.has(url)) {
-            prefetchedModels.add(url);
-            const link = document.createElement('link');
-            link.rel = 'prefetch';
-            link.as = 'fetch';
-            link.href = url;
-            link.crossOrigin = 'anonymous';
-            document.head.appendChild(link);
-          }
-        });
-      }
-
       function destroyModelViewer() {
         if (viewerSlot) {
           viewerSlot.innerHTML = '';
@@ -1655,7 +1644,6 @@
 
         newMv.addEventListener('load', () => {
           newMv.style.opacity = '1';
-          preloadNeighborhood(currentIndex);
         }, { once: true });
 
         viewerSlot.appendChild(newMv);
@@ -1671,7 +1659,6 @@
         mv.setAttribute('src', models[currentIndex]);
         mv.addEventListener('load', () => {
           mv.style.opacity = '1';
-          preloadNeighborhood(currentIndex);
         }, { once: true });
       }
 
@@ -1840,30 +1827,42 @@
         sessionStorage.setItem('from_ar', '1');
         sessionStorage.setItem('modelo_actual', currentIndex);
 
-        // Destrucción total antes de navegar (libera VRAM y evita frame congelado)
-        destroyModelViewer();
-
+        // v5.09: Navegación continua sin destruir el visor para erradicar el corte negro previo
         window.location.href = 'ar-world.html';
       });
 
-      // v5.08: Purga absoluta de VRAM en Safari iOS (BFCache Hard Reload sin perder el plato)
-      window.addEventListener('pageshow', () => {
+      // v5.09: Restauración reactiva en pageshow según sistema operativo
+      window.addEventListener('pageshow', (e) => {
         const navigatedFromAR = sessionStorage.getItem('from_ar') === '1';
         if (navigatedFromAR) {
           sessionStorage.removeItem('from_ar');
-          sessionStorage.setItem('from_ar_reload', '1');
-          window.location.reload();
+          if (isIOS) {
+            // Sacred Rule 6: Purga absoluta de VRAM en Safari iOS
+            sessionStorage.setItem('from_ar_reload', '1');
+            window.location.reload();
+            return;
+          }
+
+          // En Android: sin recarga forzada, preservamos el flujo nativo fluido
+          const saved = sessionStorage.getItem('modelo_actual');
+          if (saved !== null && !isNaN(parseInt(saved, 10))) {
+            currentIndex = parseInt(saved, 10);
+          }
+          if (mv) {
+            mv.style.opacity = '0';
+          }
+          selectDish(currentIndex, true);
           return;
         }
 
-        const saved = sessionStorage.getItem('modelo_actual');
-        if (saved !== null && !isNaN(parseInt(saved))) {
-          currentIndex = parseInt(saved);
+        // Restauración limpia en retroceso ordinario de historial (BFCache)
+        if (e.persisted) {
+          const saved = sessionStorage.getItem('modelo_actual');
+          if (saved !== null && !isNaN(parseInt(saved, 10))) {
+            currentIndex = parseInt(saved, 10);
+          }
+          selectDish(currentIndex, false);
         }
-
-        // Siempre instanciar un elemento model-viewer limpio sin memoria de canvas previa
-        createModelViewer();
-        selectDish(currentIndex, true);
       });
 
       // Arranque inicial
