@@ -1,11 +1,11 @@
-<!-- 9th_Design v5.08 (Clean Reticle / Stepped Specular / Human-Scale Lobes / PMREM Crisp sRGB / Differential Dark-Table Guard / Dominant Color Desaturator / Fast AE Lerp / Delayed AR Nav Arrows / Multi-Select Photo Strip & Native Share / Gallery Backbutton Interception / 0ms Instant Photo-Save / Landscape Warning Blocker / Permission Fix & Transient Gesture Hint / Damped Dish Switch / Prime Spinner Instant Drop / Deferred UI Mount / Docked AR Card) -->
+<!-- 9th_Design v5.09 (Clean Reticle / Stepped Specular / Human-Scale Lobes / PMREM Crisp sRGB / Differential Dark-Table Guard / Dominant Color Desaturator / Fast AE Lerp / Delayed AR Nav Arrows / Multi-Select Photo Strip & Native Share / Gallery Backbutton Interception / 0ms Instant Photo-Save / Landscape Warning Blocker / Permission Fix & Transient Gesture Hint / Damped Dish Switch / Prime Spinner Instant Drop / Deferred UI Mount / Docked AR Card / iOS Contrast & Memory Guard / Dual-Stage Camera Watchdog) -->
 <html>
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no,viewport-fit=cover">
   <meta name="theme-color" content="#040507">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <title>9th_Design AR 5.08</title>
+  <title>9th_Design AR 5.09</title>
   <script crossorigin="anonymous" src="external/runtime/runtime.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@8thwall/engine-binary@1/dist/xr.js" async crossorigin="anonymous" data-preload-chunks="slam"></script>
   <script src="https://cdn.jsdelivr.net/npm/@8thwall/landing-page@1/dist/landing-page.js" crossorigin="anonymous"></script>
@@ -20,8 +20,8 @@
     style="position:fixed;top:10px;right:10px;z-index:1000000;background:rgba(0,0,0,0.9);color:#0f0;font-family:monospace;font-size:12px;padding:8px;border-radius:4px;cursor:pointer;line-height:1.3;border:1px solid #0f0;display:none;pointer-events:auto;">
     <div id="debugTitle">FPS: --</div>
     <div id="debugContent">
-      ar-world: v5.08<br>
-      bundle: v5.08<br>
+      ar-world: v5.09<br>
+      bundle: v5.09<br>
       <span id="envVerdictSpan" style="color:#0f0;">Entorno: ESPERANDO MESA...</span><br>
       <span id="telemetrySpan" style="color:#0f0;">P98: -- (/255) | Lum: -- (/255) | Cálido: --%</span><br>
       <span id="benchmarkSpan" style="color:#0f0;">Pre: --sec - Post: --sec</span><br>
@@ -59,6 +59,26 @@
     </div>
     <button id="readyBtn" style="pointer-events:auto !important;background:#00e5ff;color:#000;border:none;font-family:sans-serif;font-size:16px;font-weight:bold;padding:14px 40px;border-radius:28px;box-shadow:0 4px 20px rgba(0,229,255,0.7);cursor:pointer;letter-spacing:0.5px;">
       Listo
+    </button>
+  </div>
+
+  <!-- v5.09: Watchdog de Cámara (Fase 1: Aviso sutil flotante a los 2.0s) -->
+  <div id="cameraSyncBanner" style="position:fixed;top:24px;left:50%;transform:translateX(-50%);background:rgba(0,0,0,0.82);color:#00e5ff;font-family:sans-serif;font-size:13px;font-weight:bold;padding:9px 18px;border-radius:20px;border:1px solid rgba(0,229,255,0.45);box-shadow:0 4px 14px rgba(0,0,0,0.6);z-index:999999;display:none;pointer-events:none;letter-spacing:0.4px;white-space:nowrap;transition:opacity 0.3s ease;">
+    Sincronizando sensor de cámara...
+  </div>
+
+  <!-- v5.09: Watchdog de Cámara (Fase 2: Modal de recuperación a los 5.0s con liberación de tracks) -->
+  <div id="cameraErrorModal" style="position:fixed;inset:0;background:rgba(4,5,7,0.96);z-index:1000010;display:none;flex-direction:column;align-items:center;justify-content:center;padding:28px;text-align:center;color:white;font-family:sans-serif;">
+    <svg viewBox="0 0 24 24" width="48" height="48" fill="none" stroke="#00e5ff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-bottom:18px;">
+      <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path>
+      <line x1="1" y1="1" x2="23" y2="23"></line>
+    </svg>
+    <div style="font-size:19px;font-weight:bold;margin-bottom:12px;letter-spacing:0.3px;">Sensor no disponible</div>
+    <div style="font-size:14px;opacity:0.85;line-height:1.55;margin-bottom:26px;max-width:310px;">
+      No se pudo sincronizar la cámara. Pulsa Reintentar o reinicia el navegador si el problema persiste.
+    </div>
+    <button id="retryCameraBtn" style="background:#00e5ff;color:#000;border:none;font-family:sans-serif;font-weight:bold;font-size:15px;padding:13px 36px;border-radius:26px;box-shadow:0 4px 16px rgba(0,229,255,0.6);cursor:pointer;letter-spacing:0.4px;outline:none;">
+      Reintentar
     </button>
   </div>
 
@@ -649,11 +669,11 @@
   </style>
 
   <script>
-    // Detección de entorno iOS para compensación de color y saturación
+    // Detección infalible de entorno iOS para blindaje y balance de render
     const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
 
     // =========================================================================
-    // 2. CONSOLA DE ESPECULARES (v5.08: Escala Humana / Halo sin lavado blanco)
+    // 2. CONSOLA DE ESPECULARES (v5.09: Escala Humana / Halo sin lavado blanco)
     // =========================================================================
     const SPECULAR_CONFIG = {
       // Capa 1: Lóbulo THIN (Núcleo nítido y puntual)
@@ -671,10 +691,11 @@
     // =========================================================================
     // 3. CONSOLA DE ILUMINACIÓN Y CALIBRACIÓN AMBIENTAL
     // =========================================================================
+    // v5.09: Escaneo ligero de ISO desacoplado del PMREM pesado para eliminar colisiones en CPU
     const LIGHTING_CONFIG = {
       pmrem_resolution: 256,
-      pmrem_interval_ms: 200,
-      scan_interval_ms: 200,     // Escaneo acelerado a 200ms para seguimiento de AE
+      pmrem_interval_ms: isIOS ? 500 : 300,    // v5.09: Convolución pesada espaciada (iOS: 500ms | Android: 300ms)
+      scan_interval_ms: isIOS ? 250 : 180,     // v5.09: Light Estimation ligera para ISO rápida (iOS: 250ms | Android: 180ms)
       calibration_frames_target: 4,
       shadow_map_size: 512,
       day_shadow_radius: 4.0,
@@ -753,7 +774,7 @@
       primerPlatoSpawnIniciado = true;
     };
 
-    // Control de pausa de regeneración PMREM durante cambios de modelo
+    // v5.09: Congelación total de Light Estimation y PMREM durante cambios de modelo
     let isDishSwitching = false;
 
     // v5.08: Margen de seguridad de 400ms tras el fin del spawn antes del fade-in suave de la UI
@@ -1019,7 +1040,7 @@
     }
 
     // =========================================================================
-    // INYECCIÓN PBR Y SHADERS (Escala humana + Pedestal sagrado + Saturación nativa iOS)
+    // INYECCIÓN PBR Y SHADERS (v5.09: Blindaje iOS sin pedestal gris / Colores vivos)
     // =========================================================================
     window.aplicarAjustesSceneViewer = function (targetNode) {
       const root = targetNode || _scene;
@@ -1079,7 +1100,7 @@
                   fp = fp * fp * (3.0 - 2.0 * fp);
 
                   vec3 h0 = fract(sin(vec3(dot(ip, vec3(127.1, 311.7, 74.7)), dot(ip + vec3(1.0, 0.0, 0.0), vec3(127.1, 311.7, 74.7)), dot(ip + vec3(0.0, 1.0, 0.0), vec3(127.1, 311.7, 74.7)))) * 43758.5453);
-                  vec3 h1 = fract(sin(vec3(dot(ip + vec3(1.0, 1.0, 0.0), vec3(127.1, 311.7, 74.7)), dot(ip + vec3(0.0, 0.0, 1.0), vec3(127.1, 311.7, 74.7)), dot(ip + vec3(1.0, 0.0, 1.0), vec3(127.1, 311.7, 74.7)))) * 43758.5453);
+                  vec3 h1 = fract(sin(vec3(dot(ip + vec3(1.0, 1.0, 0.0), vec3(127.1, 311.7, 74.7)), dot(ip + vec3(0.0, 0.0, 1.0), vec3(127.1, 311.7, 74.7)), dot(ip + vec3(0.0, 1.0, 1.0), vec3(127.1, 311.7, 74.7)))) * 43758.5453);
 
                   float nVal = mix(mix(h0.x, h0.y, fp.x), mix(h0.z, h1.x, fp.x), fp.y);
                   float nValZ = mix(mix(h1.y, h1.z, fp.x), mix(h0.x, h0.y, fp.x), fp.z);
@@ -1124,9 +1145,9 @@
               mat.roughness = LIGHTING_CONFIG.min_material_roughness;
             }
 
-            // Pedestal lumínico sagrado intacto
+            // v5.09: En iOS el pedestal emisivo se fija estrictamente a 0 para preservar negros puros OLED
             if (mat.emissive !== undefined) {
-              const p = currentPedestal;
+              const p = isIOS ? 0.0 : currentPedestal;
               mat.emissive.setRGB(p, p, p);
             }
 
@@ -1353,10 +1374,55 @@
           if (envMode === 'hdr') scene.environment = hdr;
         }, undefined, () => {});
 
+        // v5.09: Configuración del Watchdog de Cámara (Fase 1: 2.0s sutil | Fase 2: 5.0s crítico con purga de tracks)
+        const cameraSyncBanner = document.getElementById('cameraSyncBanner');
+        const cameraErrorModal = document.getElementById('cameraErrorModal');
+        const retryCameraBtn = document.getElementById('retryCameraBtn');
+
+        if (retryCameraBtn) {
+          retryCameraBtn.addEventListener('click', () => {
+            const v = document.querySelector('video');
+            if (v && v.srcObject) {
+              try {
+                v.srcObject.getTracks().forEach(t => t.stop());
+              } catch (err) {}
+            }
+            window.location.reload();
+          });
+        }
+
+        let isCameraConnected = false;
+
+        const watchdogTimer1 = setTimeout(() => {
+          if (!isCameraConnected && cameraSyncBanner) {
+            cameraSyncBanner.style.display = 'block';
+          }
+        }, 2000);
+
+        const watchdogTimer2 = setTimeout(() => {
+          if (!isCameraConnected) {
+            if (cameraSyncBanner) cameraSyncBanner.style.display = 'none';
+            if (cameraErrorModal) cameraErrorModal.style.display = 'flex';
+            const v = document.querySelector('video');
+            if (v && v.srcObject) {
+              try {
+                v.srcObject.getTracks().forEach(t => t.stop());
+              } catch (err) {}
+            }
+          }
+        }, 5000);
+
         const waitForVideo = setInterval(() => {
           const video = document.querySelector('video');
           if (video && video.readyState >= 2) {
             clearInterval(waitForVideo);
+
+            // Cancelación inmediata del watchdog de cámara
+            isCameraConnected = true;
+            clearTimeout(watchdogTimer1);
+            clearTimeout(watchdogTimer2);
+            if (cameraSyncBanner) cameraSyncBanner.style.display = 'none';
+            if (cameraErrorModal) cameraErrorModal.style.display = 'none';
 
             const readyPrompt = document.getElementById('readyPromptContainer');
             const touchBlocker = document.getElementById('touchBlocker');
@@ -1469,7 +1535,8 @@
                 const deltaSec = Math.max(0.001, (now - lastFrameTime) / 1000.0);
                 lastFrameTime = now;
 
-                const shouldScan = isCalibrating || (now - lastScanTime >= LIGHTING_CONFIG.scan_interval_ms);
+                // v5.09: Light Estimation ligera para ISO rápida; congelada durante cambios de modelo
+                const shouldScan = !isDishSwitching && (isCalibrating || (now - lastScanTime >= LIGHTING_CONFIG.scan_interval_ms));
 
                 if (shouldScan) {
                   lastScanTime = now;
@@ -1626,14 +1693,15 @@
                       currentPmremMult = THREE_INSTANCE.MathUtils.lerp(LIGHTING_CONFIG.day_pmrem_mult, LIGHTING_CONFIG.night_pmrem_mult, environmentFactor);
                       currentPedestal = THREE_INSTANCE.MathUtils.lerp(LIGHTING_CONFIG.day_pedestal, LIGHTING_CONFIG.night_pedestal, environmentFactor);
 
+                      // v5.09: Calibración específica por SO (iOS: desactivado en penumbra/suave, 50% en día/direccional)
                       if (verdict === "DIRECCIONAL_FUERTE") {
-                        currentSpecularLevel = 1.00;
+                        currentSpecularLevel = isIOS ? 0.50 : 1.00;
                       } else if (verdict === "DIA_NORMAL") {
-                        currentSpecularLevel = 0.80;
+                        currentSpecularLevel = isIOS ? 0.40 : 0.80;
                       } else if (verdict === "AMBIENTE_SUAVE") {
-                        currentSpecularLevel = 0.50;
+                        currentSpecularLevel = isIOS ? 0.00 : 0.50;
                       } else {
-                        currentSpecularLevel = 0.27;
+                        currentSpecularLevel = isIOS ? 0.00 : 0.27;
                       }
                       actualizarNivelEspecularGlobal(currentSpecularLevel);
 
@@ -1821,14 +1889,12 @@
                   }
                 }
 
-                // v5.08: Pausa de regeneración PMREM durante el cambio de modelo para liberar ancho de banda GPU
+                // v5.09: Regeneración pesada PMREM (congelada en cambios de modelo para retener iluminación y VRAM)
                 if (!isDishSwitching && (now - lastPmremTime >= LIGHTING_CONFIG.pmrem_interval_ms)) {
                   lastPmremTime = now;
 
-                  // Compensación cromática anti-amarillo para iOS y filtro de saturación
-                  if (isIOS) {
-                    pmremCtx.filter = shouldDesaturatePMREM ? 'saturate(50%) hue-rotate(-7deg)' : 'hue-rotate(-7deg)';
-                  } else if (shouldDesaturatePMREM) {
+                  // v5.09: Supresión de hue-rotate(-7deg) en iOS para devolver calidez y vivacidad natural
+                  if (shouldDesaturatePMREM) {
                     pmremCtx.filter = 'saturate(50%)';
                   } else {
                     pmremCtx.filter = 'none';
@@ -2012,6 +2078,7 @@
         capContainer.style.pointerEvents = 'none';
       }
 
+      // v5.09: Congelación inmediata del cálculo lumínico para liberar bus GPU
       isDishSwitching = true;
 
       currentDishIndex = (currentDishIndex + direction + _modelsList.length) % _modelsList.length;
