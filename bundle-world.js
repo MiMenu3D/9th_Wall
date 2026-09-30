@@ -1,4 +1,4 @@
-// 9th Wall v5.10
+// 9th Wall v5.11
 (() => {
   var e = {
     574() {
@@ -30,6 +30,9 @@
     }
   },
   t = {};
+
+  // Detección infalible de entorno iOS
+  const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
 
   // Leemos el estado del interruptor debug persistido de forma transitoria
   const IS_DEBUG = sessionStorage.getItem("debug_features") === "true";
@@ -143,7 +146,7 @@
     const e = window.ecs;
 
     // [INMUTABLE - NO MODIFICAR BAJO NINGÚN CONCEPTO: ARRANQUE CINEMÁTICO INICIAL v4.53 / v5.00]
-    // v5.10: Spawner con sondeo nativo v4.64, sincronización SceneViewer, purga quirúrgica de mapas propios (cero impacto a envMap) y frame limpio anti-coexistencia
+    // v5.11: Spawner con blindaje absoluto de envMap global, renderLists intactas (15 FPS en Android), hundimiento proporcional y Frame Cero en Metal iOS
     e.registerComponent({
       name: "dish-spawner",
       schema: { prefab: "eid" },
@@ -157,7 +160,7 @@
         const opacityDuration = 800;   // v4.47: 800ms Opacidad rápida con presencia inmediata
         const totalSpinAngle = -Math.PI * 3; // -540° (1.5 vueltas completas en sentido horario)
 
-        // v5.10: Purga quirúrgica de geometrías y mapas propios del modelo (map, normalMap, roughnessMap) sin tocar envMap de escena
+        // v5.11: Destrucción profunda quirúrgica: se purgan geometrías y mapas locales, con blindaje estricto de envMap (nunca se destruye el cubemap de la escena)
         const destruirMallaProfunda = (meshNode) => {
           if (!meshNode) return;
           meshNode.traverse((child) => {
@@ -166,9 +169,12 @@
               if (child.material) {
                 const mats = Array.isArray(child.material) ? child.material : [child.material];
                 mats.forEach((m) => {
-                  if (m.map && m.map.isTexture) m.map.dispose();
-                  if (m.normalMap && m.normalMap.isTexture) m.normalMap.dispose();
-                  if (m.roughnessMap && m.roughnessMap.isTexture) m.roughnessMap.dispose();
+                  const textureKeys = ['map', 'normalMap', 'roughnessMap'];
+                  textureKeys.forEach(k => {
+                    if (m[k] && m[k].isTexture && k !== 'envMap') {
+                      m[k].dispose();
+                    }
+                  });
                   m.dispose();
                 });
               }
@@ -304,7 +310,7 @@
             };
             requestAnimationFrame(comprobarMallaLista);
           })
-          // Hundimiento opaco, anclaje SLAM, sombras Contact AO y purga exhaustiva de VRAM
+          // v5.11: Hundimiento proporcional, retención de listas en GPU (Android 15 FPS) y Frame Cero en Metal iOS
           .listen(t.events.globalId, "switch-dish-model", ev => {
             if (!isPlaced || !spawnedEid || isTransitioning || !ev.data || !ev.data.modelSrc || !window.THREE) return;
             isTransitioning = true;
@@ -368,7 +374,7 @@
               if (progress < 1.0) {
                 requestAnimationFrame(animarHundimiento);
               } else {
-                // v5.10: Destrucción inmediata del modelo previo ANTES de cargar el nuevo para erradicar la coexistencia en VRAM
+                // v5.11: Destrucción limpia del modelo saliente con blindaje de envMap
                 const entityObj = (t.three && t.three.entityToObject) ? t.three.entityToObject.get(spawnedEid) : null;
 
                 if (entityObj) {
@@ -386,8 +392,8 @@
                   nodosBorrar.forEach(n => destruirMallaProfunda(n));
                 }
 
-                // v5.10: 1 frame limpio en blanco en la GPU para recolección de basura sin desestabilizar renderLists
-                requestAnimationFrame(() => {
+                // v5.11: Estrategia 02 exclusiva para iOS: Frame Cero en Metal para vaciar asignaciones gráficas
+                const ejecutarCarga = () => {
                   if (loader) {
                     loader.load(ev.data.modelSrc, (gltf) => {
                       const newModel = gltf.scene;
@@ -430,7 +436,13 @@
                     isTransitioning = false;
                     if (window.notificarSpawnFinalizado) window.notificarSpawnFinalizado();
                   }
-                });
+                };
+
+                if (isIOS) {
+                  requestAnimationFrame(ejecutarCarga);
+                } else {
+                  ejecutarCarga();
+                }
               }
             };
             requestAnimationFrame(animarHundimiento);
