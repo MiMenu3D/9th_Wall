@@ -1,4 +1,4 @@
-<!-- Versión: 9th_Design v5.10 -->
+<!-- Versión: 9th_Design v5.11 -->
 <!DOCTYPE html>
 <html lang="es">
 <head>
@@ -90,6 +90,7 @@
       height: 100dvh;
       margin: 0 auto;
       overflow-x: hidden;
+      overflow-x: clip;
       overflow-y: hidden;
       display: flex;
       flex-direction: column;
@@ -127,13 +128,17 @@
       overflow: hidden;
     }
 
-    /* Estilo del visor 3D (v5.09: Filtros de desaturación CSS suprimidos para fidelidad cromática) */
+    /* Estilo del visor 3D (v5.11: Filtro de atenuación exclusivo para Android, neutro en iOS) */
     model-viewer {
       width: 100%;
       height: 100%;
       background: transparent;
       opacity: 0;
       transition: opacity 0.35s ease;
+    }
+
+    body:not(.is-ios) model-viewer {
+      filter: saturate(0.87) contrast(0.88);
     }
 
     /* Flechas de navegación (-10% = 36px × 36px, font 23px) */
@@ -325,7 +330,10 @@
     .menu-list {
       position: relative;
       z-index: 10;
+      width: 100%;
       height: 100%;
+      overflow-x: hidden;
+      overflow-x: clip;
       overflow-y: auto;
       -webkit-overflow-scrolling: touch;
       list-style: none;
@@ -805,7 +813,7 @@
       <div class="fade-top"></div>
       <div class="fade-bottom"></div>
 
-      <!-- Lista completa de 15 platos (v5.10: Sin clase active fija para renderizado limpio inmediato sin parpadeo) -->
+      <!-- Lista completa de 15 platos -->
       <ul class="menu-list" id="menu-list">
         
         <li class="menu-item" data-index="01">
@@ -1370,6 +1378,12 @@
 
   <script>
     document.addEventListener('DOMContentLoaded', () => {
+      // Detección infalible de SO (Blindaje de entorno)
+      const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+      if (isIOS) {
+        document.body.classList.add('is-ios');
+      }
+
       const menuList = document.getElementById('menu-list');
       const menuItems = Array.from(document.querySelectorAll('.menu-item'));
       const btnAr = document.getElementById('btn-ar');
@@ -1388,7 +1402,7 @@
         "Plato_13.glb", "Plato_14.glb", "Plato_15.glb"
       ];
 
-      // v5.10: Detección estricta de tipo de navegación y persistencia selectiva
+      // v5.10 / v5.11: Detección estricta de tipo de navegación y persistencia selectiva
       const navEntries = performance.getEntriesByType('navigation');
       const isReload = navEntries.length > 0 && navEntries[0].type === 'reload';
       const fromAR = sessionStorage.getItem('from_ar') === '1';
@@ -1662,6 +1676,7 @@
         menuList.classList.remove('has-expanded');
       }
 
+      // v5.11: Restauración estricta de la cinemática de selección v5.09 (cero saltos de lista en primer toque)
       function selectDish(index, shouldScroll = false, triggerReaction = true) {
         if (index < 0 || index >= models.length) return;
         currentIndex = index;
@@ -1684,14 +1699,6 @@
             it.classList.remove('active');
           }
         });
-
-        // v5.10: Posicionamiento inicial instantáneo sin animaciones parásitas
-        if (!shouldScroll && currentIndex > 0) {
-          const targetItem = menuItems[currentIndex];
-          if (targetItem) {
-            menuList.scrollTop = Math.max(0, targetItem.offsetTop - 10);
-          }
-        }
 
         updateModelViewer();
         if (triggerReaction) {
@@ -1766,7 +1773,7 @@
       initGestureHint();
 
       // ======================================================================
-      // 8. GESTOS TÁCTILES Y SELECCIÓN EN LA LISTA
+      // 8. GESTOS TÁCTILES Y SELECCIÓN EN LA LISTA (RESTAURACIÓN v5.09)
       // ======================================================================
       let touchStartY = 0;
       let touchStartX = 0;
@@ -1794,7 +1801,7 @@
           const isCurrentlyExpanded = item.classList.contains('expanded');
 
           if (isCurrentlyActive) {
-            // SEGUNDO TOQUE: Alterna Card
+            // SEGUNDO TOQUE: Alterna Card con desplazamiento suave centrado
             if (isCurrentlyExpanded) {
               collapseAllCards();
             } else {
@@ -1819,7 +1826,7 @@
               }, 110);
             }
           } else {
-            // PRIMER TOQUE: Selección simple y actualización de visor
+            // PRIMER TOQUE: Selección simple y actualización de visor (cero saltos de lista)
             selectDish(index, false, true);
           }
         });
@@ -1832,7 +1839,20 @@
         sessionStorage.setItem('from_ar', '1');
         sessionStorage.setItem('modelo_actual', currentIndex);
 
-        // v5.10: Navegación continua sin destruir el visor para erradicar el corte negro previo
+        // v5.11: Estrategia 04 (Sólo iOS) - Desconexión deliberada de contexto WebGL previa a AR
+        if (isIOS && mv) {
+          try {
+            const canvas = mv.shadowRoot ? mv.shadowRoot.querySelector('canvas') : null;
+            if (canvas) {
+              const gl = canvas.getContext('webgl2') || canvas.getContext('webgl');
+              if (gl) {
+                const loseContextExt = gl.getExtension('WEBGL_lose_context');
+                if (loseContextExt) loseContextExt.loseContext();
+              }
+            }
+          } catch (e) {}
+        }
+
         window.location.href = 'ar-world.html';
       });
 
@@ -1847,9 +1867,16 @@
         }
       });
 
-      // Arranque inicial limpio (síncrono y posicionado directamente en el plato correspondiente)
+      // Arranque inicial limpio: posicionado estático directo sin animaciones de scroll
       createModelViewer();
       selectDish(currentIndex, false, false);
+
+      if (fromAR && currentIndex > 0) {
+        const targetItem = menuItems[currentIndex];
+        if (targetItem) {
+          menuList.scrollTop = Math.max(0, targetItem.offsetTop - 10);
+        }
+      }
     });
   </script>
 </body>
