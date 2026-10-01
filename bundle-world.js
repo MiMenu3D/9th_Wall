@@ -1,4 +1,4 @@
-// 9th Wall v5.08
+// 9th Wall v5.05
 (() => {
   var e = {
     574() {
@@ -143,7 +143,7 @@
     const e = window.ecs;
 
     // [INMUTABLE - NO MODIFICAR BAJO NINGÚN CONCEPTO: ARRANQUE CINEMÁTICO INICIAL v4.53 / v5.00]
-    // v5.08: Spawner con sondeo de malla nativo v4.64, sincronización 100% de SceneViewer, hundimiento físico opaco, Contact AO y purga total de VRAM
+    // v5.05: Spawner con reloj desacoplado desde frame 0 real, hundimiento físico opaco, Contact AO, anclaje SLAM nativo y purga total de VRAM
     e.registerComponent({
       name: "dish-spawner",
       schema: { prefab: "eid" },
@@ -220,10 +220,14 @@
             });
           }
 
-          let spawnStartTime = performance.now();
+          // v5.05: Reloj desacoplado (inicia estrictamente en el primer fotograma dibujado tras la compilación de shaders)
+          let spawnStartTime = null;
 
-          const animarSpawnCompleto = () => {
-            const elapsed = performance.now() - spawnStartTime;
+          const animarSpawnCompleto = (now) => {
+            if (!spawnStartTime) {
+              spawnStartTime = now || performance.now();
+            }
+            const elapsed = (now || performance.now()) - spawnStartTime;
 
             // 1. Cinemática de Escala (2000ms - Quadratic Ease-Out)
             const progressScale = Math.min(1.0, elapsed / scaleDuration);
@@ -268,7 +272,7 @@
         };
 
         i("initial").initial()
-          // Sondeo directo v4.64 restaurado: asegura la aplicación de shaders y arranca la cinemática sin saltos
+          // Arranque inmediato desacoplado v5.05 (sin saltos temporales)
           .listen(t.events.globalId, "auto-place-dish", ev => {
             if (isPlaced) return;
             if (!ev.data || !ev.data.worldPosition) return;
@@ -289,32 +293,11 @@
             e.Scale.set(t, spawnedEid, { x: 0.001, y: 0.001, z: 0.001 });
             d.set(e.Quaternion, e.math.quat.yRadians(baseRotY));
 
-            let animationStarted = false;
+            if (window.aplicarAjustesSceneViewer && t.three && t.three.scene) {
+              window.aplicarAjustesSceneViewer(t.three.scene);
+            }
 
-            // Sondeo directo v4.53 / v4.64: asegura la aplicación de shaders y arranca la cinemática sin bloqueos
-            const comprobarMallaLista = () => {
-              if (animationStarted) return;
-              let encontrada = false;
-
-              if (t.three && t.three.scene) {
-                t.three.scene.traverse((child) => {
-                  if (child.isMesh && child.geometry && child.geometry.attributes && child.geometry.attributes.position && child.geometry.attributes.position.count > 0 && child.name !== "Ground" && child.name !== "Hider" && (!child.material || (child.material.type !== 'ShadowMaterial' && child.material.colorWrite !== false))) {
-                    encontrada = true;
-                  }
-                });
-              }
-
-              if (encontrada) {
-                animationStarted = true;
-                if (window.aplicarAjustesSceneViewer) {
-                  window.aplicarAjustesSceneViewer(t.three.scene);
-                }
-                dispararCinematicaSpawn(spawnedEid, baseRotY, 1.0);
-              } else {
-                requestAnimationFrame(comprobarMallaLista);
-              }
-            };
-            requestAnimationFrame(comprobarMallaLista);
+            dispararCinematicaSpawn(spawnedEid, baseRotY, 1.0);
           })
           // Hundimiento opaco, anclaje SLAM, sombras Contact AO y purga exhaustiva de VRAM
           .listen(t.events.globalId, "switch-dish-model", ev => {
