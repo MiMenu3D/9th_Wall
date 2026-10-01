@@ -1,4 +1,4 @@
-<!-- Versión: 9th_Design v5.12 -->
+<!-- Versión: 9th_Design v5.14 -->
 <!DOCTYPE html>
 <html lang="es">
 <head>
@@ -14,6 +14,9 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Fredoka:wdth,wght@75..125,300..600&display=swap" rel="stylesheet">
+
+  <!-- Archivo de Contenidos Centralizado v5.14 -->
+  <script src="contents.js"></script>
 
   <!-- Model Viewer Oficial de Google -->
   <script type="module" src="https://unpkg.com/@google/model-viewer/dist/model-viewer.min.js"></script>
@@ -114,8 +117,6 @@
       background: radial-gradient(circle at 50% 60%, #171920 0%, #060709 88%);
       border-bottom: 0.0625rem solid rgba(0, 0, 0, 0.12);
       box-shadow: 0 0.25rem 1.25rem rgba(0, 0, 0, 0.18);
-      touch-action: pan-y;
-      overscroll-behavior-x: none;
     }
 
     .viewer-slot {
@@ -128,13 +129,16 @@
       overflow: hidden;
     }
 
-    /* Estilo del visor 3D (v5.12: Filtro 0.95 en iOS | 0.87/0.88 en Android) */
+    /* Estilo del visor 3D (v5.14: Aislamiento GPU en plano dedicado translateZ(0)) */
     model-viewer {
       width: 100%;
       height: 100%;
       background: transparent;
       opacity: 0;
       transition: opacity 0.35s ease;
+      transform: translateZ(0);
+      will-change: filter, transform;
+      backface-visibility: hidden;
     }
 
     body.is-ios model-viewer {
@@ -817,565 +821,8 @@
       <div class="fade-top"></div>
       <div class="fade-bottom"></div>
 
-      <!-- Lista completa de 15 platos -->
-      <ul class="menu-list" id="menu-list">
-        
-        <li class="menu-item" data-index="01">
-          <div class="glass-shadow"></div>
-          <div class="caustic-bg"></div>
-          <div class="glass-overlay">
-            <div class="caustic-glass"></div>
-            <div class="specular-top"></div>
-            <div class="specular-bottom"></div>
-          </div>
-          <div class="red-indicator"></div>
-          <div class="item-wrapper">
-            <div class="item-header">
-              <span class="item-number">01</span>
-              <span class="item-name">Ensalada César</span>
-              <div class="item-meta">
-                <div class="more-info-icon">
-                  <div class="bar"></div>
-                  <div class="bar"></div>
-                  <div class="bar"></div>
-                </div>
-              </div>
-            </div>
-            <div class="card-body">
-              <div class="card-scroll-container">
-                <div class="card-scroll-wrap">
-                  <p class="card-text">
-                    Delicada selección de lechugas tiernas combinadas con pechuga asada a baja temperatura, lascas de Parmigiano Reggiano curado 24 meses, crujientes dados de pan artesanal y un aliño tradicional emulsionado suavemente con toques de anchoa del Cantábrico y limón fresco. Un clásico atemporal elaborado con técnicas de alta cocina para garantizar una textura envolvente en cada bocado.
-                  </p>
-                </div>
-                <div class="card-scroll-track">
-                  <div class="card-scroll-dot"></div>
-                </div>
-              </div>
-              <div class="card-price">18€</div>
-            </div>
-          </div>
-        </li>
-
-        <li class="menu-item" data-index="02">
-          <div class="glass-shadow"></div>
-          <div class="caustic-bg"></div>
-          <div class="glass-overlay">
-            <div class="caustic-glass"></div>
-            <div class="specular-top"></div>
-            <div class="specular-bottom"></div>
-          </div>
-          <div class="red-indicator"></div>
-          <div class="item-wrapper">
-            <div class="item-header">
-              <span class="item-number">02</span>
-              <span class="item-name">Pizza Diávola</span>
-              <div class="item-meta">
-                <div class="more-info-icon">
-                  <div class="bar"></div>
-                  <div class="bar"></div>
-                  <div class="bar"></div>
-                </div>
-              </div>
-            </div>
-            <div class="card-body">
-              <div class="card-scroll-container">
-                <div class="card-scroll-wrap">
-                  <p class="card-text">
-                    Masa madre de fermentación lenta horneada a la piedra, base de tomate San Marzano DOP, mozzarella fior di latte fundente y una cuidada selección de salame piccante calabrés, terminado con finas láminas de guindilla fresca y un hilo de aceite aromatizado con orégano silvestre.
-                  </p>
-                </div>
-                <div class="card-scroll-track">
-                  <div class="card-scroll-dot"></div>
-                </div>
-              </div>
-              <div class="card-price">18€</div>
-            </div>
-          </div>
-        </li>
-
-        <li class="menu-item" data-index="03">
-          <div class="glass-shadow"></div>
-          <div class="caustic-bg"></div>
-          <div class="glass-overlay">
-            <div class="caustic-glass"></div>
-            <div class="specular-top"></div>
-            <div class="specular-bottom"></div>
-          </div>
-          <div class="red-indicator"></div>
-          <div class="item-wrapper">
-            <div class="item-header">
-              <span class="item-number">03</span>
-              <span class="item-name">Cheeseburger</span>
-              <div class="item-meta">
-                <div class="more-info-icon">
-                  <div class="bar"></div>
-                  <div class="bar"></div>
-                  <div class="bar"></div>
-                </div>
-              </div>
-            </div>
-            <div class="card-body">
-              <div class="card-scroll-container">
-                <div class="card-scroll-wrap">
-                  <p class="card-text">
-                    Carne 100% de vaca madurada picada al momento, fundida con doble loncha de queso cheddar inglés curado, cebolla caramelizada lentamente, pepinillos encurtidos artesanos y salsa especial de la casa en pan brioche artesanal ligeramente tostado con mantequilla.
-                  </p>
-                </div>
-                <div class="card-scroll-track">
-                  <div class="card-scroll-dot"></div>
-                </div>
-              </div>
-              <div class="card-price">18€</div>
-            </div>
-          </div>
-        </li>
-
-        <li class="menu-item" data-index="04">
-          <div class="glass-shadow"></div>
-          <div class="caustic-bg"></div>
-          <div class="glass-overlay">
-            <div class="caustic-glass"></div>
-            <div class="specular-top"></div>
-            <div class="specular-bottom"></div>
-          </div>
-          <div class="red-indicator"></div>
-          <div class="item-wrapper">
-            <div class="item-header">
-              <span class="item-number">04</span>
-              <span class="item-name">Burrata italiana</span>
-              <div class="item-meta">
-                <div class="more-info-icon">
-                  <div class="bar"></div>
-                  <div class="bar"></div>
-                  <div class="bar"></div>
-                </div>
-              </div>
-            </div>
-            <div class="card-body">
-              <div class="card-scroll-container">
-                <div class="card-scroll-wrap">
-                  <p class="card-text">
-                    Corazón cremoso de burrata de Puglia acompañada de tomates cherry confitados en aceite virgen extra, pesto verde genovés elaborado al mortero, piñones tostados crujientes y una reducción aterciopelada de vinagre balsámico tradicional de Módena.
-                  </p>
-                </div>
-                <div class="card-scroll-track">
-                  <div class="card-scroll-dot"></div>
-                </div>
-              </div>
-              <div class="card-price">18€</div>
-            </div>
-          </div>
-        </li>
-
-        <li class="menu-item" data-index="05">
-          <div class="glass-shadow"></div>
-          <div class="caustic-bg"></div>
-          <div class="glass-overlay">
-            <div class="caustic-glass"></div>
-            <div class="specular-top"></div>
-            <div class="specular-bottom"></div>
-          </div>
-          <div class="red-indicator"></div>
-          <div class="item-wrapper">
-            <div class="item-header">
-              <span class="item-number">05</span>
-              <span class="item-name">Pizza de la casa</span>
-              <div class="item-meta">
-                <div class="more-info-icon">
-                  <div class="bar"></div>
-                  <div class="bar"></div>
-                  <div class="bar"></div>
-                </div>
-              </div>
-            </div>
-            <div class="card-body">
-              <div class="card-scroll-container">
-                <div class="card-scroll-wrap">
-                  <p class="card-text">
-                    Nuestra receta insignia con crema de trufa negra, setas silvestres salteadas al vino blanco, queso scamorza ahumado y prosciutto di Parma añadido al final del horneado para preservar todos sus matices aromáticos y textura sedosa.
-                  </p>
-                </div>
-                <div class="card-scroll-track">
-                  <div class="card-scroll-dot"></div>
-                </div>
-              </div>
-              <div class="card-price">18€</div>
-            </div>
-          </div>
-        </li>
-
-        <li class="menu-item" data-index="06">
-          <div class="glass-shadow"></div>
-          <div class="caustic-bg"></div>
-          <div class="glass-overlay">
-            <div class="caustic-glass"></div>
-            <div class="specular-top"></div>
-            <div class="specular-bottom"></div>
-          </div>
-          <div class="red-indicator"></div>
-          <div class="item-wrapper">
-            <div class="item-header">
-              <span class="item-number">06</span>
-              <span class="item-name">Ensalada Caprese</span>
-              <div class="item-meta">
-                <div class="more-info-icon">
-                  <div class="bar"></div>
-                  <div class="bar"></div>
-                  <div class="bar"></div>
-                </div>
-              </div>
-            </div>
-            <div class="card-body">
-              <div class="card-scroll-container">
-                <div class="card-scroll-wrap">
-                  <p class="card-text">
-                    Láminas intercaladas de tomate corazón de buey de huerta y mozzarella de búfala campana, aderezadas con hojas frescas de albahaca morada, escamas de sal marina ahumada y aceite monovarietal de aceituna arbequina de primera extracción.
-                  </p>
-                </div>
-                <div class="card-scroll-track">
-                  <div class="card-scroll-dot"></div>
-                </div>
-              </div>
-              <div class="card-price">18€</div>
-            </div>
-          </div>
-        </li>
-
-        <li class="menu-item" data-index="07">
-          <div class="glass-shadow"></div>
-          <div class="caustic-bg"></div>
-          <div class="glass-overlay">
-            <div class="caustic-glass"></div>
-            <div class="specular-top"></div>
-            <div class="specular-bottom"></div>
-          </div>
-          <div class="red-indicator"></div>
-          <div class="item-wrapper">
-            <div class="item-header">
-              <span class="item-number">07</span>
-              <span class="item-name">Pizza especial</span>
-              <div class="item-meta">
-                <div class="more-info-icon">
-                  <div class="bar"></div>
-                  <div class="bar"></div>
-                  <div class="bar"></div>
-                </div>
-              </div>
-            </div>
-            <div class="card-body">
-              <div class="card-scroll-container">
-                <div class="card-scroll-wrap">
-                  <p class="card-text">
-                    Combinación gourmet de higos frescos de temporada, queso gorgonzola dulce, nueces pacanas tostadas y un ligero glaseado de miel de flores silvestres sobre una base blanca y crujiente de fermentación de 48 horas.
-                  </p>
-                </div>
-                <div class="card-scroll-track">
-                  <div class="card-scroll-dot"></div>
-                </div>
-              </div>
-              <div class="card-price">18€</div>
-            </div>
-          </div>
-        </li>
-
-        <li class="menu-item" data-index="08">
-          <div class="glass-shadow"></div>
-          <div class="caustic-bg"></div>
-          <div class="glass-overlay">
-            <div class="caustic-glass"></div>
-            <div class="specular-top"></div>
-            <div class="specular-bottom"></div>
-          </div>
-          <div class="red-indicator"></div>
-          <div class="item-wrapper">
-            <div class="item-header">
-              <span class="item-number">08</span>
-              <span class="item-name">Ensalada César</span>
-              <div class="item-meta">
-                <div class="more-info-icon">
-                  <div class="bar"></div>
-                  <div class="bar"></div>
-                  <div class="bar"></div>
-                </div>
-              </div>
-            </div>
-            <div class="card-body">
-              <div class="card-scroll-container">
-                <div class="card-scroll-wrap">
-                  <p class="card-text">
-                    Delicada selección de lechugas tiernas combinadas con pechuga asada a baja temperatura, lascas de Parmigiano Reggiano curado 24 meses, crujientes dados de pan artesanal y un aliño tradicional emulsionado suavemente con toques de anchoa del Cantábrico y limón fresco.
-                  </p>
-                </div>
-                <div class="card-scroll-track">
-                  <div class="card-scroll-dot"></div>
-                </div>
-              </div>
-              <div class="card-price">18€</div>
-            </div>
-          </div>
-        </li>
-
-        <li class="menu-item" data-index="09">
-          <div class="glass-shadow"></div>
-          <div class="caustic-bg"></div>
-          <div class="glass-overlay">
-            <div class="caustic-glass"></div>
-            <div class="specular-top"></div>
-            <div class="specular-bottom"></div>
-          </div>
-          <div class="red-indicator"></div>
-          <div class="item-wrapper">
-            <div class="item-header">
-              <span class="item-number">09</span>
-              <span class="item-name">Pizza Diávola</span>
-              <div class="item-meta">
-                <div class="more-info-icon">
-                  <div class="bar"></div>
-                  <div class="bar"></div>
-                  <div class="bar"></div>
-                </div>
-              </div>
-            </div>
-            <div class="card-body">
-              <div class="card-scroll-container">
-                <div class="card-scroll-wrap">
-                  <p class="card-text">
-                    Masa madre de fermentación lenta horneada a la piedra, base de tomate San Marzano DOP, mozzarella fior di latte fundente y una cuidada selección de salame piccante calabrés, terminado con finas láminas de guindilla fresca y un hilo de aceite aromatizado con orégano silvestre.
-                  </p>
-                </div>
-                <div class="card-scroll-track">
-                  <div class="card-scroll-dot"></div>
-                </div>
-              </div>
-              <div class="card-price">18€</div>
-            </div>
-          </div>
-        </li>
-
-        <li class="menu-item" data-index="10">
-          <div class="glass-shadow"></div>
-          <div class="caustic-bg"></div>
-          <div class="glass-overlay">
-            <div class="caustic-glass"></div>
-            <div class="specular-top"></div>
-            <div class="specular-bottom"></div>
-          </div>
-          <div class="red-indicator"></div>
-          <div class="item-wrapper">
-            <div class="item-header">
-              <span class="item-number">10</span>
-              <span class="item-name">Cheeseburger</span>
-              <div class="item-meta">
-                <div class="more-info-icon">
-                  <div class="bar"></div>
-                  <div class="bar"></div>
-                  <div class="bar"></div>
-                </div>
-              </div>
-            </div>
-            <div class="card-body">
-              <div class="card-scroll-container">
-                <div class="card-scroll-wrap">
-                  <p class="card-text">
-                    Carne 100% de vaca madurada picada al momento, fundida con doble loncha de queso cheddar inglés curado, cebolla caramelizada lentamente, pepinillos encurtidos artesanos y salsa especial de la casa en pan brioche artesanal ligeramente tostado con mantequilla.
-                  </p>
-                </div>
-                <div class="card-scroll-track">
-                  <div class="card-scroll-dot"></div>
-                </div>
-              </div>
-              <div class="card-price">18€</div>
-            </div>
-          </div>
-        </li>
-
-        <li class="menu-item" data-index="11">
-          <div class="glass-shadow"></div>
-          <div class="caustic-bg"></div>
-          <div class="glass-overlay">
-            <div class="caustic-glass"></div>
-            <div class="specular-top"></div>
-            <div class="specular-bottom"></div>
-          </div>
-          <div class="red-indicator"></div>
-          <div class="item-wrapper">
-            <div class="item-header">
-              <span class="item-number">11</span>
-              <span class="item-name">Burrata italiana</span>
-              <div class="item-meta">
-                <div class="more-info-icon">
-                  <div class="bar"></div>
-                  <div class="bar"></div>
-                  <div class="bar"></div>
-                </div>
-              </div>
-            </div>
-            <div class="card-body">
-              <div class="card-scroll-container">
-                <div class="card-scroll-wrap">
-                  <p class="card-text">
-                    Corazón cremoso de burrata de Puglia acompañada de tomates cherry confitados en aceite virgen extra, pesto verde genovés elaborado al mortero, piñones tostados crujientes y una reducción aterciopelada de vinagre balsámico tradicional de Módena.
-                  </p>
-                </div>
-                <div class="card-scroll-track">
-                  <div class="card-scroll-dot"></div>
-                </div>
-              </div>
-              <div class="card-price">18€</div>
-            </div>
-          </div>
-        </li>
-
-        <li class="menu-item" data-index="12">
-          <div class="glass-shadow"></div>
-          <div class="caustic-bg"></div>
-          <div class="glass-overlay">
-            <div class="caustic-glass"></div>
-            <div class="specular-top"></div>
-            <div class="specular-bottom"></div>
-          </div>
-          <div class="red-indicator"></div>
-          <div class="item-wrapper">
-            <div class="item-header">
-              <span class="item-number">12</span>
-              <span class="item-name">Pizza de la casa</span>
-              <div class="item-meta">
-                <div class="more-info-icon">
-                  <div class="bar"></div>
-                  <div class="bar"></div>
-                  <div class="bar"></div>
-                </div>
-              </div>
-            </div>
-            <div class="card-body">
-              <div class="card-scroll-container">
-                <div class="card-scroll-wrap">
-                  <p class="card-text">
-                    Nuestra receta insignia con crema de trufa negra, setas silvestres salteadas al vino blanco, queso scamorza ahumado y prosciutto di Parma añadido al final del horneado para preservar todos sus matices aromáticos y textura sedosa.
-                  </p>
-                </div>
-                <div class="card-scroll-track">
-                  <div class="card-scroll-dot"></div>
-                </div>
-              </div>
-              <div class="card-price">18€</div>
-            </div>
-          </div>
-        </li>
-
-        <li class="menu-item" data-index="13">
-          <div class="glass-shadow"></div>
-          <div class="caustic-bg"></div>
-          <div class="glass-overlay">
-            <div class="caustic-glass"></div>
-            <div class="specular-top"></div>
-            <div class="specular-bottom"></div>
-          </div>
-          <div class="red-indicator"></div>
-          <div class="item-wrapper">
-            <div class="item-header">
-              <span class="item-number">13</span>
-              <span class="item-name">Ensalada Caprese</span>
-              <div class="item-meta">
-                <div class="more-info-icon">
-                  <div class="bar"></div>
-                  <div class="bar"></div>
-                  <div class="bar"></div>
-                </div>
-              </div>
-            </div>
-            <div class="card-body">
-              <div class="card-scroll-container">
-                <div class="card-scroll-wrap">
-                  <p class="card-text">
-                    Láminas intercaladas de tomate corazón de buey de huerta y mozzarella de búfala campana, aderezadas con hojas frescas de albahaca morada, escamas de sal marina ahumada y aceite monovarietal de aceituna arbequina de primera extracción.
-                  </p>
-                </div>
-                <div class="card-scroll-track">
-                  <div class="card-scroll-dot"></div>
-                </div>
-              </div>
-              <div class="card-price">18€</div>
-            </div>
-          </div>
-        </li>
-
-        <li class="menu-item" data-index="14">
-          <div class="glass-shadow"></div>
-          <div class="caustic-bg"></div>
-          <div class="glass-overlay">
-            <div class="caustic-glass"></div>
-            <div class="specular-top"></div>
-            <div class="specular-bottom"></div>
-          </div>
-          <div class="red-indicator"></div>
-          <div class="item-wrapper">
-            <div class="item-header">
-              <span class="item-number">14</span>
-              <span class="item-name">Pizza especial</span>
-              <div class="item-meta">
-                <div class="more-info-icon">
-                  <div class="bar"></div>
-                  <div class="bar"></div>
-                  <div class="bar"></div>
-                </div>
-              </div>
-            </div>
-            <div class="card-body">
-              <div class="card-scroll-container">
-                <div class="card-scroll-wrap">
-                  <p class="card-text">
-                    Combinación gourmet de higos frescos de temporada, queso gorgonzola dulce, nueces pacanas tostadas y un ligero glaseado de miel de flores silvestres sobre una base blanca y crujiente de fermentación de 48 horas.
-                  </p>
-                </div>
-                <div class="card-scroll-track">
-                  <div class="card-scroll-dot"></div>
-                </div>
-              </div>
-              <div class="card-price">18€</div>
-            </div>
-          </div>
-        </li>
-
-        <li class="menu-item" data-index="15">
-          <div class="glass-shadow"></div>
-          <div class="caustic-bg"></div>
-          <div class="glass-overlay">
-            <div class="caustic-glass"></div>
-            <div class="specular-top"></div>
-            <div class="specular-bottom"></div>
-          </div>
-          <div class="red-indicator"></div>
-          <div class="item-wrapper">
-            <div class="item-header">
-              <span class="item-number">15</span>
-              <span class="item-name">Pizza de la casa</span>
-              <div class="item-meta">
-                <div class="more-info-icon">
-                  <div class="bar"></div>
-                  <div class="bar"></div>
-                  <div class="bar"></div>
-                </div>
-              </div>
-            </div>
-            <div class="card-body">
-              <div class="card-scroll-container">
-                <div class="card-scroll-wrap">
-                  <p class="card-text">
-                    Nuestra receta insignia con crema de trufa negra, setas silvestres salteadas al vino blanco, queso scamorza ahumado y prosciutto di Parma añadido al final del horneado para preservar todos sus matices aromáticos y textura sedosa.
-                  </p>
-                </div>
-                <div class="card-scroll-track">
-                  <div class="card-scroll-dot"></div>
-                </div>
-              </div>
-              <div class="card-price">18€</div>
-            </div>
-          </div>
-        </li>
-
-      </ul>
+      <!-- Lista dinámica de platos inyectada automáticamente desde contents.js -->
+      <ul class="menu-list" id="menu-list"></ul>
     </section>
 
   </main>
@@ -1388,7 +835,60 @@
         document.body.classList.add('is-ios');
       }
 
+      // ======================================================================
+      // 0. GENERACIÓN DINÁMICA DE LA LISTA DESDE contents.js (v5.14)
+      // ======================================================================
       const menuList = document.getElementById('menu-list');
+      const menuConfig = window.MENU_CONFIG || { platos: [], moneda: "€" };
+      const rawPlatos = menuConfig.platos || [];
+      const totalToDisplay = menuConfig.totalPlatos ? Math.min(menuConfig.totalPlatos, rawPlatos.length) : rawPlatos.length;
+      const platosData = rawPlatos.slice(0, totalToDisplay);
+
+      const symbol = menuConfig.moneda || "€";
+      menuList.innerHTML = '';
+
+      platosData.forEach((p) => {
+        const li = document.createElement('li');
+        li.className = 'menu-item';
+        li.setAttribute('data-index', p.id);
+
+        li.innerHTML = `
+          <div class="glass-shadow"></div>
+          <div class="caustic-bg"></div>
+          <div class="glass-overlay">
+            <div class="caustic-glass"></div>
+            <div class="specular-top"></div>
+            <div class="specular-bottom"></div>
+          </div>
+          <div class="red-indicator"></div>
+          <div class="item-wrapper">
+            <div class="item-header">
+              <span class="item-number">${p.id}</span>
+              <span class="item-name">${p.nombre}</span>
+              <div class="item-meta">
+                <div class="more-info-icon">
+                  <div class="bar"></div>
+                  <div class="bar"></div>
+                  <div class="bar"></div>
+                </div>
+              </div>
+            </div>
+            <div class="card-body">
+              <div class="card-scroll-container">
+                <div class="card-scroll-wrap">
+                  <p class="card-text">${p.descripcion}</p>
+                </div>
+                <div class="card-scroll-track">
+                  <div class="card-scroll-dot"></div>
+                </div>
+              </div>
+              <div class="card-price">${p.precio}${symbol}</div>
+            </div>
+          </div>
+        `;
+        menuList.appendChild(li);
+      });
+
       const menuItems = Array.from(document.querySelectorAll('.menu-item'));
       const btnAr = document.getElementById('btn-ar');
       const prevDishBtn = document.getElementById('prevDishBtn');
@@ -1398,15 +898,10 @@
       const gestureHint = document.getElementById('gestureHint');
       let mv = null;
 
-      // Modelos 3D disponibles
-      const models = [
-        "Plato_01.glb", "Plato_02.glb", "Plato_03.glb", "Plato_04.glb",
-        "Plato_05.glb", "Plato_06.glb", "Plato_07.glb", "Plato_08.glb",
-        "Plato_09.glb", "Plato_10.glb", "Plato_11.glb", "Plato_12.glb",
-        "Plato_13.glb", "Plato_14.glb", "Plato_15.glb"
-      ];
+      // Modelos 3D leídos directamente desde contents.js
+      const models = platosData.map(p => p.archivoGLB);
 
-      // v5.12: Handshake BFCache exclusivo para iOS (recarga total para purga de VRAM de cámara)
+      // v5.14: Handshake BFCache exclusivo para iOS con retardo limpio de 150ms anti T-1000
       const navEntries = performance.getEntriesByType('navigation');
       const isReload = navEntries.length > 0 && navEntries[0].type === 'reload';
       const fromAR = sessionStorage.getItem('from_ar') === '1';
@@ -1628,7 +1123,7 @@
       });
 
       // ======================================================================
-      // 6. INSTANCIACIÓN Y GESTIÓN LIMPIA DEL VISOR 3D
+      // 6. INSTANCIACIÓN Y GESTIÓN LIMPIA DEL VISOR 3D (v5.14)
       // ======================================================================
       function destroyModelViewer() {
         if (viewerSlot) {
@@ -1642,7 +1137,7 @@
 
         const newMv = document.createElement('model-viewer');
         newMv.id = 'mv';
-        newMv.setAttribute('src', models[currentIndex]);
+        newMv.setAttribute('src', models[currentIndex] || "Plato_01.glb");
         newMv.setAttribute('autoplay', '');
         newMv.setAttribute('auto-rotate', '');
         newMv.setAttribute('auto-rotate-delay', '0');
@@ -1673,7 +1168,7 @@
           return;
         }
         mv.style.opacity = '0';
-        mv.setAttribute('src', models[currentIndex]);
+        mv.setAttribute('src', models[currentIndex] || "Plato_01.glb");
         mv.addEventListener('load', () => {
           mv.style.opacity = '1';
         }, { once: true });
@@ -1684,7 +1179,7 @@
         menuList.classList.remove('has-expanded');
       }
 
-      // v5.11 / v5.12: Restauración de selección v5.09 (cero saltos de lista en primer toque)
+      // v5.11 / v5.14: Restauración de selección v5.09 (cero saltos de lista en primer toque)
       function selectDish(index, shouldScroll = false, triggerReaction = true) {
         if (index < 0 || index >= models.length) return;
         currentIndex = index;
@@ -1727,7 +1222,7 @@
       });
 
       // ======================================================================
-      // 7. GESTIÓN DEL ICONO FLOTANTE CON MEMORIA DE SESIÓN (v5.12)
+      // 7. GESTIÓN DEL ICONO FLOTANTE CON MEMORIA DE SESIÓN (v5.14)
       // ======================================================================
       let hasInteractedWithMV = false;
       let hintTimer1 = null;
@@ -1750,7 +1245,7 @@
       }
 
       function initGestureHint() {
-        // v5.12: Si el usuario ya usó gestos en esta sesión, no volver a mostrar jamás
+        // v5.14: Si el usuario ya interactuó con gestos en esta sesión, no volver a mostrar
         if (sessionStorage.getItem('mv_gesture_dismissed') === '1') {
           hasInteractedWithMV = true;
           if (gestureHint) gestureHint.remove();
@@ -1850,15 +1345,16 @@
       });
 
       // ======================================================================
-      // 9. LANZAMIENTO HACIA AR Y RESTAURACIÓN LIMPIA AL VOLVER (v5.12)
+      // 9. LANZAMIENTO HACIA AR Y RESTAURACIÓN LIMPIA AL VOLVER (v5.14)
       // ======================================================================
       btnAr.addEventListener('click', () => {
         sessionStorage.setItem('from_ar', '1');
         sessionStorage.setItem('modelo_actual', currentIndex);
+        destroyModelViewer(); // Desmontaje limpio de VRAM antes de levantar la cámara AR
         window.location.href = 'ar-world.html';
       });
 
-      // v5.12: Handshake en pageshow para iOS (recarga limpia) y Android (continuidad directa)
+      // v5.14: Handshake en pageshow para iOS (recarga limpia) y Android (continuidad directa)
       window.addEventListener('pageshow', (e) => {
         const navigatedFromAR = sessionStorage.getItem('from_ar') === '1';
         if (navigatedFromAR) {
@@ -1888,14 +1384,26 @@
         }
       });
 
-      // Arranque inicial limpio: posicionado estático directo sin animaciones de scroll
-      createModelViewer();
-      selectDish(currentIndex, false, false);
-
-      if ((fromAR || isFromArReload) && currentIndex > 0) {
-        const targetItem = menuItems[currentIndex];
-        if (targetItem) {
-          menuList.scrollTop = Math.max(0, targetItem.offsetTop - 10);
+      // Arranque inicial: si proviene de recarga post-AR en iOS, margen de seguridad de 150ms anti T-1000
+      if (isFromArReload && isIOS) {
+        setTimeout(() => {
+          createModelViewer();
+          selectDish(currentIndex, false, false);
+          if (currentIndex > 0) {
+            const targetItem = menuItems[currentIndex];
+            if (targetItem) {
+              menuList.scrollTop = Math.max(0, targetItem.offsetTop - 10);
+            }
+          }
+        }, 150);
+      } else {
+        createModelViewer();
+        selectDish(currentIndex, false, false);
+        if ((fromAR || isFromArReload) && currentIndex > 0) {
+          const targetItem = menuItems[currentIndex];
+          if (targetItem) {
+            menuList.scrollTop = Math.max(0, targetItem.offsetTop - 10);
+          }
         }
       }
     });
