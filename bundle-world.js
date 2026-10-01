@@ -1,4 +1,4 @@
-// 9th Wall v5.12
+// 9th Wall v5.08
 (() => {
   var e = {
     574() {
@@ -30,9 +30,6 @@
     }
   },
   t = {};
-
-  // Detección infalible de entorno iOS
-  const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
 
   // Leemos el estado del interruptor debug persistido de forma transitoria
   const IS_DEBUG = sessionStorage.getItem("debug_features") === "true";
@@ -146,7 +143,7 @@
     const e = window.ecs;
 
     // [INMUTABLE - NO MODIFICAR BAJO NINGÚN CONCEPTO: ARRANQUE CINEMÁTICO INICIAL v4.53 / v5.00]
-    // v5.12: Spawner con retención de texturas en Android (15 FPS continuos sin caídas), blindaje de envMap, hundimiento proporcional completo (800ms) y aligerado de subida GPU en Metal iOS
+    // v5.08: Spawner con sondeo de malla nativo v4.64, sincronización 100% de SceneViewer, hundimiento físico opaco, Contact AO y purga total de VRAM
     e.registerComponent({
       name: "dish-spawner",
       schema: { prefab: "eid" },
@@ -160,25 +157,32 @@
         const opacityDuration = 800;   // v4.47: 800ms Opacidad rápida con presencia inmediata
         const totalSpinAngle = -Math.PI * 3; // -540° (1.5 vueltas completas en sentido horario)
 
-        // v5.12: Destrucción selectiva: en iOS se purgan texturas locales para no saturar Metal; en Android se conservan en memoria de GPU para mantener 15 FPS estables sin tirones
+        // Destrucción profunda de mallas, buffers y texturas PBR (VRAM = 0)
         const destruirMallaProfunda = (meshNode) => {
           if (!meshNode) return;
           meshNode.traverse((child) => {
             if (child.isMesh) {
-              if (isIOS) {
-                if (child.geometry) child.geometry.dispose();
-                if (child.material) {
-                  const mats = Array.isArray(child.material) ? child.material : [child.material];
-                  mats.forEach((m) => {
-                    const textureKeys = ['map', 'normalMap', 'roughnessMap'];
-                    textureKeys.forEach(k => {
-                      if (m[k] && m[k].isTexture && k !== 'envMap') {
-                        m[k].dispose();
-                      }
-                    });
-                    m.dispose();
+              if (child.geometry) child.geometry.dispose();
+              if (child.material) {
+                const mats = Array.isArray(child.material) ? child.material : [child.material];
+                mats.forEach((m) => {
+                  const textureKeys = [
+                    'map', 'normalMap', 'roughnessMap', 'metalnessMap',
+                    'aoMap', 'emissiveMap', 'lightMap', 'bumpMap',
+                    'displacementMap', 'alphaMap', 'envMap'
+                  ];
+                  textureKeys.forEach(k => {
+                    if (m[k] && m[k].isTexture) {
+                      m[k].dispose();
+                    }
                   });
-                }
+                  for (const key in m) {
+                    if (m[key] && m[key].isTexture) {
+                      m[key].dispose();
+                    }
+                  }
+                  m.dispose();
+                });
               }
             }
           });
@@ -312,7 +316,7 @@
             };
             requestAnimationFrame(comprobarMallaLista);
           })
-          // v5.12: Cinemática completa de hundimiento (800ms) respetada íntegramente, retención de GPU en Android y subida ligera sin bloqueo en iOS
+          // Hundimiento opaco, anclaje SLAM, sombras Contact AO y purga exhaustiva de VRAM
           .listen(t.events.globalId, "switch-dish-model", ev => {
             if (!isPlaced || !spawnedEid || isTransitioning || !ev.data || !ev.data.modelSrc || !window.THREE) return;
             isTransitioning = true;
@@ -356,7 +360,7 @@
               if (sz.y > 0.01) dishHeight = sz.y;
             }
 
-            // 2. Cinemática de Hundimiento 800ms completa y 100% visible (sin cortes previos)
+            // 2. Cinemática de Hundimiento 800ms con EaseIn 100% opaco ocluido bajo el Hider
             const sinkStartTime = performance.now();
             const sinkDuration = 800;
             const startY = dishPos.y;
@@ -376,84 +380,66 @@
               if (progress < 1.0) {
                 requestAnimationFrame(animarHundimiento);
               } else {
-                // Final del hundimiento (800ms transcurridos): retirada del modelo previo
-                const entityObj = (t.three && t.three.entityToObject) ? t.three.entityToObject.get(spawnedEid) : null;
+                if (loader) {
+                  loader.load(ev.data.modelSrc, (gltf) => {
+                    // API Oficial 8th Wall ECS: Obtener el Object3D de la entidad
+                    const entityObj = (t.three && t.three.entityToObject) ? t.three.entityToObject.get(spawnedEid) : null;
 
-                if (entityObj) {
-                  while (entityObj.children.length > 0) {
-                    const childNode = entityObj.children[0];
-                    destruirMallaProfunda(childNode);
-                  }
-                } else if (t.three && t.three.scene) {
-                  const nodosBorrar = [];
-                  t.three.scene.traverse((child) => {
-                    if (child.name === "Model" || (child.isMesh && child.name !== "Ground" && child.name !== "Hider" && (!child.material || (child.material.type !== 'ShadowMaterial' && child.material.colorWrite !== false)))) {
-                      nodosBorrar.push(child);
-                    }
-                  });
-                  nodosBorrar.forEach(n => destruirMallaProfunda(n));
-                }
-
-                const ejecutarCarga = () => {
-                  if (loader) {
-                    loader.load(ev.data.modelSrc, (gltf) => {
-                      const newModel = gltf.scene;
-                      newModel.name = "Model";
-                      newModel.position.set(0, 0, 0);
-                      newModel.rotation.set(0, 0, 0);
-                      newModel.scale.set(1, 1, 1);
-
-                      // Sombras sobre Ground y aligerado de subida de texturas en iOS (sin mipmaps síncronos pesados)
-                      newModel.traverse((c) => {
-                        if (c.isMesh) {
-                          c.castShadow = true;
-                          if (isIOS && c.material) {
-                            const mats = Array.isArray(c.material) ? c.material : [c.material];
-                            mats.forEach((m) => {
-                              ['map', 'normalMap', 'roughnessMap'].forEach((key) => {
-                                if (m[key] && m[key].isTexture) {
-                                  m[key].generateMipmaps = false;
-                                  m[key].minFilter = rInstance.LinearFilter;
-                                }
-                              });
-                            });
-                          }
+                    // Limpieza profunda de los hijos de la entidad anterior (VRAM = 0)
+                    if (entityObj) {
+                      while (entityObj.children.length > 0) {
+                        const childNode = entityObj.children[0];
+                        destruirMallaProfunda(childNode);
+                      }
+                    } else if (t.three && t.three.scene) {
+                      const nodosBorrar = [];
+                      t.three.scene.traverse((child) => {
+                        if (child.name === "Model" || (child.isMesh && child.name !== "Ground" && child.name !== "Hider" && (!child.material || (child.material.type !== 'ShadowMaterial' && child.material.colorWrite !== false)))) {
+                          nodosBorrar.push(child);
                         }
                       });
+                      nodosBorrar.forEach(n => destruirMallaProfunda(n));
+                    }
 
-                      // Emparentamiento directo en el Object3D de la entidad ECS
-                      if (entityObj) {
-                        entityObj.add(newModel);
-                      } else if (t.three && t.three.scene) {
-                        t.three.scene.add(newModel);
+                    const newModel = gltf.scene;
+                    newModel.name = "Model";
+                    newModel.position.set(0, 0, 0);
+                    newModel.rotation.set(0, 0, 0);
+                    newModel.scale.set(1, 1, 1);
+
+                    // Asegurar que el nuevo modelo proyecte sombras sobre Ground (Contact AO)
+                    newModel.traverse((c) => {
+                      if (c.isMesh) {
+                        c.castShadow = true;
                       }
-
-                      // Reposicionar la entidad ECS en la superficie
-                      t.transform.setWorldPosition(spawnedEid, { x: dishPos.x, y: 0.001, z: dishPos.z });
-                      e.Scale.set(t, spawnedEid, { x: 0.001, y: 0.001, z: 0.001 });
-                      t.getEntity(spawnedEid).set(e.Quaternion, e.math.quat.yRadians(currentRotY));
-
-                      t.events.dispatch(spawnedEid, "recalc-bounding-box");
-
-                      if (window.aplicarAjustesSceneViewer) {
-                        window.aplicarAjustesSceneViewer(t.three.scene);
-                      }
-
-                      dispararCinematicaSpawn(spawnedEid, currentRotY, currentScale);
-                    }, undefined, () => {
-                      isTransitioning = false;
-                      if (window.notificarSpawnFinalizado) window.notificarSpawnFinalizado();
                     });
-                  } else {
+
+                    // Emparentamiento directo en el Object3D de la entidad ECS
+                    if (entityObj) {
+                      entityObj.add(newModel);
+                    } else if (t.three && t.three.scene) {
+                      t.three.scene.add(newModel);
+                    }
+
+                    // Reposicionar la entidad ECS en la superficie
+                    t.transform.setWorldPosition(spawnedEid, { x: dishPos.x, y: 0.001, z: dishPos.z });
+                    e.Scale.set(t, spawnedEid, { x: 0.001, y: 0.001, z: 0.001 });
+                    t.getEntity(spawnedEid).set(e.Quaternion, e.math.quat.yRadians(currentRotY));
+
+                    t.events.dispatch(spawnedEid, "recalc-bounding-box");
+
+                    if (window.aplicarAjustesSceneViewer) {
+                      window.aplicarAjustesSceneViewer(t.three.scene);
+                    }
+
+                    dispararCinematicaSpawn(spawnedEid, currentRotY, currentScale);
+                  }, undefined, () => {
                     isTransitioning = false;
                     if (window.notificarSpawnFinalizado) window.notificarSpawnFinalizado();
-                  }
-                };
-
-                if (isIOS) {
-                  requestAnimationFrame(ejecutarCarga);
+                  });
                 } else {
-                  ejecutarCarga();
+                  isTransitioning = false;
+                  if (window.notificarSpawnFinalizado) window.notificarSpawnFinalizado();
                 }
               }
             };
