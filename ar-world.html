@@ -1,11 +1,11 @@
-<!-- 9th_Design v5.11 (Clean Reticle / Stepped Specular / Human-Scale Lobes / PMREM Crisp sRGB / Differential Dark-Table Guard / Dominant Color Desaturator / Fast AE Lerp / Delayed AR Nav Arrows / Multi-Select Photo Strip & Native Share / Gallery Backbutton Interception / 0ms Instant Photo-Save / Landscape Warning Blocker / Permission Fix & Transient Gesture Hint / Damped Dish Switch / Prime Spinner Instant Drop / Deferred UI Mount / Docked AR Card / iOS Contrast & Memory Guard / Dual-Stage Camera Watchdog / Paint-Holding AR Freeze Exit / Post-Calib CPU Loop Guard / iOS 64px PMREM Clamp / WebGL Context Guard) -->
+<!-- 9th_Design v5.12 (Clean Reticle / Stepped Specular / Human-Scale Lobes / PMREM Crisp sRGB / Differential Dark-Table Guard / Dominant Color Desaturator / Fast AE Lerp / Delayed AR Nav Arrows / Multi-Select Photo Strip & Native Share / Gallery Backbutton Interception / 0ms Instant Photo-Save / Landscape Warning Blocker / Permission Fix & Persistent Gesture Memory / Damped Dish Switch / Prime Spinner Instant Drop / Deferred UI Mount / Docked AR Card / iOS Contrast & Memory Guard / Dual-Stage Camera Watchdog / Paint-Holding AR Freeze Exit / WebGL Context Recovery) -->
 <html>
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no,viewport-fit=cover">
   <meta name="theme-color" content="#040507">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <title>9th_Design AR 5.11</title>
+  <title>9th_Design AR 5.12</title>
   <script crossorigin="anonymous" src="external/runtime/runtime.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@8thwall/engine-binary@1/dist/xr.js" async crossorigin="anonymous" data-preload-chunks="slam"></script>
   <script src="https://cdn.jsdelivr.net/npm/@8thwall/landing-page@1/dist/landing-page.js" crossorigin="anonymous"></script>
@@ -20,8 +20,8 @@
     style="position:fixed;top:10px;right:10px;z-index:1000000;background:rgba(0,0,0,0.9);color:#0f0;font-family:monospace;font-size:12px;padding:8px;border-radius:4px;cursor:pointer;line-height:1.3;border:1px solid #0f0;display:none;pointer-events:auto;">
     <div id="debugTitle">FPS: --</div>
     <div id="debugContent">
-      ar-world: v5.11<br>
-      bundle: v5.11<br>
+      ar-world: v5.12<br>
+      bundle: v5.12<br>
       <span id="envVerdictSpan" style="color:#0f0;">Entorno: ESPERANDO MESA...</span><br>
       <span id="telemetrySpan" style="color:#0f0;">P98: -- (/255) | Lum: -- (/255) | Cálido: --%</span><br>
       <span id="benchmarkSpan" style="color:#0f0;">Pre: --sec - Post: --sec</span><br>
@@ -689,12 +689,12 @@
     };
 
     // =========================================================================
-    // 3. CONSOLA DE ILUMINACIÓN Y CALIBRACIÓN AMBIENTAL (v5.11: iOS 64px PMREM Clamp)
+    // 3. CONSOLA DE ILUMINACIÓN Y CALIBRACIÓN AMBIENTAL (v5.12: iOS 64px Clamp)
     // =========================================================================
     const LIGHTING_CONFIG = {
-      pmrem_resolution: isIOS ? 64 : 256,     // v5.11: Reducción drástica a 64px en iOS (-93.7% VRAM); 256px en Android
-      pmrem_interval_ms: isIOS ? 500 : 200,   // v5.11: Frecuencias armónicas y limpias
-      scan_interval_ms: isIOS ? 250 : 200,    // v5.11: Escaneo ligero sincronizado con PMREM en Android
+      pmrem_resolution: isIOS ? 64 : 256,     // v5.12: 64px en iOS (-93.7% VRAM); 256px en Android
+      pmrem_interval_ms: isIOS ? 500 : 200,   // v5.12: Frecuencias armónicas y limpias
+      scan_interval_ms: isIOS ? 250 : 200,    // v5.12: Escaneo ligero sincronizado con PMREM en Android
       calibration_frames_target: 4,
       shadow_map_size: 512,
       day_shadow_radius: 4.0,
@@ -1039,7 +1039,7 @@
     }
 
     // =========================================================================
-    // INYECCIÓN PBR Y SHADERS (v5.09: Blindaje iOS sin pedestal gris / Colores vivos)
+    // INYECCIÓN PBR Y SHADERS (v5.12: Calibración albedo 0.95 en iOS)
     // =========================================================================
     window.aplicarAjustesSceneViewer = function (targetNode) {
       const root = targetNode || _scene;
@@ -1150,14 +1150,16 @@
               mat.emissive.setRGB(p, p, p);
             }
 
-            // v5.08: En iOS se anula la reducción del 15% para devolver la riqueza de color nativa del GLTF
+            // v5.12: Atenuación calibrada: 15% de reducción en Android | 5% (0.95) en iOS
             if (mat.color && !mat._desaturated) {
+              const hsl = { h: 0, s: 0, l: 0 };
+              mat.color.getHSL(hsl);
               if (!isIOS) {
-                const hsl = { h: 0, s: 0, l: 0 };
-                mat.color.getHSL(hsl);
                 hsl.s = Math.max(0.0, hsl.s * (1.0 - LIGHTING_CONFIG.albedo_desaturation));
-                mat.color.setHSL(hsl.h, hsl.s, hsl.l);
+              } else {
+                hsl.s = Math.max(0.0, hsl.s * 0.95);
               }
+              mat.color.setHSL(hsl.h, hsl.s, hsl.l);
               mat._desaturated = true;
             }
           });
@@ -1182,6 +1184,18 @@
                 _renderer.shadowMap.enabled = true;
                 _renderer.toneMapping = nativeTHREE.ACESFilmicToneMapping;
                 _renderer.toneMappingExposure = 1.0;
+
+                // v5.12: Manejador de recuperación de Contexto WebGL contra pantallazos negros en iOS
+                if (_renderer.domElement) {
+                  _renderer.domElement.addEventListener('webglcontextlost', (e) => {
+                    e.preventDefault();
+                  }, false);
+                  _renderer.domElement.addEventListener('webglcontextrestored', () => {
+                    if (_scene && _activeCamera && _renderer) {
+                      _renderer.render(_scene, _activeCamera);
+                    }
+                  }, false);
+                }
 
                 candidateDebounce.dir = new nativeTHREE.Vector3();
 
@@ -1559,7 +1573,7 @@
                   const colorBinWeight = new Float32Array(8);
                   lumaBins.fill(0);
 
-                  // v5.11: Optimización de CPU: cálculo cromático y balance cálido restringido únicamente a la fase de calibración
+                  // v5.11: Optimización de CPU: cálculo cromático y balance cálido restringido únicamente a la calibración
                   const needFullChroma = isCalibrating && !isCalibrated;
 
                   for (let idx = 0; idx < data.length; idx += 4) {
@@ -2151,7 +2165,7 @@
     if (closeArCardBtn) closeArCardBtn.addEventListener('click', cerrarCardAR);
 
     // =========================================================================
-    // GESTIÓN DEL ICONO FLOTANTE DE GESTOS EN MEMORIA TRANSIENTE (RESET AL REFRESCAR)
+    // GESTIÓN DEL ICONO FLOTANTE CON MEMORIA DE SESIÓN (v5.12)
     // =========================================================================
     const arGestureHint = document.getElementById('arGestureHint');
     let hasInteractedWithAR = false;
@@ -2163,6 +2177,7 @@
     window.dismissARHint = function () {
       if (hasInteractedWithAR) return;
       hasInteractedWithAR = true;
+      sessionStorage.setItem('ar_gesture_dismissed', '1');
       clearTimeout(arHintTimer1);
       clearTimeout(arHintTimer2);
       clearTimeout(arHintTimer3);
@@ -2174,6 +2189,13 @@
     };
 
     window.iniciarHintGestosAR = function () {
+      // v5.12: Si el usuario ya usó gestos en esta sesión en AR, no volver a mostrar jamás
+      if (sessionStorage.getItem('ar_gesture_dismissed') === '1') {
+        hasInteractedWithAR = true;
+        if (arGestureHint) arGestureHint.remove();
+        return;
+      }
+
       if (hasInteractedWithAR || !arGestureHint) {
         if (arGestureHint) arGestureHint.remove();
         return;
@@ -2191,6 +2213,7 @@
             arHintTimer4 = setTimeout(() => {
               arGestureHint.classList.remove('visible');
               hasInteractedWithAR = true;
+              sessionStorage.setItem('ar_gesture_dismissed', '1');
               setTimeout(() => arGestureHint.remove(), 400);
             }, 3000);
           }, 6000);
@@ -2399,7 +2422,7 @@
     closeViewerBtn.addEventListener('click', cerrarVisorFotos);
 
     // =========================================================================
-    // v5.10 / v5.11: INTERCEPCIÓN DE BOTÓN ATRÁS Y SALIDA CONGELADA (PAINT-HOLDING AR FREEZE)
+    // v5.10 / v5.12: INTERCEPCIÓN DE BOTÓN ATRÁS Y SALIDA CONGELADA (PAINT-HOLDING)
     // =========================================================================
     history.pushState({ inAR: true }, '');
 
