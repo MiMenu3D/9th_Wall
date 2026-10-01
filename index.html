@@ -1,4 +1,4 @@
-<!-- Versión: 9th_Design v5.11 -->
+<!-- Versión: 9th_Design v5.12 -->
 <!DOCTYPE html>
 <html lang="es">
 <head>
@@ -128,13 +128,17 @@
       overflow: hidden;
     }
 
-    /* Estilo del visor 3D (v5.11: Filtro de atenuación exclusivo para Android, neutro en iOS) */
+    /* Estilo del visor 3D (v5.12: Filtro 0.95 en iOS | 0.87/0.88 en Android) */
     model-viewer {
       width: 100%;
       height: 100%;
       background: transparent;
       opacity: 0;
       transition: opacity 0.35s ease;
+    }
+
+    body.is-ios model-viewer {
+      filter: saturate(0.95) contrast(0.95);
     }
 
     body:not(.is-ios) model-viewer {
@@ -1402,20 +1406,24 @@
         "Plato_13.glb", "Plato_14.glb", "Plato_15.glb"
       ];
 
-      // v5.10 / v5.11: Detección estricta de tipo de navegación y persistencia selectiva
+      // v5.12: Handshake BFCache exclusivo para iOS (recarga total para purga de VRAM de cámara)
       const navEntries = performance.getEntriesByType('navigation');
       const isReload = navEntries.length > 0 && navEntries[0].type === 'reload';
       const fromAR = sessionStorage.getItem('from_ar') === '1';
+      const isFromArReload = sessionStorage.getItem('from_ar_reload') === '1';
       let currentIndex = 0;
 
-      if (isReload && !fromAR) {
-        // Recarga manual por el usuario: reseteo estricto a Plato 01
+      if (isReload && !fromAR && !isFromArReload) {
+        // Recarga manual por el usuario: reseteo estricto a Plato 01 y purga de memoria de gestos
         sessionStorage.removeItem('modelo_actual');
         sessionStorage.removeItem('from_ar');
+        sessionStorage.removeItem('from_ar_reload');
+        sessionStorage.removeItem('mv_gesture_dismissed');
+        sessionStorage.removeItem('ar_gesture_dismissed');
         currentIndex = 0;
-      } else if (fromAR) {
-        // Retorno legítimo desde AR (Paint Holding): recuperación exacta del plato seleccionado
-        sessionStorage.removeItem('from_ar');
+      } else if (isFromArReload || fromAR) {
+        // Retorno legítimo desde AR: recuperación exacta del plato seleccionado
+        sessionStorage.removeItem('from_ar_reload');
         const saved = sessionStorage.getItem('modelo_actual');
         if (saved !== null && !isNaN(parseInt(saved, 10))) {
           currentIndex = parseInt(saved, 10);
@@ -1676,7 +1684,7 @@
         menuList.classList.remove('has-expanded');
       }
 
-      // v5.11: Restauración estricta de la cinemática de selección v5.09 (cero saltos de lista en primer toque)
+      // v5.11 / v5.12: Restauración de selección v5.09 (cero saltos de lista en primer toque)
       function selectDish(index, shouldScroll = false, triggerReaction = true) {
         if (index < 0 || index >= models.length) return;
         currentIndex = index;
@@ -1719,7 +1727,7 @@
       });
 
       // ======================================================================
-      // 7. GESTIÓN DEL ICONO FLOTANTE EN MEMORIA TRANSIENTE (RESET AL REFRESCAR)
+      // 7. GESTIÓN DEL ICONO FLOTANTE CON MEMORIA DE SESIÓN (v5.12)
       // ======================================================================
       let hasInteractedWithMV = false;
       let hintTimer1 = null;
@@ -1730,6 +1738,7 @@
       function dismissGestureHint() {
         if (hasInteractedWithMV) return;
         hasInteractedWithMV = true;
+        sessionStorage.setItem('mv_gesture_dismissed', '1');
         clearTimeout(hintTimer1);
         clearTimeout(hintTimer2);
         clearTimeout(hintTimer3);
@@ -1741,6 +1750,13 @@
       }
 
       function initGestureHint() {
+        // v5.12: Si el usuario ya usó gestos en esta sesión, no volver a mostrar jamás
+        if (sessionStorage.getItem('mv_gesture_dismissed') === '1') {
+          hasInteractedWithMV = true;
+          if (gestureHint) gestureHint.remove();
+          return;
+        }
+
         if (hasInteractedWithMV || !gestureHint) {
           if (gestureHint) gestureHint.remove();
           return;
@@ -1760,6 +1776,7 @@
               hintTimer4 = setTimeout(() => {
                 gestureHint.classList.remove('visible');
                 hasInteractedWithMV = true;
+                sessionStorage.setItem('mv_gesture_dismissed', '1');
                 setTimeout(() => gestureHint.remove(), 400);
               }, 3000);
             }, 10000);
@@ -1833,31 +1850,35 @@
       });
 
       // ======================================================================
-      // 9. LANZAMIENTO HACIA AR Y RESTAURACIÓN LIMPIA AL VOLVER (CERO GLITCHES)
+      // 9. LANZAMIENTO HACIA AR Y RESTAURACIÓN LIMPIA AL VOLVER (v5.12)
       // ======================================================================
       btnAr.addEventListener('click', () => {
         sessionStorage.setItem('from_ar', '1');
         sessionStorage.setItem('modelo_actual', currentIndex);
-
-        // v5.11: Estrategia 04 (Sólo iOS) - Desconexión deliberada de contexto WebGL previa a AR
-        if (isIOS && mv) {
-          try {
-            const canvas = mv.shadowRoot ? mv.shadowRoot.querySelector('canvas') : null;
-            if (canvas) {
-              const gl = canvas.getContext('webgl2') || canvas.getContext('webgl');
-              if (gl) {
-                const loseContextExt = gl.getExtension('WEBGL_lose_context');
-                if (loseContextExt) loseContextExt.loseContext();
-              }
-            }
-          } catch (e) {}
-        }
-
         window.location.href = 'ar-world.html';
       });
 
-      // Fallback defensivo en caso de restauración BFCache aislada
+      // v5.12: Handshake en pageshow para iOS (recarga limpia) y Android (continuidad directa)
       window.addEventListener('pageshow', (e) => {
+        const navigatedFromAR = sessionStorage.getItem('from_ar') === '1';
+        if (navigatedFromAR) {
+          sessionStorage.removeItem('from_ar');
+          if (isIOS) {
+            // Recarga obligatoria en Safari iOS para purgar VRAM de WebKit y levantar contexto nuevo
+            sessionStorage.setItem('from_ar_reload', '1');
+            window.location.reload();
+            return;
+          }
+
+          // En Android: flujo directo sin recargas
+          const saved = sessionStorage.getItem('modelo_actual');
+          if (saved !== null && !isNaN(parseInt(saved, 10))) {
+            currentIndex = parseInt(saved, 10);
+          }
+          selectDish(currentIndex, false, false);
+          return;
+        }
+
         if (e.persisted) {
           const saved = sessionStorage.getItem('modelo_actual');
           if (saved !== null && !isNaN(parseInt(saved, 10))) {
@@ -1871,7 +1892,7 @@
       createModelViewer();
       selectDish(currentIndex, false, false);
 
-      if (fromAR && currentIndex > 0) {
+      if ((fromAR || isFromArReload) && currentIndex > 0) {
         const targetItem = menuItems[currentIndex];
         if (targetItem) {
           menuList.scrollTop = Math.max(0, targetItem.offsetTop - 10);
