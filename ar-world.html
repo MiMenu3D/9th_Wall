@@ -1,11 +1,12 @@
-<!-- 9th_Design v5.12 (Clean Reticle / Stepped Specular / Human-Scale Lobes / PMREM Crisp sRGB / Differential Dark-Table Guard / Dominant Color Desaturator / Fast AE Lerp / Delayed AR Nav Arrows / Multi-Select Photo Strip & Native Share / Gallery Backbutton Interception / 0ms Instant Photo-Save / Landscape Warning Blocker / Permission Fix & Persistent Gesture Memory / Damped Dish Switch / Prime Spinner Instant Drop / Deferred UI Mount / Docked AR Card / iOS Contrast & Memory Guard / Dual-Stage Camera Watchdog / Paint-Holding AR Freeze Exit / WebGL Context Recovery) -->
+<!-- 9th_Design v5.14 (Clean Reticle / Stepped Specular / Human-Scale Lobes / PMREM Crisp sRGB / Differential Dark-Table Guard / Dominant Color Desaturator / Fast AE Lerp / Delayed AR Nav Arrows / Multi-Select Photo Strip & Native Share / Gallery Backbutton Interception / 0ms Instant Photo-Save / Landscape Warning Blocker / Permission Fix & Persistent Gesture Memory / Damped Dish Switch / Prime Spinner Instant Drop / Deferred UI Mount / Docked AR Card / Unified Speculars & iOS 64px PMREM / Dual-Stage Camera Watchdog / Paint-Holding AR Freeze Exit / Centralized Contents Integration) -->
 <html>
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no,viewport-fit=cover">
   <meta name="theme-color" content="#040507">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <title>9th_Design AR 5.12</title>
+  <title>9th_Design AR 5.14</title>
+  <script src="contents.js"></script>
   <script crossorigin="anonymous" src="external/runtime/runtime.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@8thwall/engine-binary@1/dist/xr.js" async crossorigin="anonymous" data-preload-chunks="slam"></script>
   <script src="https://cdn.jsdelivr.net/npm/@8thwall/landing-page@1/dist/landing-page.js" crossorigin="anonymous"></script>
@@ -20,8 +21,8 @@
     style="position:fixed;top:10px;right:10px;z-index:1000000;background:rgba(0,0,0,0.9);color:#0f0;font-family:monospace;font-size:12px;padding:8px;border-radius:4px;cursor:pointer;line-height:1.3;border:1px solid #0f0;display:none;pointer-events:auto;">
     <div id="debugTitle">FPS: --</div>
     <div id="debugContent">
-      ar-world: v5.12<br>
-      bundle: v5.12<br>
+      ar-world: v5.14<br>
+      bundle: v5.14<br>
       <span id="envVerdictSpan" style="color:#0f0;">Entorno: ESPERANDO MESA...</span><br>
       <span id="telemetrySpan" style="color:#0f0;">P98: -- (/255) | Lum: -- (/255) | Cálido: --%</span><br>
       <span id="benchmarkSpan" style="color:#0f0;">Pre: --sec - Post: --sec</span><br>
@@ -673,7 +674,7 @@
     const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
 
     // =========================================================================
-    // 2. CONSOLA DE ESPECULARES (v5.09: Escala Humana / Halo sin lavado blanco)
+    // 2. CONSOLA DE ESPECULARES (v5.14: Escala Humana / Unificada Android & iOS)
     // =========================================================================
     const SPECULAR_CONFIG = {
       // Capa 1: Lóbulo THIN (Núcleo nítido y puntual)
@@ -689,12 +690,12 @@
     };
 
     // =========================================================================
-    // 3. CONSOLA DE ILUMINACIÓN Y CALIBRACIÓN AMBIENTAL (v5.12: iOS 64px Clamp)
+    // 3. CONSOLA DE ILUMINACIÓN Y CALIBRACIÓN AMBIENTAL (v5.14: iOS 64px Clamp)
     // =========================================================================
     const LIGHTING_CONFIG = {
-      pmrem_resolution: isIOS ? 64 : 256,     // v5.12: 64px en iOS (-93.7% VRAM); 256px en Android
-      pmrem_interval_ms: isIOS ? 500 : 200,   // v5.12: Frecuencias armónicas y limpias
-      scan_interval_ms: isIOS ? 250 : 200,    // v5.12: Escaneo ligero sincronizado con PMREM en Android
+      pmrem_resolution: isIOS ? 64 : 256,     // 64px en iOS (-93.7% VRAM); 256px en Android
+      pmrem_interval_ms: isIOS ? 500 : 200,   // Frecuencias armónicas y limpias
+      scan_interval_ms: isIOS ? 250 : 200,    // Escaneo ligero sincronizado con PMREM en Android
       calibration_frames_target: 4,
       shadow_map_size: 512,
       day_shadow_radius: 4.0,
@@ -773,10 +774,10 @@
       primerPlatoSpawnIniciado = true;
     };
 
-    // v5.09: Congelación total de Light Estimation y PMREM durante cambios de modelo
+    // Congelación total de Light Estimation y PMREM durante cambios de modelo
     let isDishSwitching = false;
 
-    // v5.08: Margen de seguridad de 400ms tras el fin del spawn antes del fade-in suave de la UI
+    // Margen de seguridad de 400ms tras el fin del spawn antes del fade-in suave de la UI
     window.notificarSpawnFinalizado = function () {
       isDishSwitching = false;
 
@@ -1013,7 +1014,7 @@
       });
     }
 
-    // v5.08: Intercepción mediante touchstart con e.preventDefault() para anular el Smart Zoom de Safari iOS
+    // Intercepción mediante touchstart con e.preventDefault() para anular el Smart Zoom de Safari iOS
     if (secretTrigger) {
       let secretTaps = [];
       const procesarToqueSecreto = (e) => {
@@ -1039,7 +1040,7 @@
     }
 
     // =========================================================================
-    // INYECCIÓN PBR Y SHADERS (v5.12: Calibración albedo 0.95 en iOS)
+    // INYECCIÓN PBR Y SHADERS (v5.14: Especulares Unificados Android & iOS)
     // =========================================================================
     window.aplicarAjustesSceneViewer = function (targetNode) {
       const root = targetNode || _scene;
@@ -1099,7 +1100,7 @@
                   fp = fp * fp * (3.0 - 2.0 * fp);
 
                   vec3 h0 = fract(sin(vec3(dot(ip, vec3(127.1, 311.7, 74.7)), dot(ip + vec3(1.0, 0.0, 0.0), vec3(127.1, 311.7, 74.7)), dot(ip + vec3(0.0, 1.0, 0.0), vec3(127.1, 311.7, 74.7)))) * 43758.5453);
-                  vec3 h1 = fract(sin(vec3(dot(ip + vec3(1.0, 1.0, 0.0), vec3(127.1, 311.7, 74.7)), dot(ip + vec3(0.0, 0.0, 1.0), vec3(127.1, 311.7, 74.7)), dot(ip + vec3(1.0, 0.0, 1.0), vec3(127.1, 311.7, 74.7)))) * 43758.5453);
+                  vec3 h1 = fract(sin(vec3(dot(ip + vec3(1.0, 1.0, 0.0), vec3(127.1, 311.7, 74.7)), dot(ip + vec3(0.0, 1.0, 0.0), vec3(127.1, 311.7, 74.7)), dot(ip + vec3(1.0, 0.0, 1.0), vec3(127.1, 311.7, 74.7)))) * 43758.5453);
 
                   float nVal = mix(mix(h0.x, h0.y, fp.x), mix(h0.z, h1.x, fp.x), fp.y);
                   float nValZ = mix(mix(h1.y, h1.z, fp.x), mix(h0.x, h0.y, fp.x), fp.z);
@@ -1144,13 +1145,13 @@
               mat.roughness = LIGHTING_CONFIG.min_material_roughness;
             }
 
-            // v5.09: En iOS el pedestal emisivo se fija estrictamente a 0 para preservar negros puros OLED
+            // En iOS el pedestal emisivo se fija estrictamente a 0 para preservar negros puros OLED
             if (mat.emissive !== undefined) {
               const p = isIOS ? 0.0 : currentPedestal;
               mat.emissive.setRGB(p, p, p);
             }
 
-            // v5.12: Atenuación calibrada: 15% de reducción en Android | 5% (0.95) en iOS
+            // Atenuación calibrada de saturación
             if (mat.color && !mat._desaturated) {
               const hsl = { h: 0, s: 0, l: 0 };
               mat.color.getHSL(hsl);
@@ -1184,18 +1185,6 @@
                 _renderer.shadowMap.enabled = true;
                 _renderer.toneMapping = nativeTHREE.ACESFilmicToneMapping;
                 _renderer.toneMappingExposure = 1.0;
-
-                // v5.12: Manejador de recuperación de Contexto WebGL contra pantallazos negros en iOS
-                if (_renderer.domElement) {
-                  _renderer.domElement.addEventListener('webglcontextlost', (e) => {
-                    e.preventDefault();
-                  }, false);
-                  _renderer.domElement.addEventListener('webglcontextrestored', () => {
-                    if (_scene && _activeCamera && _renderer) {
-                      _renderer.render(_scene, _activeCamera);
-                    }
-                  }, false);
-                }
 
                 candidateDebounce.dir = new nativeTHREE.Vector3();
 
@@ -1387,7 +1376,7 @@
           if (envMode === 'hdr') scene.environment = hdr;
         }, undefined, () => {});
 
-        // v5.09: Configuración del Watchdog de Cámara (Fase 1: 2.0s sutil | Fase 2: 5.0s crítico con purga de tracks)
+        // Configuración del Watchdog de Cámara (Fase 1: 2.0s sutil | Fase 2: 5.0s crítico con purga de tracks)
         const cameraSyncBanner = document.getElementById('cameraSyncBanner');
         const cameraErrorModal = document.getElementById('cameraErrorModal');
         const retryCameraBtn = document.getElementById('retryCameraBtn');
@@ -1548,7 +1537,7 @@
                 const deltaSec = Math.max(0.001, (now - lastFrameTime) / 1000.0);
                 lastFrameTime = now;
 
-                // v5.11: Escaneo ligero de fotometría; apagado durante cambios de modelo
+                // Escaneo ligero de fotometría; apagado durante cambios de modelo
                 const shouldScan = !isDishSwitching && (isCalibrating || (now - lastScanTime >= LIGHTING_CONFIG.scan_interval_ms));
 
                 if (shouldScan) {
@@ -1573,7 +1562,6 @@
                   const colorBinWeight = new Float32Array(8);
                   lumaBins.fill(0);
 
-                  // v5.11: Optimización de CPU: cálculo cromático y balance cálido restringido únicamente a la calibración
                   const needFullChroma = isCalibrating && !isCalibrated;
 
                   for (let idx = 0; idx < data.length; idx += 4) {
@@ -1713,15 +1701,15 @@
                       currentPmremMult = THREE_INSTANCE.MathUtils.lerp(LIGHTING_CONFIG.day_pmrem_mult, LIGHTING_CONFIG.night_pmrem_mult, environmentFactor);
                       currentPedestal = THREE_INSTANCE.MathUtils.lerp(LIGHTING_CONFIG.day_pedestal, LIGHTING_CONFIG.night_pedestal, environmentFactor);
 
-                      // v5.09: Calibración específica por SO (iOS: desactivado en penumbra/suave, 50% en día/direccional)
+                      // v5.14: Especulares estrictamente unificados (mismo comportamiento Android e iOS)
                       if (verdict === "DIRECCIONAL_FUERTE") {
-                        currentSpecularLevel = isIOS ? 0.50 : 1.00;
+                        currentSpecularLevel = 1.00;
                       } else if (verdict === "DIA_NORMAL") {
-                        currentSpecularLevel = isIOS ? 0.40 : 0.80;
+                        currentSpecularLevel = 0.80;
                       } else if (verdict === "AMBIENTE_SUAVE") {
-                        currentSpecularLevel = isIOS ? 0.00 : 0.50;
+                        currentSpecularLevel = 0.50;
                       } else {
-                        currentSpecularLevel = isIOS ? 0.00 : 0.27;
+                        currentSpecularLevel = 0.27;
                       }
                       actualizarNivelEspecularGlobal(currentSpecularLevel);
 
@@ -1909,7 +1897,7 @@
                   }
                 }
 
-                // v5.09 / v5.11: Regeneración pesada PMREM (congelada en cambios de modelo para retener iluminación y VRAM)
+                // Regeneración PMREM (congelada en cambios de modelo para retener iluminación y VRAM)
                 if (!isDishSwitching && (now - lastPmremTime >= LIGHTING_CONFIG.pmrem_interval_ms)) {
                   lastPmremTime = now;
 
@@ -2043,32 +2031,33 @@
     };
 
     // =========================================================================
-    // LÓGICA DE CARRUSEL, MODELOS Y DATOS GASTRONÓMICOS
+    // LÓGICA DE CARRUSEL Y DATOS CENTRALIZADOS DESDE contents.js (v5.14)
     // =========================================================================
-    const _modelsList = [
-      "Plato_01.glb", "Plato_02.glb", "Plato_03.glb", "Plato_04.glb",
-      "Plato_05.glb", "Plato_06.glb", "Plato_07.glb", "Plato_08.glb",
-      "Plato_09.glb", "Plato_10.glb", "Plato_11.glb", "Plato_12.glb",
-      "Plato_13.glb", "Plato_14.glb", "Plato_15.glb"
-    ];
+    const menuConfig = window.MENU_CONFIG || { platos: [], moneda: "€" };
+    const rawPlatos = menuConfig.platos || [];
+    const totalToDisplay = menuConfig.totalPlatos ? Math.min(menuConfig.totalPlatos, rawPlatos.length) : rawPlatos.length;
+    const _dishesConfig = rawPlatos.slice(0, totalToDisplay);
 
-    const _dishesData = [
-      { num: "01", name: "Ensalada César", price: "18€", desc: "Delicada selección de lechugas tiernas combinadas con pechuga asada a baja temperatura, lascas de Parmigiano Reggiano curado 24 meses, crujientes dados de pan artesanal y un aliño tradicional emulsionado suavemente con toques de anchoa del Cantábrico y limón fresco." },
-      { num: "02", name: "Pizza Diávola", price: "18€", desc: "Masa madre de fermentación lenta horneada a la piedra, base de tomate San Marzano DOP, mozzarella fior di latte fundente y una cuidada selección de salame piccante calabrés, terminado con finas láminas de guindilla fresca." },
-      { num: "03", name: "Cheeseburger", price: "18€", desc: "Carne 100% de vaca madurada picada al momento, fundida con doble loncha de queso cheddar inglés curado, cebolla caramelizada lentamente, pepinillos encurtidos artesanos y salsa especial de la casa en pan brioche artesanal." },
-      { num: "04", name: "Burrata italiana", price: "18€", desc: "Corazón cremoso de burrata de Puglia acompañada de tomates cherry confitados en aceite virgen extra, pesto verde genovés elaborado al mortero, piñones tostados crujientes y una reducción aterciopelada de vinagre balsámico tradicional." },
-      { num: "05", name: "Pizza de la casa", price: "18€", desc: "Nuestra receta insignia con crema de trufa negra, setas silvestres salteadas al vino blanco, queso scamorza ahumado y prosciutto di Parma añadido al final del horneado para preservar todos sus matices aromáticos." },
-      { num: "06", name: "Ensalada Caprese", price: "18€", desc: "Láminas intercaladas de tomate corazón de buey de huerta y mozzarella de búfala campana, aderezadas con hojas frescas de albahaca morada, escamas de sal marina ahumada y aceite monovarietal de aceituna arbequina." },
-      { num: "07", name: "Pizza especial", price: "18€", desc: "Combinación gourmet de higos frescos de temporada, queso gorgonzola dulce, nueces pacanas tostadas y un ligero glaseado de miel de flores silvestres sobre una base blanca y crujiente de fermentación de 48 horas." },
-      { num: "08", name: "Ensalada César", price: "18€", desc: "Delicada selección de lechugas tiernas combinadas con pechuga asada a baja temperatura, lascas de Parmigiano Reggiano curado 24 meses, crujientes dados de pan artesanal y un aliño tradicional emulsionado suavemente." },
-      { num: "09", name: "Pizza Diávola", price: "18€", desc: "Masa madre de fermentación lenta horneada a la piedra, base de tomate San Marzano DOP, mozzarella fior di latte fundente y una cuidada selección de salame piccante calabrés, terminado con finas láminas de guindilla fresca." },
-      { num: "10", name: "Cheeseburger", price: "18€", desc: "Carne 100% de vaca madurada picada al momento, fundida con doble loncha de queso cheddar inglés curado, cebolla caramelizada lentamente, pepinillos encurtidos artesanos y salsa especial de la casa en pan brioche artesanal." },
-      { num: "11", name: "Burrata italiana", price: "18€", desc: "Corazón cremoso de burrata de Puglia acompañada de tomates cherry confitados en aceite virgen extra, pesto verde genovés elaborado al mortero, piñones tostados crujientes y una reducción aterciopelada de vinagre balsámico." },
-      { num: "12", name: "Pizza de la casa", price: "18€", desc: "Nuestra receta insignia con crema de trufa negra, setas silvestres salteadas al vino blanco, queso scamorza ahumado y prosciutto di Parma añadido al final del horneado para preservar todos sus matices aromáticos." },
-      { num: "13", name: "Ensalada Caprese", price: "18€", desc: "Láminas intercaladas de tomate corazón de buey de huerta y mozzarella de búfala campana, aderezadas con hojas frescas de albahaca morada, escamas de sal marina ahumada y aceite monovarietal de aceituna arbequina." },
-      { num: "14", name: "Pizza especial", price: "18€", desc: "Combinación gourmet de higos frescos de temporada, queso gorgonzola dulce, nueces pacanas tostadas y un ligero glaseado de miel de flores silvestres sobre una base blanca y crujiente de fermentación de 48 horas." },
-      { num: "15", name: "Pizza de la casa", price: "18€", desc: "Nuestra receta insignia con crema de trufa negra, setas silvestres salteadas al vino blanco, queso scamorza ahumado y prosciutto di Parma añadido al final del horneado para preservar todos sus matices aromáticos." }
-    ];
+    const _modelsList = _dishesConfig.length > 0
+      ? _dishesConfig.map(p => p.archivoGLB)
+      : [
+        "Plato_01.glb", "Plato_02.glb", "Plato_03.glb", "Plato_04.glb",
+        "Plato_05.glb", "Plato_06.glb", "Plato_07.glb", "Plato_08.glb",
+        "Plato_09.glb", "Plato_10.glb", "Plato_11.glb", "Plato_12.glb",
+        "Plato_13.glb", "Plato_14.glb", "Plato_15.glb"
+      ];
+
+    const symbol = menuConfig.moneda || "€";
+    const _dishesData = _dishesConfig.length > 0
+      ? _dishesConfig.map(p => ({
+          num: p.id,
+          name: p.nombre,
+          price: `${p.precio}${symbol}`,
+          desc: p.descripcion
+        }))
+      : [
+        { num: "01", name: "Ensalada César", price: "18€", desc: "Delicada selección de lechugas tiernas..." }
+      ];
 
     let currentDishIndex = 0;
     const savedIdx = sessionStorage.getItem("modelo_actual");
@@ -2097,7 +2086,7 @@
         capContainer.style.pointerEvents = 'none';
       }
 
-      // v5.09: Congelación inmediata del cálculo lumínico para liberar bus GPU
+      // Congelación inmediata del cálculo lumínico para liberar bus GPU
       isDishSwitching = true;
 
       currentDishIndex = (currentDishIndex + direction + _modelsList.length) % _modelsList.length;
@@ -2134,7 +2123,7 @@
       const info = _dishesData[currentDishIndex] || _dishesData[0];
       if (arCardNumber) arCardNumber.innerText = info.num;
       if (arCardTitle) arCardTitle.innerText = info.name;
-      if (arCardDesc) arCardDesc.innerText = info.desc;
+      if (arCardDesc) arCardDesc.innerHTML = info.desc; // Inyección HTML para soportar <b> e <i> desde contents.js
       if (arCardPrice) arCardPrice.innerText = info.price;
     };
 
@@ -2165,7 +2154,7 @@
     if (closeArCardBtn) closeArCardBtn.addEventListener('click', cerrarCardAR);
 
     // =========================================================================
-    // GESTIÓN DEL ICONO FLOTANTE CON MEMORIA DE SESIÓN (v5.12)
+    // GESTIÓN DEL ICONO FLOTANTE CON MEMORIA DE SESIÓN (v5.14)
     // =========================================================================
     const arGestureHint = document.getElementById('arGestureHint');
     let hasInteractedWithAR = false;
@@ -2189,7 +2178,7 @@
     };
 
     window.iniciarHintGestosAR = function () {
-      // v5.12: Si el usuario ya usó gestos en esta sesión en AR, no volver a mostrar jamás
+      // Si el usuario ya usó gestos en esta sesión en AR, no volver a mostrar jamás
       if (sessionStorage.getItem('ar_gesture_dismissed') === '1') {
         hasInteractedWithAR = true;
         if (arGestureHint) arGestureHint.remove();
@@ -2422,7 +2411,7 @@
     closeViewerBtn.addEventListener('click', cerrarVisorFotos);
 
     // =========================================================================
-    // v5.10 / v5.12: INTERCEPCIÓN DE BOTÓN ATRÁS Y SALIDA CONGELADA (PAINT-HOLDING)
+    // INTERCEPCIÓN DE BOTÓN ATRÁS Y SALIDA CONGELADA (PAINT-HOLDING)
     // =========================================================================
     history.pushState({ inAR: true }, '');
 
