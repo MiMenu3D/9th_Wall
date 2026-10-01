@@ -1,4 +1,4 @@
-<!-- Versión: 9th_Design v5.05 -->
+<!-- Versión: 9th_Design v5.12 -->
 <!DOCTYPE html>
 <html lang="es">
 <head>
@@ -90,10 +90,13 @@
       height: 100dvh;
       margin: 0 auto;
       overflow-x: hidden;
+      overflow-x: clip;
       overflow-y: hidden;
       display: flex;
       flex-direction: column;
       background-color: var(--color-bg-base);
+      touch-action: pan-y;
+      overscroll-behavior-x: none;
     }
 
     /* ==========================================================================
@@ -111,6 +114,8 @@
       background: radial-gradient(circle at 50% 60%, #171920 0%, #060709 88%);
       border-bottom: 0.0625rem solid rgba(0, 0, 0, 0.12);
       box-shadow: 0 0.25rem 1.25rem rgba(0, 0, 0, 0.18);
+      touch-action: pan-y;
+      overscroll-behavior-x: none;
     }
 
     .viewer-slot {
@@ -123,14 +128,21 @@
       overflow: hidden;
     }
 
-    /* Estilo del visor 3D */
+    /* Estilo del visor 3D (v5.12: Filtro 0.95 en iOS | 0.87/0.88 en Android) */
     model-viewer {
       width: 100%;
       height: 100%;
       background: transparent;
-      filter: saturate(0.87) contrast(0.88);
       opacity: 0;
-      transition: opacity 0.4s ease;
+      transition: opacity 0.35s ease;
+    }
+
+    body.is-ios model-viewer {
+      filter: saturate(0.95) contrast(0.95);
+    }
+
+    body:not(.is-ios) model-viewer {
+      filter: saturate(0.87) contrast(0.88);
     }
 
     /* Flechas de navegación (-10% = 36px × 36px, font 23px) */
@@ -322,12 +334,17 @@
     .menu-list {
       position: relative;
       z-index: 10;
+      width: 100%;
       height: 100%;
+      overflow-x: hidden;
+      overflow-x: clip;
       overflow-y: auto;
       -webkit-overflow-scrolling: touch;
       list-style: none;
       padding: 0.8rem 0 0.8rem 0;
       scrollbar-width: none;
+      touch-action: pan-y;
+      overscroll-behavior-x: none;
     }
 
     .menu-list::-webkit-scrollbar {
@@ -803,7 +820,7 @@
       <!-- Lista completa de 15 platos -->
       <ul class="menu-list" id="menu-list">
         
-        <li class="menu-item active" data-index="01">
+        <li class="menu-item" data-index="01">
           <div class="glass-shadow"></div>
           <div class="caustic-bg"></div>
           <div class="glass-overlay">
@@ -1365,6 +1382,12 @@
 
   <script>
     document.addEventListener('DOMContentLoaded', () => {
+      // Detección infalible de SO (Blindaje de entorno)
+      const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+      if (isIOS) {
+        document.body.classList.add('is-ios');
+      }
+
       const menuList = document.getElementById('menu-list');
       const menuItems = Array.from(document.querySelectorAll('.menu-item'));
       const btnAr = document.getElementById('btn-ar');
@@ -1383,21 +1406,33 @@
         "Plato_13.glb", "Plato_14.glb", "Plato_15.glb"
       ];
 
-      // v5.05: Detección estricta: sólo restaura plato si proviene explícitamente de AR y no es una recarga manual
-      const navEntries = (window.performance && performance.getEntriesByType) ? performance.getEntriesByType('navigation') : [];
+      // v5.12: Handshake BFCache exclusivo para iOS (recarga total para purga de VRAM de cámara)
+      const navEntries = performance.getEntriesByType('navigation');
       const isReload = navEntries.length > 0 && navEntries[0].type === 'reload';
-
       const fromAR = sessionStorage.getItem('from_ar') === '1';
+      const isFromArReload = sessionStorage.getItem('from_ar_reload') === '1';
       let currentIndex = 0;
 
-      if (fromAR && !isReload) {
-        const saved = sessionStorage.getItem('modelo_actual');
-        if (saved !== null && !isNaN(parseInt(saved))) {
-          currentIndex = parseInt(saved);
-        }
-      } else {
+      if (isReload && !fromAR && !isFromArReload) {
+        // Recarga manual por el usuario: reseteo estricto a Plato 01 y purga de memoria de gestos
         sessionStorage.removeItem('modelo_actual');
         sessionStorage.removeItem('from_ar');
+        sessionStorage.removeItem('from_ar_reload');
+        sessionStorage.removeItem('mv_gesture_dismissed');
+        sessionStorage.removeItem('ar_gesture_dismissed');
+        currentIndex = 0;
+      } else if (isFromArReload || fromAR) {
+        // Retorno legítimo desde AR: recuperación exacta del plato seleccionado
+        sessionStorage.removeItem('from_ar_reload');
+        const saved = sessionStorage.getItem('modelo_actual');
+        if (saved !== null && !isNaN(parseInt(saved, 10))) {
+          currentIndex = parseInt(saved, 10);
+        }
+      } else {
+        // Apertura inicial limpia
+        sessionStorage.removeItem('modelo_actual');
+        sessionStorage.removeItem('from_ar');
+        currentIndex = 0;
       }
 
       // ======================================================================
@@ -1593,27 +1628,8 @@
       });
 
       // ======================================================================
-      // 6. PRECARGA VECINAL Y RECREACIÓN LIMPIA DOM
+      // 6. INSTANCIACIÓN Y GESTIÓN LIMPIA DEL VISOR 3D
       // ======================================================================
-      const prefetchedModels = new Set();
-
-      function preloadNeighborhood(currIdx) {
-        const prevIdx = (currIdx - 1 + models.length) % models.length;
-        const nextIdx = (currIdx + 1) % models.length;
-        [prevIdx, nextIdx].forEach(idx => {
-          const url = models[idx];
-          if (!prefetchedModels.has(url)) {
-            prefetchedModels.add(url);
-            const link = document.createElement('link');
-            link.rel = 'prefetch';
-            link.as = 'fetch';
-            link.href = url;
-            link.crossOrigin = 'anonymous';
-            document.head.appendChild(link);
-          }
-        });
-      }
-
       function destroyModelViewer() {
         if (viewerSlot) {
           viewerSlot.innerHTML = '';
@@ -1645,7 +1661,6 @@
 
         newMv.addEventListener('load', () => {
           newMv.style.opacity = '1';
-          preloadNeighborhood(currentIndex);
         }, { once: true });
 
         viewerSlot.appendChild(newMv);
@@ -1661,7 +1676,6 @@
         mv.setAttribute('src', models[currentIndex]);
         mv.addEventListener('load', () => {
           mv.style.opacity = '1';
-          preloadNeighborhood(currentIndex);
         }, { once: true });
       }
 
@@ -1670,7 +1684,8 @@
         menuList.classList.remove('has-expanded');
       }
 
-      function selectDish(index, shouldScroll = false) {
+      // v5.11 / v5.12: Restauración de selección v5.09 (cero saltos de lista en primer toque)
+      function selectDish(index, shouldScroll = false, triggerReaction = true) {
         if (index < 0 || index >= models.length) return;
         currentIndex = index;
 
@@ -1694,23 +1709,25 @@
         });
 
         updateModelViewer();
-        triggerChainReaction();
+        if (triggerReaction) {
+          triggerChainReaction();
+        }
       }
 
       prevDishBtn.addEventListener('click', (e) => {
         e.stopPropagation();
         const nextIdx = (currentIndex - 1 + models.length) % models.length;
-        selectDish(nextIdx, true);
+        selectDish(nextIdx, true, true);
       });
 
       nextDishBtn.addEventListener('click', (e) => {
         e.stopPropagation();
         const nextIdx = (currentIndex + 1) % models.length;
-        selectDish(nextIdx, true);
+        selectDish(nextIdx, true, true);
       });
 
       // ======================================================================
-      // 7. GESTIÓN DEL ICONO FLOTANTE EN MEMORIA TRANSIENTE (RESET AL REFRESCAR)
+      // 7. GESTIÓN DEL ICONO FLOTANTE CON MEMORIA DE SESIÓN (v5.12)
       // ======================================================================
       let hasInteractedWithMV = false;
       let hintTimer1 = null;
@@ -1721,6 +1738,7 @@
       function dismissGestureHint() {
         if (hasInteractedWithMV) return;
         hasInteractedWithMV = true;
+        sessionStorage.setItem('mv_gesture_dismissed', '1');
         clearTimeout(hintTimer1);
         clearTimeout(hintTimer2);
         clearTimeout(hintTimer3);
@@ -1732,6 +1750,13 @@
       }
 
       function initGestureHint() {
+        // v5.12: Si el usuario ya usó gestos en esta sesión, no volver a mostrar jamás
+        if (sessionStorage.getItem('mv_gesture_dismissed') === '1') {
+          hasInteractedWithMV = true;
+          if (gestureHint) gestureHint.remove();
+          return;
+        }
+
         if (hasInteractedWithMV || !gestureHint) {
           if (gestureHint) gestureHint.remove();
           return;
@@ -1751,6 +1776,7 @@
               hintTimer4 = setTimeout(() => {
                 gestureHint.classList.remove('visible');
                 hasInteractedWithMV = true;
+                sessionStorage.setItem('mv_gesture_dismissed', '1');
                 setTimeout(() => gestureHint.remove(), 400);
               }, 3000);
             }, 10000);
@@ -1764,7 +1790,7 @@
       initGestureHint();
 
       // ======================================================================
-      // 8. GESTOS TÁCTILES Y SELECCIÓN EN LA LISTA
+      // 8. GESTOS TÁCTILES Y SELECCIÓN EN LA LISTA (RESTAURACIÓN v5.09)
       // ======================================================================
       let touchStartY = 0;
       let touchStartX = 0;
@@ -1792,7 +1818,7 @@
           const isCurrentlyExpanded = item.classList.contains('expanded');
 
           if (isCurrentlyActive) {
-            // SEGUNDO TOQUE: Alterna Card
+            // SEGUNDO TOQUE: Alterna Card con desplazamiento suave centrado
             if (isCurrentlyExpanded) {
               collapseAllCards();
             } else {
@@ -1817,44 +1843,61 @@
               }, 110);
             }
           } else {
-            // PRIMER TOQUE: Selección simple y actualización de visor
-            selectDish(index, false);
+            // PRIMER TOQUE: Selección simple y actualización de visor (cero saltos de lista)
+            selectDish(index, false, true);
           }
         });
       });
 
       // ======================================================================
-      // 9. LANZAMIENTO HACIA AR Y RESTAURACIÓN LIMPIA AL VOLVER (CERO GLITCHES)
+      // 9. LANZAMIENTO HACIA AR Y RESTAURACIÓN LIMPIA AL VOLVER (v5.12)
       // ======================================================================
       btnAr.addEventListener('click', () => {
         sessionStorage.setItem('from_ar', '1');
         sessionStorage.setItem('modelo_actual', currentIndex);
-
-        // Destrucción total antes de navegar (libera VRAM y evita frame congelado)
-        destroyModelViewer();
-
         window.location.href = 'ar-world.html';
       });
 
-      window.addEventListener('pageshow', () => {
+      // v5.12: Handshake en pageshow para iOS (recarga limpia) y Android (continuidad directa)
+      window.addEventListener('pageshow', (e) => {
         const navigatedFromAR = sessionStorage.getItem('from_ar') === '1';
-        sessionStorage.removeItem('from_ar');
-
         if (navigatedFromAR) {
-          const saved = sessionStorage.getItem('modelo_actual');
-          if (saved !== null && !isNaN(parseInt(saved))) {
-            currentIndex = parseInt(saved);
+          sessionStorage.removeItem('from_ar');
+          if (isIOS) {
+            // Recarga obligatoria en Safari iOS para purgar VRAM de WebKit y levantar contexto nuevo
+            sessionStorage.setItem('from_ar_reload', '1');
+            window.location.reload();
+            return;
           }
+
+          // En Android: flujo directo sin recargas
+          const saved = sessionStorage.getItem('modelo_actual');
+          if (saved !== null && !isNaN(parseInt(saved, 10))) {
+            currentIndex = parseInt(saved, 10);
+          }
+          selectDish(currentIndex, false, false);
+          return;
         }
 
-        // Siempre instanciar un elemento model-viewer limpio sin memoria de canvas previa
-        createModelViewer();
-        selectDish(currentIndex, true);
+        if (e.persisted) {
+          const saved = sessionStorage.getItem('modelo_actual');
+          if (saved !== null && !isNaN(parseInt(saved, 10))) {
+            currentIndex = parseInt(saved, 10);
+          }
+          selectDish(currentIndex, false, false);
+        }
       });
 
-      // Arranque inicial
+      // Arranque inicial limpio: posicionado estático directo sin animaciones de scroll
       createModelViewer();
-      selectDish(currentIndex, false);
+      selectDish(currentIndex, false, false);
+
+      if ((fromAR || isFromArReload) && currentIndex > 0) {
+        const targetItem = menuItems[currentIndex];
+        if (targetItem) {
+          menuList.scrollTop = Math.max(0, targetItem.offsetTop - 10);
+        }
+      }
     });
   </script>
 </body>
