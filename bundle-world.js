@@ -1,4 +1,4 @@
-// 9th Wall v5.12
+// 9th Wall v5.14
 (() => {
   var e = {
     574() {
@@ -146,7 +146,7 @@
     const e = window.ecs;
 
     // [INMUTABLE - NO MODIFICAR BAJO NINGÚN CONCEPTO: ARRANQUE CINEMÁTICO INICIAL v4.53 / v5.00]
-    // v5.12: Spawner con retención de texturas en Android (15 FPS continuos sin caídas), blindaje de envMap, hundimiento proporcional completo (800ms) y aligerado de subida GPU en Metal iOS
+    // v5.14: Spawner con hundimiento proporcional completo (800ms), pausa de 5 frames en iOS antes de carga, texturas estándar nativas y blindaje sagrado de envMap
     e.registerComponent({
       name: "dish-spawner",
       schema: { prefab: "eid" },
@@ -160,7 +160,7 @@
         const opacityDuration = 800;   // v4.47: 800ms Opacidad rápida con presencia inmediata
         const totalSpinAngle = -Math.PI * 3; // -540° (1.5 vueltas completas en sentido horario)
 
-        // v5.12: Destrucción selectiva: en iOS se purgan texturas locales para no saturar Metal; en Android se conservan en memoria de GPU para mantener 15 FPS estables sin tirones
+        // v5.14: Destrucción selectiva con purga de mapas PBR locales (map, normal, roughness, metalness, ao) blindando estrictamente envMap
         const destruirMallaProfunda = (meshNode) => {
           if (!meshNode) return;
           meshNode.traverse((child) => {
@@ -170,7 +170,7 @@
                 if (child.material) {
                   const mats = Array.isArray(child.material) ? child.material : [child.material];
                   mats.forEach((m) => {
-                    const textureKeys = ['map', 'normalMap', 'roughnessMap'];
+                    const textureKeys = ['map', 'normalMap', 'roughnessMap', 'metalnessMap', 'aoMap'];
                     textureKeys.forEach(k => {
                       if (m[k] && m[k].isTexture && k !== 'envMap') {
                         m[k].dispose();
@@ -312,7 +312,7 @@
             };
             requestAnimationFrame(comprobarMallaLista);
           })
-          // v5.12: Cinemática completa de hundimiento (800ms) respetada íntegramente, retención de GPU en Android y subida ligera sin bloqueo en iOS
+          // v5.14: Cinemática completa de hundimiento (800ms), retiro previo, 5 frames limpios en iOS y carga estándar sin manipulación de mipmaps
           .listen(t.events.globalId, "switch-dish-model", ev => {
             if (!isPlaced || !spawnedEid || isTransitioning || !ev.data || !ev.data.modelSrc || !window.THREE) return;
             isTransitioning = true;
@@ -356,7 +356,7 @@
               if (sz.y > 0.01) dishHeight = sz.y;
             }
 
-            // 2. Cinemática de Hundimiento 800ms completa y 100% visible (sin cortes previos)
+            // 2. Cinemática de Hundimiento 800ms completa
             const sinkStartTime = performance.now();
             const sinkDuration = 800;
             const startY = dishPos.y;
@@ -403,21 +403,10 @@
                       newModel.rotation.set(0, 0, 0);
                       newModel.scale.set(1, 1, 1);
 
-                      // Sombras sobre Ground y aligerado de subida de texturas en iOS (sin mipmaps síncronos pesados)
+                      // Proyección de sombras sobre el Ground
                       newModel.traverse((c) => {
                         if (c.isMesh) {
                           c.castShadow = true;
-                          if (isIOS && c.material) {
-                            const mats = Array.isArray(c.material) ? c.material : [c.material];
-                            mats.forEach((m) => {
-                              ['map', 'normalMap', 'roughnessMap'].forEach((key) => {
-                                if (m[key] && m[key].isTexture) {
-                                  m[key].generateMipmaps = false;
-                                  m[key].minFilter = rInstance.LinearFilter;
-                                }
-                              });
-                            });
-                          }
                         }
                       });
 
@@ -450,8 +439,18 @@
                   }
                 };
 
+                // v5.14: Pausa limpia de 5 frames en iOS para vaciado de Metal antes de parsear nuevo modelo
                 if (isIOS) {
-                  requestAnimationFrame(ejecutarCarga);
+                  let framesWait = 5;
+                  const waitFrames = () => {
+                    framesWait--;
+                    if (framesWait <= 0) {
+                      ejecutarCarga();
+                    } else {
+                      requestAnimationFrame(waitFrames);
+                    }
+                  };
+                  requestAnimationFrame(waitFrames);
                 } else {
                   ejecutarCarga();
                 }
@@ -1131,12 +1130,19 @@
     delete i.history;
     delete i.historyVersion;
     const _idx = sessionStorage.getItem("modelo_actual");
-    const _models = [
+
+    // v5.14: Mapeo de modelos desde contents.js
+    const _cfg = window.MENU_CONFIG || {};
+    const _raw = _cfg.platos || [];
+    const _limit = _cfg.totalPlatos ? Math.min(_cfg.totalPlatos, _raw.length) : _raw.length;
+    const _platos = _raw.slice(0, _limit);
+    const _models = _platos.length > 0 ? _platos.map(p => p.archivoGLB) : [
       "Plato_01.glb", "Plato_02.glb", "Plato_03.glb", "Plato_04.glb",
       "Plato_05.glb", "Plato_06.glb", "Plato_07.glb", "Plato_08.glb",
       "Plato_09.glb", "Plato_10.glb", "Plato_11.glb", "Plato_12.glb",
       "Plato_13.glb", "Plato_14.glb", "Plato_15.glb"
     ];
+
     if (_idx !== null && parseInt(_idx) < _models.length) {
       i.objects["a02b4479-461e-40c2-ba91-0ccabbd1bd83"].gltfModel.src = {
         type: "asset",
