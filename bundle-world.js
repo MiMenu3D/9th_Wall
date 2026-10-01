@@ -1,4 +1,4 @@
-// 9th Wall v5.11
+// 9th Wall v5.12
 (() => {
   var e = {
     574() {
@@ -146,7 +146,7 @@
     const e = window.ecs;
 
     // [INMUTABLE - NO MODIFICAR BAJO NINGÚN CONCEPTO: ARRANQUE CINEMÁTICO INICIAL v4.53 / v5.00]
-    // v5.11: Spawner con blindaje absoluto de envMap global, renderLists intactas (15 FPS en Android), hundimiento proporcional y Frame Cero en Metal iOS
+    // v5.12: Spawner con retención de texturas en Android (15 FPS continuos sin caídas), blindaje de envMap, hundimiento proporcional completo (800ms) y aligerado de subida GPU en Metal iOS
     e.registerComponent({
       name: "dish-spawner",
       schema: { prefab: "eid" },
@@ -160,23 +160,25 @@
         const opacityDuration = 800;   // v4.47: 800ms Opacidad rápida con presencia inmediata
         const totalSpinAngle = -Math.PI * 3; // -540° (1.5 vueltas completas en sentido horario)
 
-        // v5.11: Destrucción profunda quirúrgica: se purgan geometrías y mapas locales, con blindaje estricto de envMap (nunca se destruye el cubemap de la escena)
+        // v5.12: Destrucción selectiva: en iOS se purgan texturas locales para no saturar Metal; en Android se conservan en memoria de GPU para mantener 15 FPS estables sin tirones
         const destruirMallaProfunda = (meshNode) => {
           if (!meshNode) return;
           meshNode.traverse((child) => {
             if (child.isMesh) {
-              if (child.geometry) child.geometry.dispose();
-              if (child.material) {
-                const mats = Array.isArray(child.material) ? child.material : [child.material];
-                mats.forEach((m) => {
-                  const textureKeys = ['map', 'normalMap', 'roughnessMap'];
-                  textureKeys.forEach(k => {
-                    if (m[k] && m[k].isTexture && k !== 'envMap') {
-                      m[k].dispose();
-                    }
+              if (isIOS) {
+                if (child.geometry) child.geometry.dispose();
+                if (child.material) {
+                  const mats = Array.isArray(child.material) ? child.material : [child.material];
+                  mats.forEach((m) => {
+                    const textureKeys = ['map', 'normalMap', 'roughnessMap'];
+                    textureKeys.forEach(k => {
+                      if (m[k] && m[k].isTexture && k !== 'envMap') {
+                        m[k].dispose();
+                      }
+                    });
+                    m.dispose();
                   });
-                  m.dispose();
-                });
+                }
               }
             }
           });
@@ -310,7 +312,7 @@
             };
             requestAnimationFrame(comprobarMallaLista);
           })
-          // v5.11: Hundimiento proporcional, retención de listas en GPU (Android 15 FPS) y Frame Cero en Metal iOS
+          // v5.12: Cinemática completa de hundimiento (800ms) respetada íntegramente, retención de GPU en Android y subida ligera sin bloqueo en iOS
           .listen(t.events.globalId, "switch-dish-model", ev => {
             if (!isPlaced || !spawnedEid || isTransitioning || !ev.data || !ev.data.modelSrc || !window.THREE) return;
             isTransitioning = true;
@@ -354,7 +356,7 @@
               if (sz.y > 0.01) dishHeight = sz.y;
             }
 
-            // 2. Cinemática de Hundimiento 800ms con EaseIn 100% opaco ocluido bajo el Hider
+            // 2. Cinemática de Hundimiento 800ms completa y 100% visible (sin cortes previos)
             const sinkStartTime = performance.now();
             const sinkDuration = 800;
             const startY = dishPos.y;
@@ -374,7 +376,7 @@
               if (progress < 1.0) {
                 requestAnimationFrame(animarHundimiento);
               } else {
-                // v5.11: Destrucción limpia del modelo saliente con blindaje de envMap
+                // Final del hundimiento (800ms transcurridos): retirada del modelo previo
                 const entityObj = (t.three && t.three.entityToObject) ? t.three.entityToObject.get(spawnedEid) : null;
 
                 if (entityObj) {
@@ -392,7 +394,6 @@
                   nodosBorrar.forEach(n => destruirMallaProfunda(n));
                 }
 
-                // v5.11: Estrategia 02 exclusiva para iOS: Frame Cero en Metal para vaciar asignaciones gráficas
                 const ejecutarCarga = () => {
                   if (loader) {
                     loader.load(ev.data.modelSrc, (gltf) => {
@@ -402,10 +403,21 @@
                       newModel.rotation.set(0, 0, 0);
                       newModel.scale.set(1, 1, 1);
 
-                      // Asegurar que el nuevo modelo proyecte sombras sobre Ground (Contact AO)
+                      // Sombras sobre Ground y aligerado de subida de texturas en iOS (sin mipmaps síncronos pesados)
                       newModel.traverse((c) => {
                         if (c.isMesh) {
                           c.castShadow = true;
+                          if (isIOS && c.material) {
+                            const mats = Array.isArray(c.material) ? c.material : [c.material];
+                            mats.forEach((m) => {
+                              ['map', 'normalMap', 'roughnessMap'].forEach((key) => {
+                                if (m[key] && m[key].isTexture) {
+                                  m[key].generateMipmaps = false;
+                                  m[key].minFilter = rInstance.LinearFilter;
+                                }
+                              });
+                            });
+                          }
                         }
                       });
 
