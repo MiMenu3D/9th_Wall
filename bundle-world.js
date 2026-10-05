@@ -1,4 +1,4 @@
-// 9th Wall v5.14
+﻿// 9th Wall v4.64
 (() => {
   var e = {
     574() {
@@ -30,9 +30,6 @@
     }
   },
   t = {};
-
-  // Detección infalible de entorno iOS
-  const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
 
   // Leemos el estado del interruptor debug persistido de forma transitoria
   const IS_DEBUG = sessionStorage.getItem("debug_features") === "true";
@@ -145,8 +142,8 @@
     a(574);
     const e = window.ecs;
 
-    // [INMUTABLE - NO MODIFICAR BAJO NINGÚN CONCEPTO: ARRANQUE CINEMÁTICO INICIAL v4.53 / v5.00]
-    // v5.14: Spawner con hundimiento proporcional completo (800ms), pausa de 5 frames en iOS antes de carga, texturas estándar nativas y blindaje sagrado de envMap
+    // [INMUTABLE - NO MODIFICAR BAJO NINGÚN CONCEPTO: ARRANQUE CINEMÁTICO INICIAL v4.53]
+    // v4.64: Spawner con hundimiento físico opaco, Contact AO garantizado, anclaje SLAM nativo y purga total de VRAM
     e.registerComponent({
       name: "dish-spawner",
       schema: { prefab: "eid" },
@@ -160,25 +157,32 @@
         const opacityDuration = 800;   // v4.47: 800ms Opacidad rápida con presencia inmediata
         const totalSpinAngle = -Math.PI * 3; // -540° (1.5 vueltas completas en sentido horario)
 
-        // v5.14: Destrucción selectiva con purga de mapas PBR locales (map, normal, roughness, metalness, ao) blindando estrictamente envMap
+        // Destrucción profunda de mallas, buffers y texturas PBR (VRAM = 0)
         const destruirMallaProfunda = (meshNode) => {
           if (!meshNode) return;
           meshNode.traverse((child) => {
             if (child.isMesh) {
-              if (isIOS) {
-                if (child.geometry) child.geometry.dispose();
-                if (child.material) {
-                  const mats = Array.isArray(child.material) ? child.material : [child.material];
-                  mats.forEach((m) => {
-                    const textureKeys = ['map', 'normalMap', 'roughnessMap', 'metalnessMap', 'aoMap'];
-                    textureKeys.forEach(k => {
-                      if (m[k] && m[k].isTexture && k !== 'envMap') {
-                        m[k].dispose();
-                      }
-                    });
-                    m.dispose();
+              if (child.geometry) child.geometry.dispose();
+              if (child.material) {
+                const mats = Array.isArray(child.material) ? child.material : [child.material];
+                mats.forEach((m) => {
+                  const textureKeys = [
+                    'map', 'normalMap', 'roughnessMap', 'metalnessMap',
+                    'aoMap', 'emissiveMap', 'lightMap', 'bumpMap',
+                    'displacementMap', 'alphaMap', 'envMap'
+                  ];
+                  textureKeys.forEach(k => {
+                    if (m[k] && m[k].isTexture) {
+                      m[k].dispose();
+                    }
                   });
-                }
+                  for (const key in m) {
+                    if (m[key] && m[key].isTexture) {
+                      m[key].dispose();
+                    }
+                  }
+                  m.dispose();
+                });
               }
             }
           });
@@ -188,7 +192,7 @@
         };
 
         const dispararCinematicaSpawn = (rootTarget, baseRotY = 0, targetScale = 1.0) => {
-          // Notificación de inicio de animación para el cronómetro Post-Listo y desvanecimiento de spinner
+          // v4.53: Notificación de inicio de animación para el cronómetro Post-Listo
           if (window.notificarSpawnIniciado) {
             window.notificarSpawnIniciado();
           }
@@ -254,7 +258,7 @@
                 m.needsUpdate = true;
               });
 
-              // Desbloqueo de las flechas y montaje de controles secundarios al finalizar la cinemática
+              // v4.64: Desbloqueo de las flechas únicamente al finalizar la cinemática completa
               if (window.notificarSpawnFinalizado) {
                 window.notificarSpawnFinalizado();
               }
@@ -264,7 +268,6 @@
         };
 
         i("initial").initial()
-          // Sondeo directo v4.64 restaurado: asegura la aplicación de shaders y arranca la cinemática sin saltos
           .listen(t.events.globalId, "auto-place-dish", ev => {
             if (isPlaced) return;
             if (!ev.data || !ev.data.worldPosition) return;
@@ -287,7 +290,7 @@
 
             let animationStarted = false;
 
-            // Sondeo directo v4.53 / v4.64: asegura la aplicación de shaders y arranca la cinemática sin bloqueos
+            // Sondeo directo v4.53: asegura la aplicación de shaders y arranca la cinemática sin bloqueos
             const comprobarMallaLista = () => {
               if (animationStarted) return;
               let encontrada = false;
@@ -312,7 +315,7 @@
             };
             requestAnimationFrame(comprobarMallaLista);
           })
-          // v5.14: Cinemática completa de hundimiento (800ms), retiro previo, 5 frames limpios en iOS y carga estándar sin manipulación de mipmaps
+          // v4.64: Hundimiento opaco, anclaje SLAM, sombras Contact AO y purga exhaustiva de VRAM
           .listen(t.events.globalId, "switch-dish-model", ev => {
             if (!isPlaced || !spawnedEid || isTransitioning || !ev.data || !ev.data.modelSrc || !window.THREE) return;
             isTransitioning = true;
@@ -356,7 +359,7 @@
               if (sz.y > 0.01) dishHeight = sz.y;
             }
 
-            // 2. Cinemática de Hundimiento 800ms completa
+            // 2. Cinemática de Hundimiento 800ms con EaseIn 100% opaco ocluido bajo el Hider
             const sinkStartTime = performance.now();
             const sinkDuration = 800;
             const startY = dishPos.y;
@@ -376,83 +379,66 @@
               if (progress < 1.0) {
                 requestAnimationFrame(animarHundimiento);
               } else {
-                // Final del hundimiento (800ms transcurridos): retirada del modelo previo
-                const entityObj = (t.three && t.three.entityToObject) ? t.three.entityToObject.get(spawnedEid) : null;
+                if (loader) {
+                  loader.load(ev.data.modelSrc, (gltf) => {
+                    // API Oficial 8th Wall ECS: Obtener el Object3D de la entidad
+                    const entityObj = (t.three && t.three.entityToObject) ? t.three.entityToObject.get(spawnedEid) : null;
 
-                if (entityObj) {
-                  while (entityObj.children.length > 0) {
-                    const childNode = entityObj.children[0];
-                    destruirMallaProfunda(childNode);
-                  }
-                } else if (t.three && t.three.scene) {
-                  const nodosBorrar = [];
-                  t.three.scene.traverse((child) => {
-                    if (child.name === "Model" || (child.isMesh && child.name !== "Ground" && child.name !== "Hider" && (!child.material || (child.material.type !== 'ShadowMaterial' && child.material.colorWrite !== false)))) {
-                      nodosBorrar.push(child);
-                    }
-                  });
-                  nodosBorrar.forEach(n => destruirMallaProfunda(n));
-                }
-
-                const ejecutarCarga = () => {
-                  if (loader) {
-                    loader.load(ev.data.modelSrc, (gltf) => {
-                      const newModel = gltf.scene;
-                      newModel.name = "Model";
-                      newModel.position.set(0, 0, 0);
-                      newModel.rotation.set(0, 0, 0);
-                      newModel.scale.set(1, 1, 1);
-
-                      // Proyección de sombras sobre el Ground
-                      newModel.traverse((c) => {
-                        if (c.isMesh) {
-                          c.castShadow = true;
+                    // Limpieza profunda de los hijos de la entidad anterior (VRAM = 0)
+                    if (entityObj) {
+                      while (entityObj.children.length > 0) {
+                        const childNode = entityObj.children[0];
+                        destruirMallaProfunda(childNode);
+                      }
+                    } else if (t.three && t.three.scene) {
+                      const nodosBorrar = [];
+                      t.three.scene.traverse((child) => {
+                        if (child.name === "Model" || (child.isMesh && child.name !== "Ground" && child.name !== "Hider" && (!child.material || (child.material.type !== 'ShadowMaterial' && child.material.colorWrite !== false)))) {
+                          nodosBorrar.push(child);
                         }
                       });
+                      nodosBorrar.forEach(n => destruirMallaProfunda(n));
+                    }
 
-                      // Emparentamiento directo en el Object3D de la entidad ECS
-                      if (entityObj) {
-                        entityObj.add(newModel);
-                      } else if (t.three && t.three.scene) {
-                        t.three.scene.add(newModel);
+                    const newModel = gltf.scene;
+                    newModel.name = "Model";
+                    newModel.position.set(0, 0, 0);
+                    newModel.rotation.set(0, 0, 0);
+                    newModel.scale.set(1, 1, 1);
+
+                    // v4.64: Asegurar que el nuevo modelo proyecte sombras sobre Ground (Contact AO)
+                    newModel.traverse((c) => {
+                      if (c.isMesh) {
+                        c.castShadow = true;
                       }
-
-                      // Reposicionar la entidad ECS en la superficie
-                      t.transform.setWorldPosition(spawnedEid, { x: dishPos.x, y: 0.001, z: dishPos.z });
-                      e.Scale.set(t, spawnedEid, { x: 0.001, y: 0.001, z: 0.001 });
-                      t.getEntity(spawnedEid).set(e.Quaternion, e.math.quat.yRadians(currentRotY));
-
-                      t.events.dispatch(spawnedEid, "recalc-bounding-box");
-
-                      if (window.aplicarAjustesSceneViewer) {
-                        window.aplicarAjustesSceneViewer(t.three.scene);
-                      }
-
-                      dispararCinematicaSpawn(spawnedEid, currentRotY, currentScale);
-                    }, undefined, () => {
-                      isTransitioning = false;
-                      if (window.notificarSpawnFinalizado) window.notificarSpawnFinalizado();
                     });
-                  } else {
+
+                    // Emparentamiento directo en el Object3D de la entidad ECS
+                    if (entityObj) {
+                      entityObj.add(newModel);
+                    } else if (t.three && t.three.scene) {
+                      t.three.scene.add(newModel);
+                    }
+
+                    // Reposicionar la entidad ECS en la superficie
+                    t.transform.setWorldPosition(spawnedEid, { x: dishPos.x, y: 0.001, z: dishPos.z });
+                    e.Scale.set(t, spawnedEid, { x: 0.001, y: 0.001, z: 0.001 });
+                    t.getEntity(spawnedEid).set(e.Quaternion, e.math.quat.yRadians(currentRotY));
+
+                    t.events.dispatch(spawnedEid, "recalc-bounding-box");
+
+                    if (window.aplicarAjustesSceneViewer) {
+                      window.aplicarAjustesSceneViewer(t.three.scene);
+                    }
+
+                    dispararCinematicaSpawn(spawnedEid, currentRotY, currentScale);
+                  }, undefined, () => {
                     isTransitioning = false;
                     if (window.notificarSpawnFinalizado) window.notificarSpawnFinalizado();
-                  }
-                };
-
-                // v5.14: Pausa limpia de 5 frames en iOS para vaciado de Metal antes de parsear nuevo modelo
-                if (isIOS) {
-                  let framesWait = 5;
-                  const waitFrames = () => {
-                    framesWait--;
-                    if (framesWait <= 0) {
-                      ejecutarCarga();
-                    } else {
-                      requestAnimationFrame(waitFrames);
-                    }
-                  };
-                  requestAnimationFrame(waitFrames);
+                  });
                 } else {
-                  ejecutarCarga();
+                  isTransitioning = false;
+                  if (window.notificarSpawnFinalizado) window.notificarSpawnFinalizado();
                 }
               }
             };
@@ -487,7 +473,7 @@
         reticleLocalCenterZ = 0,
         bboxCalculated = false;
 
-        // Medición de dimensiones estricta v4.53 con filtrado riguroso por nombre y tipo de material
+        // v4.58: Medición de dimensiones estricta v4.53 con filtrado riguroso por nombre y tipo de material
         const actualizarBoundingBox = (THREE_INSTANCE) => {
           if (bboxCalculated || !t.three || !t.three.scene) return;
 
@@ -545,7 +531,7 @@
             unifiedBox.getCenter(ctr);
 
             if (sz.x > 0.05 && sz.z > 0.05 && sz.x < 2.5 && sz.z < 2.5) {
-              // Ajuste ceñido exacto (+1.2cm holgura periférica real)
+              // v4.53: Ajuste ceñido exacto (+1.2cm holgura periférica real)
               bboxSizeX = sz.x + 0.012;
               bboxSizeZ = sz.z + 0.012;
               reticleLocalCenterX = ctr.x;
@@ -555,7 +541,7 @@
           }
         };
 
-        // Sincronización ultraligera 60 FPS en GPU con offsetRotated v4.53
+        // v4.58: Sincronización ultraligera 60 FPS en GPU con offsetRotated v4.53
         const sincronizarTransformReticula = (ret, THREE_INSTANCE) => {
           if (!ret || !THREE_INSTANCE) return;
 
@@ -577,7 +563,7 @@
           ret.scale.set(currentScale, currentScale, currentScale);
         };
 
-        // Obtención con caché estable: creación única por gesto y actualización por matrices continuas
+        // v4.53: Obtención con caché estable: creación única por gesto y actualización por matrices continuas
         const obtenerReticula = (THREE_INSTANCE, scene) => {
           if (reticleMesh) {
             sincronizarTransformReticula(reticleMesh, THREE_INSTANCE);
@@ -647,7 +633,7 @@
               return;
             }
 
-            // Invalidación limpia al inicio del toque para recalcular medidas frescas sin impacto durante el arrastre
+            // v4.53: Invalidación limpia al inicio del toque para recalcular medidas frescas sin impacto durante el arrastre
             if (reticleMesh && t.three && t.three.scene) {
               t.three.scene.remove(reticleMesh);
               if (reticleMesh.geometry) reticleMesh.geometry.dispose();
@@ -723,7 +709,7 @@
                 const rInstance = window.THREE;
 
                 if (rInstance) {
-                  // Caída vertical y bamboleo físico con elevación de seguridad de 8mm (+0.008) anti-clipping
+                  // v4.53: Caída vertical y bamboleo físico con elevación de seguridad de 8mm (+0.008) anti-clipping
                   const wobbleDuration = 1200;
                   const wobbleStartTime = performance.now();
                   const startY = n.y;
@@ -1130,19 +1116,12 @@
     delete i.history;
     delete i.historyVersion;
     const _idx = sessionStorage.getItem("modelo_actual");
-
-    // v5.14: Mapeo de modelos desde contents.js
-    const _cfg = window.MENU_CONFIG || {};
-    const _raw = _cfg.platos || [];
-    const _limit = _cfg.totalPlatos ? Math.min(_cfg.totalPlatos, _raw.length) : _raw.length;
-    const _platos = _raw.slice(0, _limit);
-    const _models = _platos.length > 0 ? _platos.map(p => p.archivoGLB) : [
+    const _models = [
       "Plato_01.glb", "Plato_02.glb", "Plato_03.glb", "Plato_04.glb",
       "Plato_05.glb", "Plato_06.glb", "Plato_07.glb", "Plato_08.glb",
       "Plato_09.glb", "Plato_10.glb", "Plato_11.glb", "Plato_12.glb",
       "Plato_13.glb", "Plato_14.glb", "Plato_15.glb"
     ];
-
     if (_idx !== null && parseInt(_idx) < _models.length) {
       i.objects["a02b4479-461e-40c2-ba91-0ccabbd1bd83"].gltfModel.src = {
         type: "asset",
