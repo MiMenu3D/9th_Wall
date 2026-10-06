@@ -1,26 +1,29 @@
-<!-- Versión: 9th_Design v5.00 -->
+<!-- Versión: 9th_Design v5.15 -->
 <!DOCTYPE html>
 <html lang="es">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
   
   <meta name="theme-color" content="#040507">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   
-  <title>Menú 3D - Luxury Ceramic</title>
+  <title>Menú 3D - Development</title>
 
   <!-- Google Fonts: Fredoka Variable -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Fredoka:wdth,wght@75..125,300..600&display=swap" rel="stylesheet">
 
+  <!-- Archivo de Contenidos Centralizado v5.15 -->
+  <script src="contents.js"></script>
+
   <!-- Model Viewer Oficial de Google -->
   <script type="module" src="https://unpkg.com/@google/model-viewer/dist/model-viewer.min.js"></script>
 
   <style>
     /* ==========================================================================
-       1. RESET Y VARIABLES GLOBALES
+       1. RESET Y VARIABLES GLOBALES (BLOQUEO ESTRICTO DE SCROLL HORIZONTAL)
        ========================================================================== */
     *, *::before, *::after {
       box-sizing: border-box;
@@ -47,6 +50,37 @@
       color: var(--color-text-active);
       font-family: var(--font-fredoka);
       overflow: hidden;
+      position: fixed;
+      inset: 0;
+      overscroll-behavior-x: none;
+      touch-action: pan-y;
+      color-scheme: dark;
+    }
+
+    /* Bloqueador visual para posición vertical (Landscape Warning) */
+    #orientationBlocker {
+      display: none;
+      position: fixed;
+      inset: 0;
+      width: 100vw;
+      height: 100vh;
+      background: #040507;
+      z-index: 1000005;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      color: white;
+      font-family: var(--font-fredoka);
+      text-align: center;
+      padding: 24px;
+      box-sizing: border-box;
+      pointer-events: auto;
+    }
+
+    @media screen and (orientation: landscape) {
+      #orientationBlocker {
+        display: flex;
+      }
     }
 
     /* ==========================================================================
@@ -58,10 +92,14 @@
       max-width: 30rem;
       height: 100dvh;
       margin: 0 auto;
-      overflow: hidden;
+      overflow-x: hidden;
+      overflow-x: clip;
+      overflow-y: hidden;
       display: flex;
       flex-direction: column;
       background-color: var(--color-bg-base);
+      touch-action: pan-y;
+      overscroll-behavior-x: none;
     }
 
     /* ==========================================================================
@@ -91,29 +129,39 @@
       overflow: hidden;
     }
 
-    /* Estilo del visor 3D */
+    /* Estilo del visor 3D (v5.15: Aislamiento visual optimizado en iOS sin distorsión de escala) */
     model-viewer {
       width: 100%;
       height: 100%;
       background: transparent;
-      filter: saturate(0.87) contrast(0.88);
       opacity: 0;
-      transition: opacity 0.4s ease;
+      transition: opacity 0.35s ease;
     }
 
-    /* Flechas de navegación (Diseño idéntico a AR) */
+    body.is-ios model-viewer {
+      filter: saturate(0.95) contrast(0.95);
+    }
+
+    body:not(.is-ios) model-viewer {
+      filter: saturate(0.87) contrast(0.88);
+      transform: translateZ(0);
+      will-change: filter, transform;
+      backface-visibility: hidden;
+    }
+
+    /* Flechas de navegación (-10% = 36px × 36px, font 23px) */
     .ar-nav-arrow {
       position: absolute;
       top: 50%;
       transform: translateY(-50%);
-      width: 40px;
-      height: 40px;
+      width: 36px;
+      height: 36px;
       border-radius: 50%;
       background: rgba(255, 255, 255, 0.25);
       border: 1px solid rgba(255, 255, 255, 0.4);
       color: white;
       font-family: sans-serif;
-      font-size: 26px;
+      font-size: 23px;
       line-height: 1;
       display: flex;
       align-items: center;
@@ -131,7 +179,7 @@
       transform: translateY(-50%) scale(0.92);
     }
 
-    /* Icono flotante indicador de interacción táctil */
+    /* Icono flotante indicador de gestos (-15% = 39px) */
     .gesture-hint-overlay {
       position: absolute;
       inset: 0;
@@ -147,16 +195,16 @@
       opacity: 1;
     }
     .gesture-hint-icon {
-      width: 54px;
-      height: 54px;
+      width: 39px;
+      height: 39px;
       filter: drop-shadow(0 2px 8px rgba(0,0,0,0.6));
       animation: gestureSweep 2.2s ease-in-out infinite;
     }
     @keyframes gestureSweep {
-      0% { transform: scale(0.92) translateX(-22px) rotate(-7deg); opacity: 0.85; }
+      0% { transform: scale(0.92) translateX(-19px) rotate(-7deg); opacity: 0.85; }
       40% { transform: scale(1.0) translateX(0px) rotate(0deg); opacity: 1; }
-      70% { transform: scale(0.98) translateX(22px) rotate(7deg); opacity: 0.95; }
-      100% { transform: scale(0.92) translateX(-22px) rotate(-7deg); opacity: 0.85; }
+      70% { transform: scale(0.98) translateX(19px) rotate(7deg); opacity: 0.95; }
+      100% { transform: scale(0.92) translateX(-19px) rotate(-7deg); opacity: 0.85; }
     }
 
     /* Botón "Ver en tu mesa" */
@@ -193,7 +241,7 @@
     }
 
     /* ==========================================================================
-       4. ZONA INFERIOR: CERÁMICA 3D (40% AZULADO + ARRANQUE ILUMINADO 225°)
+       4. ZONA INFERIOR: CERÁMICA 3D (3 CAPAS CON +5% ESCALA Y LUZ A 225°)
        ========================================================================== */
     .menu-section {
       position: relative;
@@ -220,15 +268,16 @@
       top: 50%;
       left: 50%;
       transform-origin: center center;
+      transform: translate(-50%, -50%) rotate(225deg) scale(1);
       will-change: transform;
       background: linear-gradient(90deg, #CCD6E0 0%, #DCE4EC 25%, #E8EFF5 50%, #F5F8FA 78%, #FFFFFF 100%);
     }
 
-    /* CAPA 1: Terraza central */
+    /* CAPA 1: Terraza central (+5% escala: 16.73rem × 12.53rem) */
     .layer-1 {
-      width: 15.9375rem;
-      height: 11.9375rem;
-      border-radius: 2.75rem;
+      width: 16.734rem;
+      height: 12.534rem;
+      border-radius: 2.8875rem;
       z-index: 5;
       box-shadow: 
         0.5rem 0.875rem 1.5rem rgba(18, 25, 40, 0.08),
@@ -237,11 +286,11 @@
         inset 0.75rem 0.75rem 2rem rgba(165, 180, 198, 0.35);
     }
 
-    /* CAPA 2: Terraza 1 */
+    /* CAPA 2: Terraza 1 (+5% escala: 22.51rem × 18.375rem) */
     .layer-2 {
-      width: 21.4375rem;
-      height: 17.5rem;
-      border-radius: 5rem;
+      width: 22.51rem;
+      height: 18.375rem;
+      border-radius: 5.25rem;
       z-index: 4;
       box-shadow: 
         0.75rem 1.125rem 1.875rem rgba(18, 25, 40, 0.065),
@@ -250,30 +299,17 @@
         inset 1rem 1rem 2.5rem rgba(165, 180, 198, 0.30);
     }
 
-    /* CAPA 3: Terraza 2 */
+    /* CAPA 3: Terraza 2 (+5% escala: 28.35rem × 24.15rem) */
     .layer-3 {
-      width: 27rem;
-      height: 23rem;
-      border-radius: 7.75rem;
+      width: 28.35rem;
+      height: 24.15rem;
+      border-radius: 8.1375rem;
       z-index: 3;
       box-shadow: 
         1rem 1.5rem 2.375rem rgba(18, 25, 40, 0.05),
         0.25rem 0.4375rem 0.875rem rgba(18, 25, 40, 0.02),
         inset -1.25rem -1.25rem 3rem rgba(255, 255, 255, 0.80),
         inset 1.25rem 1.25rem 3rem rgba(165, 180, 198, 0.25);
-    }
-
-    /* CAPA 4: Base exterior */
-    .layer-4 {
-      width: 32.5rem;
-      height: 28.5rem;
-      border-radius: 10.5rem;
-      z-index: 2;
-      box-shadow: 
-        1.375rem 2rem 3.125rem rgba(18, 25, 40, 0.04),
-        0.375rem 0.625rem 1.125rem rgba(18, 25, 40, 0.015),
-        inset -1.5rem -1.5rem 3.5rem rgba(255, 255, 255, 0.75),
-        inset 1.5rem 1.5rem 3.5rem rgba(165, 180, 198, 0.20);
     }
 
     /* Fades de scroll */
@@ -297,24 +333,29 @@
     }
 
     /* ==========================================================================
-       5. LISTA DE PLATOS Y CARD FLUIDA (ACCELERACIÓN GPU PURA + BLUR SANTO GRIAL)
+       5. LISTA DE PLATOS Y CARD FLUIDA (BLUR A 6px)
        ========================================================================== */
     .menu-list {
       position: relative;
       z-index: 10;
+      width: 100%;
       height: 100%;
+      overflow-x: hidden;
+      overflow-x: clip;
       overflow-y: auto;
       -webkit-overflow-scrolling: touch;
       list-style: none;
       padding: 0.8rem 0 0.8rem 0;
       scrollbar-width: none;
+      touch-action: pan-y;
+      overscroll-behavior-x: none;
     }
 
     .menu-list::-webkit-scrollbar {
       display: none;
     }
 
-    /* Inyección dinámica matemática de altura (calc(60dvh - 3.25rem)) para scroll sin topes físicos */
+    /* Inyección dinámica matemática de altura (INMUTABLE) */
     .menu-list.has-expanded {
       padding-bottom: calc(60dvh - 3.25rem) !important;
     }
@@ -337,7 +378,7 @@
       margin: 0;
     }
 
-    /* 1. SOMBRA AMBIENTAL BAJO EL CRISTAL */
+    /* 1. SOMBRA AMBIENTAL (CONTRACCIÓN HORIZONTAL INSTANTÁNEA 0.06s) */
     .glass-shadow {
       position: absolute;
       left: 2rem;
@@ -350,7 +391,7 @@
       box-shadow: 
         0 0.875rem 1.75rem rgba(18, 25, 40, 0.12),
         0 0.25rem 0.625rem rgba(18, 25, 40, 0.06);
-      transition: opacity 0.35s var(--ease-webflow), right 0.18s var(--ease-webflow), border-radius 0.18s var(--ease-webflow);
+      transition: opacity 0.35s var(--ease-webflow), right 0.06s ease-out, border-radius 0.06s ease-out;
       z-index: 2;
     }
 
@@ -393,7 +434,7 @@
       bottom: -0.5rem;
     }
 
-    /* 3. CRISTAL LÍQUIDO (BLUR 8px BLINDADO SOBRE CERÁMICA) */
+    /* 3. CRISTAL LÍQUIDO (BLUR 6px + CONTRACCIÓN 0.06s) */
     .glass-overlay {
       position: absolute;
       left: 2rem;
@@ -407,8 +448,8 @@
         rgba(255, 255, 255, 0.18) 55%, 
         rgba(255, 255, 255, 0.03) 100%
       );
-      backdrop-filter: blur(8px);
-      -webkit-backdrop-filter: blur(8px);
+      backdrop-filter: blur(6px);
+      -webkit-backdrop-filter: blur(6px);
       opacity: 0;
       pointer-events: none;
       overflow: hidden;
@@ -416,7 +457,7 @@
         0 0.5rem 1.5rem rgba(18, 25, 40, 0.06),
         inset 0.09375rem 0.125rem 0.1875rem rgba(255, 255, 255, 0.92),
         inset -0.09375rem -0.125rem 0.25rem rgba(18, 25, 40, 0.04);
-      transition: opacity 0.35s var(--ease-webflow), right 0.18s var(--ease-webflow), border-radius 0.18s var(--ease-webflow);
+      transition: opacity 0.35s var(--ease-webflow), right 0.06s ease-out, border-radius 0.06s ease-out;
       z-index: 5;
     }
 
@@ -565,7 +606,7 @@
       width: 2.8rem;
     }
 
-    /* ICONO "MÁS INFO" (3 BARRAS APILADAS) */
+    /* ICONO "MÁS INFO" (ANIMACIÓN SIMÉTRICA REVERSIBLE EN 0.18s) */
     .more-info-icon {
       position: absolute;
       display: flex;
@@ -577,7 +618,8 @@
       height: 1.4rem;
       opacity: 0;
       pointer-events: none;
-      transition: opacity 0.18s ease-out, transform 0.18s ease-out;
+      transform: scale(1);
+      transition: opacity 0.18s var(--ease-webflow), transform 0.18s var(--ease-webflow);
     }
 
     .more-info-icon .bar {
@@ -589,12 +631,13 @@
 
     .menu-item.active .more-info-icon {
       opacity: 0.80;
+      transform: scale(1);
     }
 
     .menu-item.expanded .more-info-icon {
       opacity: 0;
       transform: scale(0.6);
-      transition: opacity 0.06s ease-out, transform 0.06s ease-out;
+      transition: opacity 0.18s var(--ease-webflow), transform 0.18s var(--ease-webflow);
     }
 
     /* CUERPO DEL CARD */
@@ -621,13 +664,14 @@
       height: 8.8rem;
     }
 
+    /* v5.05: Fade superior recortado a la mitad de altura (~6% arriba frente a 28% abajo) */
     .card-scroll-wrap {
       height: 100%;
       overflow-y: auto;
       padding-right: 1.6rem;
       padding-bottom: 2.6rem;
-      -webkit-mask-image: linear-gradient(to bottom, black 0%, black 72%, transparent 100%);
-      mask-image: linear-gradient(to bottom, black 0%, black 72%, transparent 100%);
+      -webkit-mask-image: linear-gradient(to bottom, transparent 0%, black 6%, black 72%, transparent 100%);
+      mask-image: linear-gradient(to bottom, transparent 0%, black 6%, black 72%, transparent 100%);
       scrollbar-width: none;
     }
 
@@ -635,16 +679,31 @@
       display: none;
     }
 
-    /* PISTA Y ESFERA BLANCA */
+    /* PISTA CON LÍNEA GUÍA OSCURA */
     .card-scroll-track {
       position: absolute;
       right: 0.3rem;
       top: 0.2rem;
       bottom: 2.6rem;
       width: 0.6rem;
-      pointer-events: none;
+      pointer-events: auto;
+      touch-action: none;
+      cursor: pointer;
     }
 
+    .card-scroll-track::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      bottom: 0;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 0.10rem;
+      background-color: rgba(0, 0, 0, 0.14);
+      border-radius: 0.05rem;
+    }
+
+    /* v5.05: Bolita con área táctil ampliada al triple (~36px) mediante pseudo-elemento */
     .card-scroll-dot {
       width: 0.58rem;
       height: 0.58rem;
@@ -658,6 +717,20 @@
       left: 50%;
       transform: translate(-50%, 0);
       will-change: transform;
+      cursor: pointer;
+      pointer-events: auto;
+      touch-action: none;
+    }
+
+    .card-scroll-dot::after {
+      content: '';
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      width: 2.25rem;
+      height: 2.25rem;
+      border-radius: 50%;
     }
 
     /* TEXTO DESCRIPTIVO */
@@ -675,7 +748,7 @@
     .card-price {
       position: absolute;
       right: 3.2rem;
-      bottom: 1.2rem;
+      bottom: calc(1.2rem - 10px);
       font-size: 2.10rem;
       font-family: var(--font-fredoka);
       font-variation-settings: "wdth" 105, "wght" 300;
@@ -697,56 +770,48 @@
 </head>
 <body>
 
+  <!-- Bloqueador visual para posición vertical (Landscape Warning) -->
+  <div id="orientationBlocker">
+    <svg viewBox="0 0 24 24" width="48" height="48" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-bottom:16px;">
+      <rect x="5" y="2" width="14" height="20" rx="2" ry="2"></rect>
+      <line x1="12" y1="18" x2="12.01" y2="18"></line>
+      <path d="M17 6h2a2 2 0 0 1 2 2v2"></path>
+      <path d="M7 6H5a2 2 0 0 0-2 2v2"></path>
+    </svg>
+    <div style="font-size:18px; font-weight:bold; margin-bottom:8px;">Gira tu dispositivo</div>
+    <div style="font-size:14px; opacity:0.8;">Por favor, coloca el teléfono en posición vertical para continuar.</div>
+  </div>
+
   <main class="app-container">
 
-    <!-- ZONA SUPERIOR: Visor 3D reservado + Botón AR + Flechas AR -->
+    <!-- ZONA SUPERIOR: Visor 3D dinámico + Botón AR + Flechas AR -->
     <section class="viewer-section" id="viewerSection">
       
-      <!-- Flechas de navegación (idénticas a ar-world.html) -->
+      <!-- Flechas de navegación (-10% escala = 36px) -->
       <button id="prevDishBtn" class="ar-nav-arrow" style="left:12px;" aria-label="Plato anterior">&#8249;</button>
       <button id="nextDishBtn" class="ar-nav-arrow" style="right:12px;" aria-label="Plato siguiente">&#8250;</button>
 
       <!-- Slot dinámico para model-viewer -->
-      <div class="viewer-slot" id="viewerSlot">
-        <model-viewer
-          id="mv"
-          src="Plato_01.glb"
-          autoplay
-          auto-rotate
-          auto-rotate-delay="0"
-          rotation-per-second="17deg"
-          camera-orbit="0deg 70deg 45%"
-          min-camera-orbit="0deg 0deg 45%"
-          max-camera-orbit="360deg 90deg 45%"
-          camera-controls="false"
-          touch-action="none"
-          disable-pan
-          disable-zoom
-          interaction-prompt="none"
-          shadow-intensity="0.4"
-          exposure="0.80">
-        </model-viewer>
+      <div class="viewer-slot" id="viewerSlot"></div>
 
-        <!-- Icono flotante con animación suave de barrido -->
-        <div class="gesture-hint-overlay" id="gestureHint">
-          <svg viewBox="0 0 48 48" fill="none" class="gesture-hint-icon">
-            <path d="M19 16V9a3 3 0 0 1 6 0v12" stroke="#FFFFFF" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
-            <path d="M25 19a3 3 0 0 1 6 0v2" stroke="#FFFFFF" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
-            <path d="M31 20a3 3 0 0 1 6 0v4c0 7-5 13-12 13s-11-5-11-10v-5a3 3 0 0 1 6 0v-2" stroke="#FFFFFF" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
-            <path d="M12 28a16 16 0 0 1 24 0" stroke="#00e5ff" stroke-width="2" stroke-linecap="round" stroke-dasharray="2 3" opacity="0.85"/>
-          </svg>
-        </div>
+      <!-- Icono flotante con animación de barrido (-15% escala = 39px) -->
+      <div class="gesture-hint-overlay" id="gestureHint">
+        <svg viewBox="0 0 48 48" fill="none" class="gesture-hint-icon">
+          <path d="M19 16V9a3 3 0 0 1 6 0v12" stroke="#FFFFFF" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+          <path d="M25 19a3 3 0 0 1 6 0v2" stroke="#FFFFFF" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+          <path d="M31 20a3 3 0 0 1 6 0v4c0 7-5 13-12 13s-11-5-11-10v-5a3 3 0 0 1 6 0v-2" stroke="#FFFFFF" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+          <path d="M12 28a16 16 0 0 1 24 0" stroke="#00e5ff" stroke-width="2" stroke-linecap="round" stroke-dasharray="2 3" opacity="0.85"/>
+        </svg>
       </div>
 
       <button type="button" class="btn-ar" id="btn-ar"><span>Ver en tu mesa</span></button>
     </section>
 
-    <!-- ZONA INFERIOR: Topografía Cerámica 3D y Menú -->
+    <!-- ZONA INFERIOR: Topografía Cerámica 3D (3 Capas al +5%) y Menú -->
     <section class="menu-section">
       
-      <!-- 4 Terrazas de Cerámica Concéntricas -->
+      <!-- 3 Terrazas de Cerámica Concéntricas -->
       <div class="ceramic-viewport" id="ceramic-viewport">
-        <div class="ceramic-layer layer-4"></div>
         <div class="ceramic-layer layer-3"></div>
         <div class="ceramic-layer layer-2"></div>
         <div class="ceramic-layer layer-1"></div>
@@ -756,608 +821,130 @@
       <div class="fade-top"></div>
       <div class="fade-bottom"></div>
 
-      <!-- Lista completa de 15 platos -->
-      <ul class="menu-list" id="menu-list">
-        
-        <li class="menu-item active" data-index="01">
-          <div class="glass-shadow"></div>
-          <div class="caustic-bg"></div>
-          <div class="glass-overlay">
-            <div class="caustic-glass"></div>
-            <div class="specular-top"></div>
-            <div class="specular-bottom"></div>
-          </div>
-          <div class="red-indicator"></div>
-          <div class="item-wrapper">
-            <div class="item-header">
-              <span class="item-number">01</span>
-              <span class="item-name">Ensalada César</span>
-              <div class="item-meta">
-                <div class="more-info-icon">
-                  <div class="bar"></div>
-                  <div class="bar"></div>
-                  <div class="bar"></div>
-                </div>
-              </div>
-            </div>
-            <div class="card-body">
-              <div class="card-scroll-container">
-                <div class="card-scroll-wrap">
-                  <p class="card-text">
-                    Delicada selección de lechugas tiernas combinadas con pechuga asada a baja temperatura, lascas de Parmigiano Reggiano curado 24 meses, crujientes dados de pan artesanal y un aliño tradicional emulsionado suavemente con toques de anchoa del Cantábrico y limón fresco. Un clásico atemporal elaborado con técnicas de alta cocina para garantizar una textura envolvente en cada bocado.
-                  </p>
-                </div>
-                <div class="card-scroll-track">
-                  <div class="card-scroll-dot"></div>
-                </div>
-              </div>
-              <div class="card-price">18€</div>
-            </div>
-          </div>
-        </li>
-
-        <li class="menu-item" data-index="02">
-          <div class="glass-shadow"></div>
-          <div class="caustic-bg"></div>
-          <div class="glass-overlay">
-            <div class="caustic-glass"></div>
-            <div class="specular-top"></div>
-            <div class="specular-bottom"></div>
-          </div>
-          <div class="red-indicator"></div>
-          <div class="item-wrapper">
-            <div class="item-header">
-              <span class="item-number">02</span>
-              <span class="item-name">Pizza Diávola</span>
-              <div class="item-meta">
-                <div class="more-info-icon">
-                  <div class="bar"></div>
-                  <div class="bar"></div>
-                  <div class="bar"></div>
-                </div>
-              </div>
-            </div>
-            <div class="card-body">
-              <div class="card-scroll-container">
-                <div class="card-scroll-wrap">
-                  <p class="card-text">
-                    Masa madre de fermentación lenta horneada a la piedra, base de tomate San Marzano DOP, mozzarella fior di latte fundente y una cuidada selección de salame piccante calabrés, terminado con finas láminas de guindilla fresca y un hilo de aceite aromatizado con orégano silvestre.
-                  </p>
-                </div>
-                <div class="card-scroll-track">
-                  <div class="card-scroll-dot"></div>
-                </div>
-              </div>
-              <div class="card-price">18€</div>
-            </div>
-          </div>
-        </li>
-
-        <li class="menu-item" data-index="03">
-          <div class="glass-shadow"></div>
-          <div class="caustic-bg"></div>
-          <div class="glass-overlay">
-            <div class="caustic-glass"></div>
-            <div class="specular-top"></div>
-            <div class="specular-bottom"></div>
-          </div>
-          <div class="red-indicator"></div>
-          <div class="item-wrapper">
-            <div class="item-header">
-              <span class="item-number">03</span>
-              <span class="item-name">Cheeseburger</span>
-              <div class="item-meta">
-                <div class="more-info-icon">
-                  <div class="bar"></div>
-                  <div class="bar"></div>
-                  <div class="bar"></div>
-                </div>
-              </div>
-            </div>
-            <div class="card-body">
-              <div class="card-scroll-container">
-                <div class="card-scroll-wrap">
-                  <p class="card-text">
-                    Carne 100% de vaca madurada picada al momento, fundida con doble loncha de queso cheddar inglés curado, cebolla caramelizada lentamente, pepinillos encurtidos artesanos y salsa especial de la casa en pan brioche artesanal ligeramente tostado con mantequilla.
-                  </p>
-                </div>
-                <div class="card-scroll-track">
-                  <div class="card-scroll-dot"></div>
-                </div>
-              </div>
-              <div class="card-price">18€</div>
-            </div>
-          </div>
-        </li>
-
-        <li class="menu-item" data-index="04">
-          <div class="glass-shadow"></div>
-          <div class="caustic-bg"></div>
-          <div class="glass-overlay">
-            <div class="caustic-glass"></div>
-            <div class="specular-top"></div>
-            <div class="specular-bottom"></div>
-          </div>
-          <div class="red-indicator"></div>
-          <div class="item-wrapper">
-            <div class="item-header">
-              <span class="item-number">04</span>
-              <span class="item-name">Burrata italiana</span>
-              <div class="item-meta">
-                <div class="more-info-icon">
-                  <div class="bar"></div>
-                  <div class="bar"></div>
-                  <div class="bar"></div>
-                </div>
-              </div>
-            </div>
-            <div class="card-body">
-              <div class="card-scroll-container">
-                <div class="card-scroll-wrap">
-                  <p class="card-text">
-                    Corazón cremoso de burrata de Puglia acompañada de tomates cherry confitados en aceite virgen extra, pesto verde genovés elaborado al mortero, piñones tostados crujientes y una reducción aterciopelada de vinagre balsámico tradicional de Módena.
-                  </p>
-                </div>
-                <div class="card-scroll-track">
-                  <div class="card-scroll-dot"></div>
-                </div>
-              </div>
-              <div class="card-price">18€</div>
-            </div>
-          </div>
-        </li>
-
-        <li class="menu-item" data-index="05">
-          <div class="glass-shadow"></div>
-          <div class="caustic-bg"></div>
-          <div class="glass-overlay">
-            <div class="caustic-glass"></div>
-            <div class="specular-top"></div>
-            <div class="specular-bottom"></div>
-          </div>
-          <div class="red-indicator"></div>
-          <div class="item-wrapper">
-            <div class="item-header">
-              <span class="item-number">05</span>
-              <span class="item-name">Pizza de la casa</span>
-              <div class="item-meta">
-                <div class="more-info-icon">
-                  <div class="bar"></div>
-                  <div class="bar"></div>
-                  <div class="bar"></div>
-                </div>
-              </div>
-            </div>
-            <div class="card-body">
-              <div class="card-scroll-container">
-                <div class="card-scroll-wrap">
-                  <p class="card-text">
-                    Nuestra receta insignia con crema de trufa negra, setas silvestres salteadas al vino blanco, queso scamorza ahumado y prosciutto di Parma añadido al final del horneado para preservar todos sus matices aromáticos y textura sedosa.
-                  </p>
-                </div>
-                <div class="card-scroll-track">
-                  <div class="card-scroll-dot"></div>
-                </div>
-              </div>
-              <div class="card-price">18€</div>
-            </div>
-          </div>
-        </li>
-
-        <li class="menu-item" data-index="06">
-          <div class="glass-shadow"></div>
-          <div class="caustic-bg"></div>
-          <div class="glass-overlay">
-            <div class="caustic-glass"></div>
-            <div class="specular-top"></div>
-            <div class="specular-bottom"></div>
-          </div>
-          <div class="red-indicator"></div>
-          <div class="item-wrapper">
-            <div class="item-header">
-              <span class="item-number">06</span>
-              <span class="item-name">Ensalada Caprese</span>
-              <div class="item-meta">
-                <div class="more-info-icon">
-                  <div class="bar"></div>
-                  <div class="bar"></div>
-                  <div class="bar"></div>
-                </div>
-              </div>
-            </div>
-            <div class="card-body">
-              <div class="card-scroll-container">
-                <div class="card-scroll-wrap">
-                  <p class="card-text">
-                    Láminas intercaladas de tomate corazón de buey de huerta y mozzarella de búfala campana, aderezadas con hojas frescas de albahaca morada, escamas de sal marina ahumada y aceite monovarietal de aceituna arbequina de primera extracción.
-                  </p>
-                </div>
-                <div class="card-scroll-track">
-                  <div class="card-scroll-dot"></div>
-                </div>
-              </div>
-              <div class="card-price">18€</div>
-            </div>
-          </div>
-        </li>
-
-        <li class="menu-item" data-index="07">
-          <div class="glass-shadow"></div>
-          <div class="caustic-bg"></div>
-          <div class="glass-overlay">
-            <div class="caustic-glass"></div>
-            <div class="specular-top"></div>
-            <div class="specular-bottom"></div>
-          </div>
-          <div class="red-indicator"></div>
-          <div class="item-wrapper">
-            <div class="item-header">
-              <span class="item-number">07</span>
-              <span class="item-name">Pizza especial</span>
-              <div class="item-meta">
-                <div class="more-info-icon">
-                  <div class="bar"></div>
-                  <div class="bar"></div>
-                  <div class="bar"></div>
-                </div>
-              </div>
-            </div>
-            <div class="card-body">
-              <div class="card-scroll-container">
-                <div class="card-scroll-wrap">
-                  <p class="card-text">
-                    Combinación gourmet de higos frescos de temporada, queso gorgonzola dulce, nueces pacanas tostadas y un ligero glaseado de miel de flores silvestres sobre una base blanca y crujiente de fermentación de 48 horas.
-                  </p>
-                </div>
-                <div class="card-scroll-track">
-                  <div class="card-scroll-dot"></div>
-                </div>
-              </div>
-              <div class="card-price">18€</div>
-            </div>
-          </div>
-        </li>
-
-        <li class="menu-item" data-index="08">
-          <div class="glass-shadow"></div>
-          <div class="caustic-bg"></div>
-          <div class="glass-overlay">
-            <div class="caustic-glass"></div>
-            <div class="specular-top"></div>
-            <div class="specular-bottom"></div>
-          </div>
-          <div class="red-indicator"></div>
-          <div class="item-wrapper">
-            <div class="item-header">
-              <span class="item-number">08</span>
-              <span class="item-name">Ensalada César</span>
-              <div class="item-meta">
-                <div class="more-info-icon">
-                  <div class="bar"></div>
-                  <div class="bar"></div>
-                  <div class="bar"></div>
-                </div>
-              </div>
-            </div>
-            <div class="card-body">
-              <div class="card-scroll-container">
-                <div class="card-scroll-wrap">
-                  <p class="card-text">
-                    Delicada selección de lechugas tiernas combinadas con pechuga asada a baja temperatura, lascas de Parmigiano Reggiano curado 24 meses, crujientes dados de pan artesanal y un aliño tradicional emulsionado suavemente con toques de anchoa del Cantábrico y limón fresco.
-                  </p>
-                </div>
-                <div class="card-scroll-track">
-                  <div class="card-scroll-dot"></div>
-                </div>
-              </div>
-              <div class="card-price">18€</div>
-            </div>
-          </div>
-        </li>
-
-        <li class="menu-item" data-index="09">
-          <div class="glass-shadow"></div>
-          <div class="caustic-bg"></div>
-          <div class="glass-overlay">
-            <div class="caustic-glass"></div>
-            <div class="specular-top"></div>
-            <div class="specular-bottom"></div>
-          </div>
-          <div class="red-indicator"></div>
-          <div class="item-wrapper">
-            <div class="item-header">
-              <span class="item-number">09</span>
-              <span class="item-name">Pizza Diávola</span>
-              <div class="item-meta">
-                <div class="more-info-icon">
-                  <div class="bar"></div>
-                  <div class="bar"></div>
-                  <div class="bar"></div>
-                </div>
-              </div>
-            </div>
-            <div class="card-body">
-              <div class="card-scroll-container">
-                <div class="card-scroll-wrap">
-                  <p class="card-text">
-                    Masa madre de fermentación lenta horneada a la piedra, base de tomate San Marzano DOP, mozzarella fior di latte fundente y una cuidada selección de salame piccante calabrés, terminado con finas láminas de guindilla fresca y un hilo de aceite aromatizado con orégano silvestre.
-                  </p>
-                </div>
-                <div class="card-scroll-track">
-                  <div class="card-scroll-dot"></div>
-                </div>
-              </div>
-              <div class="card-price">18€</div>
-            </div>
-          </div>
-        </li>
-
-        <li class="menu-item" data-index="10">
-          <div class="glass-shadow"></div>
-          <div class="caustic-bg"></div>
-          <div class="glass-overlay">
-            <div class="caustic-glass"></div>
-            <div class="specular-top"></div>
-            <div class="specular-bottom"></div>
-          </div>
-          <div class="red-indicator"></div>
-          <div class="item-wrapper">
-            <div class="item-header">
-              <span class="item-number">10</span>
-              <span class="item-name">Cheeseburger</span>
-              <div class="item-meta">
-                <div class="more-info-icon">
-                  <div class="bar"></div>
-                  <div class="bar"></div>
-                  <div class="bar"></div>
-                </div>
-              </div>
-            </div>
-            <div class="card-body">
-              <div class="card-scroll-container">
-                <div class="card-scroll-wrap">
-                  <p class="card-text">
-                    Carne 100% de vaca madurada picada al momento, fundida con doble loncha de queso cheddar inglés curado, cebolla caramelizada lentamente, pepinillos encurtidos artesanos y salsa especial de la casa en pan brioche artesanal ligeramente tostado con mantequilla.
-                  </p>
-                </div>
-                <div class="card-scroll-track">
-                  <div class="card-scroll-dot"></div>
-                </div>
-              </div>
-              <div class="card-price">18€</div>
-            </div>
-          </div>
-        </li>
-
-        <li class="menu-item" data-index="11">
-          <div class="glass-shadow"></div>
-          <div class="caustic-bg"></div>
-          <div class="glass-overlay">
-            <div class="caustic-glass"></div>
-            <div class="specular-top"></div>
-            <div class="specular-bottom"></div>
-          </div>
-          <div class="red-indicator"></div>
-          <div class="item-wrapper">
-            <div class="item-header">
-              <span class="item-number">11</span>
-              <span class="item-name">Burrata italiana</span>
-              <div class="item-meta">
-                <div class="more-info-icon">
-                  <div class="bar"></div>
-                  <div class="bar"></div>
-                  <div class="bar"></div>
-                </div>
-              </div>
-            </div>
-            <div class="card-body">
-              <div class="card-scroll-container">
-                <div class="card-scroll-wrap">
-                  <p class="card-text">
-                    Corazón cremoso de burrata de Puglia acompañada de tomates cherry confitados en aceite virgen extra, pesto verde genovés elaborado al mortero, piñones tostados crujientes y una reducción aterciopelada de vinagre balsámico tradicional de Módena.
-                  </p>
-                </div>
-                <div class="card-scroll-track">
-                  <div class="card-scroll-dot"></div>
-                </div>
-              </div>
-              <div class="card-price">18€</div>
-            </div>
-          </div>
-        </li>
-
-        <li class="menu-item" data-index="12">
-          <div class="glass-shadow"></div>
-          <div class="caustic-bg"></div>
-          <div class="glass-overlay">
-            <div class="caustic-glass"></div>
-            <div class="specular-top"></div>
-            <div class="specular-bottom"></div>
-          </div>
-          <div class="red-indicator"></div>
-          <div class="item-wrapper">
-            <div class="item-header">
-              <span class="item-number">12</span>
-              <span class="item-name">Pizza de la casa</span>
-              <div class="item-meta">
-                <div class="more-info-icon">
-                  <div class="bar"></div>
-                  <div class="bar"></div>
-                  <div class="bar"></div>
-                </div>
-              </div>
-            </div>
-            <div class="card-body">
-              <div class="card-scroll-container">
-                <div class="card-scroll-wrap">
-                  <p class="card-text">
-                    Nuestra receta insignia con crema de trufa negra, setas silvestres salteadas al vino blanco, queso scamorza ahumado y prosciutto di Parma añadido al final del horneado para preservar todos sus matices aromáticos y textura sedosa.
-                  </p>
-                </div>
-                <div class="card-scroll-track">
-                  <div class="card-scroll-dot"></div>
-                </div>
-              </div>
-              <div class="card-price">18€</div>
-            </div>
-          </div>
-        </li>
-
-        <li class="menu-item" data-index="13">
-          <div class="glass-shadow"></div>
-          <div class="caustic-bg"></div>
-          <div class="glass-overlay">
-            <div class="caustic-glass"></div>
-            <div class="specular-top"></div>
-            <div class="specular-bottom"></div>
-          </div>
-          <div class="red-indicator"></div>
-          <div class="item-wrapper">
-            <div class="item-header">
-              <span class="item-number">13</span>
-              <span class="item-name">Ensalada Caprese</span>
-              <div class="item-meta">
-                <div class="more-info-icon">
-                  <div class="bar"></div>
-                  <div class="bar"></div>
-                  <div class="bar"></div>
-                </div>
-              </div>
-            </div>
-            <div class="card-body">
-              <div class="card-scroll-container">
-                <div class="card-scroll-wrap">
-                  <p class="card-text">
-                    Láminas intercaladas de tomate corazón de buey de huerta y mozzarella de búfala campana, aderezadas con hojas frescas de albahaca morada, escamas de sal marina ahumada y aceite monovarietal de aceituna arbequina de primera extracción.
-                  </p>
-                </div>
-                <div class="card-scroll-track">
-                  <div class="card-scroll-dot"></div>
-                </div>
-              </div>
-              <div class="card-price">18€</div>
-            </div>
-          </div>
-        </li>
-
-        <li class="menu-item" data-index="14">
-          <div class="glass-shadow"></div>
-          <div class="caustic-bg"></div>
-          <div class="glass-overlay">
-            <div class="caustic-glass"></div>
-            <div class="specular-top"></div>
-            <div class="specular-bottom"></div>
-          </div>
-          <div class="red-indicator"></div>
-          <div class="item-wrapper">
-            <div class="item-header">
-              <span class="item-number">14</span>
-              <span class="item-name">Pizza especial</span>
-              <div class="item-meta">
-                <div class="more-info-icon">
-                  <div class="bar"></div>
-                  <div class="bar"></div>
-                  <div class="bar"></div>
-                </div>
-              </div>
-            </div>
-            <div class="card-body">
-              <div class="card-scroll-container">
-                <div class="card-scroll-wrap">
-                  <p class="card-text">
-                    Combinación gourmet de higos frescos de temporada, queso gorgonzola dulce, nueces pacanas tostadas y un ligero glaseado de miel de flores silvestres sobre una base blanca y crujiente de fermentación de 48 horas.
-                  </p>
-                </div>
-                <div class="card-scroll-track">
-                  <div class="card-scroll-dot"></div>
-                </div>
-              </div>
-              <div class="card-price">18€</div>
-            </div>
-          </div>
-        </li>
-
-        <li class="menu-item" data-index="15">
-          <div class="glass-shadow"></div>
-          <div class="caustic-bg"></div>
-          <div class="glass-overlay">
-            <div class="caustic-glass"></div>
-            <div class="specular-top"></div>
-            <div class="specular-bottom"></div>
-          </div>
-          <div class="red-indicator"></div>
-          <div class="item-wrapper">
-            <div class="item-header">
-              <span class="item-number">15</span>
-              <span class="item-name">Pizza de la casa</span>
-              <div class="item-meta">
-                <div class="more-info-icon">
-                  <div class="bar"></div>
-                  <div class="bar"></div>
-                  <div class="bar"></div>
-                </div>
-              </div>
-            </div>
-            <div class="card-body">
-              <div class="card-scroll-container">
-                <div class="card-scroll-wrap">
-                  <p class="card-text">
-                    Nuestra receta insignia con crema de trufa negra, setas silvestres salteadas al vino blanco, queso scamorza ahumado y prosciutto di Parma añadido al final del horneado para preservar todos sus matices aromáticos y textura sedosa.
-                  </p>
-                </div>
-                <div class="card-scroll-track">
-                  <div class="card-scroll-dot"></div>
-                </div>
-              </div>
-              <div class="card-price">18€</div>
-            </div>
-          </div>
-        </li>
-
-      </ul>
+      <!-- Lista dinámica de platos inyectada automáticamente desde contents.js -->
+      <ul class="menu-list" id="menu-list"></ul>
     </section>
 
   </main>
 
   <script>
     document.addEventListener('DOMContentLoaded', () => {
+      // Detección infalible de SO (Blindaje de entorno)
+      const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+      if (isIOS) {
+        document.body.classList.add('is-ios');
+      }
+
+      // ======================================================================
+      // 0. GENERACIÓN DINÁMICA DE LA LISTA DESDE contents.js (v5.15)
+      // ======================================================================
       const menuList = document.getElementById('menu-list');
+      const menuConfig = window.MENU_CONFIG || { platos: [], moneda: "€" };
+      const rawPlatos = menuConfig.platos || [];
+      const totalToDisplay = menuConfig.totalPlatos ? Math.min(menuConfig.totalPlatos, rawPlatos.length) : rawPlatos.length;
+      const platosData = rawPlatos.slice(0, totalToDisplay);
+
+      const symbol = menuConfig.moneda || "€";
+      menuList.innerHTML = '';
+
+      platosData.forEach((p) => {
+        const li = document.createElement('li');
+        li.className = 'menu-item';
+        li.setAttribute('data-index', p.id);
+
+        li.innerHTML = `
+          <div class="glass-shadow"></div>
+          <div class="caustic-bg"></div>
+          <div class="glass-overlay">
+            <div class="caustic-glass"></div>
+            <div class="specular-top"></div>
+            <div class="specular-bottom"></div>
+          </div>
+          <div class="red-indicator"></div>
+          <div class="item-wrapper">
+            <div class="item-header">
+              <span class="item-number">${p.id}</span>
+              <span class="item-name">${p.nombre}</span>
+              <div class="item-meta">
+                <div class="more-info-icon">
+                  <div class="bar"></div>
+                  <div class="bar"></div>
+                  <div class="bar"></div>
+                </div>
+              </div>
+            </div>
+            <div class="card-body">
+              <div class="card-scroll-container">
+                <div class="card-scroll-wrap">
+                  <p class="card-text">${p.descripcion}</p>
+                </div>
+                <div class="card-scroll-track">
+                  <div class="card-scroll-dot"></div>
+                </div>
+              </div>
+              <div class="card-price">${p.precio}${symbol}</div>
+            </div>
+          </div>
+        `;
+        menuList.appendChild(li);
+      });
+
       const menuItems = Array.from(document.querySelectorAll('.menu-item'));
       const btnAr = document.getElementById('btn-ar');
       const prevDishBtn = document.getElementById('prevDishBtn');
       const nextDishBtn = document.getElementById('nextDishBtn');
       const viewerSection = document.getElementById('viewerSection');
+      const viewerSlot = document.getElementById('viewerSlot');
       const gestureHint = document.getElementById('gestureHint');
-      let mv = document.getElementById('mv');
+      let mv = null;
 
-      // Modelos 3D disponibles
-      const models = [
-        "Plato_01.glb", "Plato_02.glb", "Plato_03.glb", "Plato_04.glb",
-        "Plato_05.glb", "Plato_06.glb", "Plato_07.glb", "Plato_08.glb",
-        "Plato_09.glb", "Plato_10.glb", "Plato_11.glb", "Plato_12.glb",
-        "Plato_13.glb", "Plato_14.glb", "Plato_15.glb"
-      ];
+      // Modelos 3D leídos directamente desde contents.js
+      const models = platosData.map(p => p.archivoGLB);
 
+      // v5.15: Handshake BFCache exclusivo para iOS con retardo limpio de 150ms anti T-1000
+      const navEntries = performance.getEntriesByType('navigation');
+      const isReload = navEntries.length > 0 && navEntries[0].type === 'reload';
+      const fromAR = sessionStorage.getItem('from_ar') === '1';
+      const isFromArReload = sessionStorage.getItem('from_ar_reload') === '1';
       let currentIndex = 0;
 
+      if (isReload && !fromAR && !isFromArReload) {
+        // Recarga manual por el usuario: reseteo estricto a Plato 01
+        sessionStorage.removeItem('modelo_actual');
+        sessionStorage.removeItem('from_ar');
+        sessionStorage.removeItem('from_ar_reload');
+        currentIndex = 0;
+      } else if (isFromArReload || fromAR) {
+        // Retorno legítimo desde AR: recuperación exacta del plato seleccionado
+        sessionStorage.removeItem('from_ar_reload');
+        const saved = sessionStorage.getItem('modelo_actual');
+        if (saved !== null && !isNaN(parseInt(saved, 10))) {
+          currentIndex = parseInt(saved, 10);
+        }
+      } else {
+        // Apertura inicial limpia
+        sessionStorage.removeItem('modelo_actual');
+        sessionStorage.removeItem('from_ar');
+        currentIndex = 0;
+      }
+
       // ======================================================================
-      // 1. CINEMÁTICA Y FÍSICA: ARRANQUE EN 225° + INERCIA PESADA (40% AZULADO)
+      // 1. CINEMÁTICA Y FÍSICA: 3 CAPAS AL +5% (ARRANQUE 225° + INERCIA PESADA)
       // ======================================================================
       const layerElements = [
         document.querySelector('.layer-1'),
         document.querySelector('.layer-2'),
-        document.querySelector('.layer-3'),
-        document.querySelector('.layer-4')
+        document.querySelector('.layer-3')
       ];
 
       const BASE_SPEED = 0.055;
       let currentDirection = 1;
 
+      // v5.05: +10% en compresión de escala (scaleDip) y +25% en giro (twistPower)
       const layerConfigs = [
-        { delay: 0,   twistPower: 0.42, twistDamp: 0.958, scaleDip: 0.958, parallaxK: 1.80 },
-        { delay: 170, twistPower: 0.82, twistDamp: 0.955, scaleDip: 0.969, parallaxK: 1.28 },
-        { delay: 340, twistPower: 0.35, twistDamp: 0.962, scaleDip: 0.980, parallaxK: 0.72 },
-        { delay: 510, twistPower: 0.12, twistDamp: 0.968, scaleDip: 0.989, parallaxK: 0.20 }
+        { delay: 0,   twistPower: 0.525, twistDamp: 0.958, scaleDip: 0.9538, parallaxK: 1.80 },
+        { delay: 170, twistPower: 1.025, twistDamp: 0.955, scaleDip: 0.9659, parallaxK: 1.28 },
+        { delay: 340, twistPower: 0.4375, twistDamp: 0.962, scaleDip: 0.9780, parallaxK: 0.72 }
       ];
 
       // Ángulo inicial 225°: arranque con iluminación superior
@@ -1453,7 +1040,7 @@
       }
 
       // ======================================================================
-      // 5. CONTROLADOR DE MICRO-ESFERA DE SCROLL EN CARD (0% A 100%)
+      // 5. CONTROLADOR DE MICRO-ESFERA DE SCROLL EN CARD (0% A 100% Y TÁCTIL)
       // ======================================================================
       function updateCardScrollDot(wrap) {
         const container = wrap.closest('.card-scroll-container');
@@ -1471,15 +1058,116 @@
 
       document.querySelectorAll('.card-scroll-wrap').forEach((wrap) => {
         wrap.addEventListener('scroll', () => updateCardScrollDot(wrap), { passive: true });
+
+        // v5.05: Interacción táctil en la bolita (arrastre abajo = contenido desciende)
+        const container = wrap.closest('.card-scroll-container');
+        if (!container) return;
+        const track = container.querySelector('.card-scroll-track');
+        const dot = container.querySelector('.card-scroll-dot');
+        if (!track || !dot) return;
+
+        let isDraggingDot = false;
+        let startPointerY = 0;
+        let startScrollTop = 0;
+
+        const onPointerDown = (e) => {
+          e.stopPropagation();
+          isDraggingDot = true;
+          dot.setPointerCapture(e.pointerId);
+          startPointerY = e.clientY;
+          startScrollTop = wrap.scrollTop;
+        };
+
+        const onPointerMove = (e) => {
+          if (!isDraggingDot) return;
+          e.stopPropagation();
+          e.preventDefault();
+
+          const maxScroll = wrap.scrollHeight - wrap.clientHeight;
+          const maxTravel = track.clientHeight - dot.clientHeight;
+          if (maxTravel <= 0 || maxScroll <= 0) return;
+
+          const deltaY = e.clientY - startPointerY;
+          const ratio = maxScroll / maxTravel;
+          wrap.scrollTop = Math.max(0, Math.min(startScrollTop + deltaY * ratio, maxScroll));
+        };
+
+        const onPointerUp = (e) => {
+          if (!isDraggingDot) return;
+          isDraggingDot = false;
+          try {
+            dot.releasePointerCapture(e.pointerId);
+          } catch (err) {}
+        };
+
+        dot.addEventListener('pointerdown', onPointerDown);
+        dot.addEventListener('pointermove', onPointerMove);
+        dot.addEventListener('pointerup', onPointerUp);
+        dot.addEventListener('pointercancel', onPointerUp);
+
+        // Salto rápido al pulsar sobre la pista
+        track.addEventListener('pointerdown', (e) => {
+          if (e.target === dot) return;
+          e.stopPropagation();
+          const trackRect = track.getBoundingClientRect();
+          const maxTravel = track.clientHeight - dot.clientHeight;
+          const maxScroll = wrap.scrollHeight - wrap.clientHeight;
+          if (maxTravel <= 0 || maxScroll <= 0) return;
+
+          const clickY = e.clientY - trackRect.top - (dot.clientHeight / 2);
+          const progress = Math.max(0, Math.min(clickY / maxTravel, 1));
+          wrap.scrollTop = progress * maxScroll;
+        });
       });
 
       // ======================================================================
-      // 6. GESTIÓN DEL MODEL-VIEWER Y SINCRONIZACIÓN TRIDIRECCIONAL
+      // 6. INSTANCIACIÓN Y GESTIÓN LIMPIA DEL VISOR 3D (v5.15)
       // ======================================================================
+      function destroyModelViewer() {
+        if (viewerSlot) {
+          viewerSlot.innerHTML = '';
+        }
+        mv = null;
+      }
+
+      function createModelViewer() {
+        destroyModelViewer();
+
+        const newMv = document.createElement('model-viewer');
+        newMv.id = 'mv';
+        newMv.setAttribute('src', models[currentIndex] || "Plato_01.glb");
+        newMv.setAttribute('autoplay', '');
+        newMv.setAttribute('auto-rotate', '');
+        newMv.setAttribute('auto-rotate-delay', '0');
+        newMv.setAttribute('rotation-per-second', '17deg');
+        // v5.15: En iOS se ajusta la inclinación a 62° para neutralizar la perspectiva achatada en ratios estrechos 19.5:9
+        newMv.setAttribute('camera-orbit', isIOS ? '0deg 62deg 45%' : '0deg 70deg 45%');
+        newMv.setAttribute('min-camera-orbit', '0deg 0deg 45%');
+        newMv.setAttribute('max-camera-orbit', '360deg 90deg 45%');
+        newMv.setAttribute('camera-controls', 'false');
+        newMv.setAttribute('touch-action', 'none');
+        newMv.setAttribute('disable-pan', '');
+        newMv.setAttribute('disable-zoom', '');
+        newMv.setAttribute('interaction-prompt', 'none');
+        newMv.setAttribute('shadow-intensity', '0.4');
+        newMv.setAttribute('exposure', '0.80');
+        newMv.style.opacity = '0';
+
+        newMv.addEventListener('load', () => {
+          newMv.style.opacity = '1';
+        }, { once: true });
+
+        viewerSlot.appendChild(newMv);
+        mv = newMv;
+      }
+
       function updateModelViewer() {
-        if (!mv) return;
+        if (!mv) {
+          createModelViewer();
+          return;
+        }
         mv.style.opacity = '0';
-        mv.setAttribute('src', models[currentIndex]);
+        mv.setAttribute('src', models[currentIndex] || "Plato_01.glb");
         mv.addEventListener('load', () => {
           mv.style.opacity = '1';
         }, { once: true });
@@ -1490,7 +1178,8 @@
         menuList.classList.remove('has-expanded');
       }
 
-      function selectDish(index, shouldScroll = false) {
+      // v5.11 / v5.14: Restauración de selección v5.09 (cero saltos de lista en primer toque)
+      function selectDish(index, shouldScroll = false, triggerReaction = true) {
         if (index < 0 || index >= models.length) return;
         currentIndex = index;
 
@@ -1514,32 +1203,41 @@
         });
 
         updateModelViewer();
-        triggerChainReaction();
+        if (triggerReaction) {
+          triggerChainReaction();
+        }
       }
 
       prevDishBtn.addEventListener('click', (e) => {
         e.stopPropagation();
         const nextIdx = (currentIndex - 1 + models.length) % models.length;
-        selectDish(nextIdx, true);
+        selectDish(nextIdx, true, true);
       });
 
       nextDishBtn.addEventListener('click', (e) => {
         e.stopPropagation();
         const nextIdx = (currentIndex + 1) % models.length;
-        selectDish(nextIdx, true);
+        selectDish(nextIdx, true, true);
       });
 
       // ======================================================================
-      // 7. GESTIÓN DEL ICONO FLOTANTE DE GESTOS CON MEMORIA PERSISTENTE
+      // 7. GESTIÓN DEL ICONO FLOTANTE CON MEMORIA VOLÁTIL DE PÁGINA (v5.15)
       // ======================================================================
+      let hasInteractedWithMV = false;
       let hintTimer1 = null;
       let hintTimer2 = null;
       let hintTimer3 = null;
       let hintTimer4 = null;
 
+      // v5.15: Purga total de residuos de sesión previos para garantizar que cualquier recarga restaure el icono
+      try {
+        sessionStorage.removeItem('mv_gesture_dismissed');
+        localStorage.removeItem('mv_interacted');
+      } catch (err) {}
+
       function dismissGestureHint() {
-        if (localStorage.getItem('mv_interacted') === '1') return;
-        localStorage.setItem('mv_interacted', '1');
+        if (hasInteractedWithMV) return;
+        hasInteractedWithMV = true;
         clearTimeout(hintTimer1);
         clearTimeout(hintTimer2);
         clearTimeout(hintTimer3);
@@ -1551,40 +1249,39 @@
       }
 
       function initGestureHint() {
-        if (localStorage.getItem('mv_interacted') === '1' || !gestureHint) {
+        if (hasInteractedWithMV || !gestureHint) {
           if (gestureHint) gestureHint.remove();
           return;
         }
 
-        // Ciclo 1: espera 3s -> visible 3s -> fade out
+        // Ciclo 1: espera 5s -> visible 3s -> fade out
         hintTimer1 = setTimeout(() => {
           gestureHint.classList.add('visible');
 
           hintTimer2 = setTimeout(() => {
             gestureHint.classList.remove('visible');
 
-            // Ciclo 2: espera 6s -> visible 3s -> fade out definitivo
+            // Ciclo 2: pausa 10s -> visible 3s -> fade out definitivo
             hintTimer3 = setTimeout(() => {
               gestureHint.classList.add('visible');
 
               hintTimer4 = setTimeout(() => {
                 gestureHint.classList.remove('visible');
-                localStorage.setItem('mv_interacted', '1');
+                hasInteractedWithMV = true;
                 setTimeout(() => gestureHint.remove(), 400);
               }, 3000);
-            }, 6000);
+            }, 10000);
           }, 3000);
-        }, 3000);
+        }, 5000);
       }
 
-      // Desactivación inmediata ante cualquier toque en el visor
       viewerSection.addEventListener('pointerdown', dismissGestureHint, { passive: true });
       viewerSection.addEventListener('touchstart', dismissGestureHint, { passive: true });
 
       initGestureHint();
 
       // ======================================================================
-      // 8. GESTOS TÁCTILES Y SELECCIÓN EN LA LISTA
+      // 8. GESTOS TÁCTILES Y SELECCIÓN EN LA LISTA (RESTAURACIÓN v5.09)
       // ======================================================================
       let touchStartY = 0;
       let touchStartX = 0;
@@ -1612,7 +1309,7 @@
           const isCurrentlyExpanded = item.classList.contains('expanded');
 
           if (isCurrentlyActive) {
-            // SEGUNDO TOQUE: Alterna Card
+            // SEGUNDO TOQUE: Alterna Card con desplazamiento suave centrado
             if (isCurrentlyExpanded) {
               collapseAllCards();
             } else {
@@ -1637,55 +1334,74 @@
               }, 110);
             }
           } else {
-            // PRIMER TOQUE: Selección simple y actualización de visor
-            selectDish(index, false);
+            // PRIMER TOQUE: Selección simple y actualización de visor (cero saltos de lista)
+            selectDish(index, false, true);
           }
         });
       });
 
       // ======================================================================
-      // 9. LANZAMIENTO HACIA AR Y RESTAURACIÓN AL VOLVER
+      // 9. LANZAMIENTO HACIA AR Y RESTAURACIÓN LIMPIA AL VOLVER (v5.15)
       // ======================================================================
       btnAr.addEventListener('click', () => {
         sessionStorage.setItem('from_ar', '1');
         sessionStorage.setItem('modelo_actual', currentIndex);
-
-        // Liberación limpia de contexto WebGL antes de navegar
-        if (mv) {
-          mv.style.opacity = '0';
-          mv.removeAttribute('src');
-        }
-
+        destroyModelViewer(); // Desmontaje limpio de VRAM antes de levantar la cámara AR
         window.location.href = 'ar-world.html';
       });
 
-      window.addEventListener('pageshow', () => {
-        const fromAR = sessionStorage.getItem('from_ar') === '1';
-        sessionStorage.removeItem('from_ar');
-
-        if (fromAR) {
-          const saved = sessionStorage.getItem('modelo_actual');
-          if (saved !== null && !isNaN(parseInt(saved))) {
-            currentIndex = parseInt(saved);
+      // v5.15: Handshake en pageshow para iOS (recarga limpia) y Android (continuidad directa)
+      window.addEventListener('pageshow', (e) => {
+        const navigatedFromAR = sessionStorage.getItem('from_ar') === '1';
+        if (navigatedFromAR) {
+          sessionStorage.removeItem('from_ar');
+          if (isIOS) {
+            // Recarga obligatoria en Safari iOS para purgar VRAM de WebKit y levantar contexto nuevo
+            sessionStorage.setItem('from_ar_reload', '1');
+            window.location.reload();
+            return;
           }
+
+          // En Android: flujo directo sin recargas
+          const saved = sessionStorage.getItem('modelo_actual');
+          if (saved !== null && !isNaN(parseInt(saved, 10))) {
+            currentIndex = parseInt(saved, 10);
+          }
+          selectDish(currentIndex, false, false);
+          return;
         }
 
-        if (mv) {
-          mv.setAttribute('src', models[currentIndex]);
-          mv.addEventListener('load', () => {
-            mv.style.opacity = '1';
-          }, { once: true });
+        if (e.persisted) {
+          const saved = sessionStorage.getItem('modelo_actual');
+          if (saved !== null && !isNaN(parseInt(saved, 10))) {
+            currentIndex = parseInt(saved, 10);
+          }
+          selectDish(currentIndex, false, false);
         }
-
-        selectDish(currentIndex, true);
       });
 
-      // Inicialización de arranque
-      const initialSaved = sessionStorage.getItem('modelo_actual');
-      if (initialSaved !== null && !isNaN(parseInt(initialSaved))) {
-        currentIndex = parseInt(initialSaved);
+      // Arranque inicial: si proviene de recarga post-AR en iOS, margen de seguridad de 150ms anti T-1000
+      if (isFromArReload && isIOS) {
+        setTimeout(() => {
+          createModelViewer();
+          selectDish(currentIndex, false, false);
+          if (currentIndex > 0) {
+            const targetItem = menuItems[currentIndex];
+            if (targetItem) {
+              menuList.scrollTop = Math.max(0, targetItem.offsetTop - 10);
+            }
+          }
+        }, 150);
+      } else {
+        createModelViewer();
+        selectDish(currentIndex, false, false);
+        if ((fromAR || isFromArReload) && currentIndex > 0) {
+          const targetItem = menuItems[currentIndex];
+          if (targetItem) {
+            menuList.scrollTop = Math.max(0, targetItem.offsetTop - 10);
+          }
+        }
       }
-      selectDish(currentIndex, false);
     });
   </script>
 </body>
