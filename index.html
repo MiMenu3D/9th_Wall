@@ -1,4 +1,4 @@
-<!-- Versión: 9th_Design v5.15 -->
+<!-- Versión: 9th_Design v5.16 -->
 <!DOCTYPE html>
 <html lang="es">
 <head>
@@ -15,7 +15,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Fredoka:wdth,wght@75..125,300..600&display=swap" rel="stylesheet">
 
-  <!-- Archivo de Contenidos Centralizado v5.15 -->
+  <!-- Archivo de Contenidos Centralizado v5.16 -->
   <script src="contents.js"></script>
 
   <!-- Model Viewer Oficial de Google -->
@@ -129,7 +129,7 @@
       overflow: hidden;
     }
 
-    /* Estilo del visor 3D (v5.15: Aislamiento visual optimizado en iOS sin distorsión de escala) */
+    /* Estilo del visor 3D (v5.16: Blindaje GPU translateZ(0) restaurado en iOS / Android nativo sin will-change) */
     model-viewer {
       width: 100%;
       height: 100%;
@@ -140,13 +140,13 @@
 
     body.is-ios model-viewer {
       filter: saturate(0.95) contrast(0.95);
+      transform: translateZ(0);
+      will-change: filter, transform;
+      backface-visibility: hidden;
     }
 
     body:not(.is-ios) model-viewer {
       filter: saturate(0.87) contrast(0.88);
-      transform: translateZ(0);
-      will-change: filter, transform;
-      backface-visibility: hidden;
     }
 
     /* Flechas de navegación (-10% = 36px × 36px, font 23px) */
@@ -836,7 +836,7 @@
       }
 
       // ======================================================================
-      // 0. GENERACIÓN DINÁMICA DE LA LISTA DESDE contents.js (v5.15)
+      // 0. GENERACIÓN DINÁMICA DE LA LISTA DESDE contents.js (v5.16)
       // ======================================================================
       const menuList = document.getElementById('menu-list');
       const menuConfig = window.MENU_CONFIG || { platos: [], moneda: "€" };
@@ -901,7 +901,7 @@
       // Modelos 3D leídos directamente desde contents.js
       const models = platosData.map(p => p.archivoGLB);
 
-      // v5.15: Handshake BFCache exclusivo para iOS con retardo limpio de 150ms anti T-1000
+      // v5.16: Handshake BFCache exclusivo para iOS con retardo limpio de 300ms anti T-1000
       const navEntries = performance.getEntriesByType('navigation');
       const isReload = navEntries.length > 0 && navEntries[0].type === 'reload';
       const fromAR = sessionStorage.getItem('from_ar') === '1';
@@ -1121,7 +1121,7 @@
       });
 
       // ======================================================================
-      // 6. INSTANCIACIÓN Y GESTIÓN LIMPIA DEL VISOR 3D (v5.15)
+      // 6. INSTANCIACIÓN Y GESTIÓN LIMPIA DEL VISOR 3D (v5.16)
       // ======================================================================
       function destroyModelViewer() {
         if (viewerSlot) {
@@ -1140,8 +1140,8 @@
         newMv.setAttribute('auto-rotate', '');
         newMv.setAttribute('auto-rotate-delay', '0');
         newMv.setAttribute('rotation-per-second', '17deg');
-        // v5.15: En iOS se ajusta la inclinación a 62° para neutralizar la perspectiva achatada en ratios estrechos 19.5:9
-        newMv.setAttribute('camera-orbit', isIOS ? '0deg 62deg 45%' : '0deg 70deg 45%');
+        // v5.16: Ángulo cenital consolidado restaurado a 70deg idéntico a v5.14
+        newMv.setAttribute('camera-orbit', '0deg 70deg 45%');
         newMv.setAttribute('min-camera-orbit', '0deg 0deg 45%');
         newMv.setAttribute('max-camera-orbit', '360deg 90deg 45%');
         newMv.setAttribute('camera-controls', 'false');
@@ -1221,7 +1221,7 @@
       });
 
       // ======================================================================
-      // 7. GESTIÓN DEL ICONO FLOTANTE CON MEMORIA VOLÁTIL DE PÁGINA (v5.15)
+      // 7. GESTIÓN DEL ICONO FLOTANTE CON MEMORIA VOLÁTIL DE PÁGINA (v5.16)
       // ======================================================================
       let hasInteractedWithMV = false;
       let hintTimer1 = null;
@@ -1229,7 +1229,7 @@
       let hintTimer3 = null;
       let hintTimer4 = null;
 
-      // v5.15: Purga total de residuos de sesión previos para garantizar que cualquier recarga restaure el icono
+      // Purga total de residuos de sesión previos para garantizar que cualquier recarga restaure el icono
       try {
         sessionStorage.removeItem('mv_gesture_dismissed');
         localStorage.removeItem('mv_interacted');
@@ -1341,7 +1341,7 @@
       });
 
       // ======================================================================
-      // 9. LANZAMIENTO HACIA AR Y RESTAURACIÓN LIMPIA AL VOLVER (v5.15)
+      // 9. LANZAMIENTO HACIA AR Y RESTAURACIÓN LIMPIA AL VOLVER (v5.16)
       // ======================================================================
       btnAr.addEventListener('click', () => {
         sessionStorage.setItem('from_ar', '1');
@@ -1350,7 +1350,7 @@
         window.location.href = 'ar-world.html';
       });
 
-      // v5.15: Handshake en pageshow para iOS (recarga limpia) y Android (continuidad directa)
+      // v5.16: Handshake en pageshow para iOS (recarga limpia) y Android (continuidad directa)
       window.addEventListener('pageshow', (e) => {
         const navigatedFromAR = sessionStorage.getItem('from_ar') === '1';
         if (navigatedFromAR) {
@@ -1380,7 +1380,7 @@
         }
       });
 
-      // Arranque inicial: si proviene de recarga post-AR en iOS, margen de seguridad de 150ms anti T-1000
+      // v5.16: Arranque inicial con margen de seguridad ampliado a 300ms anti T-1000 en iOS
       if (isFromArReload && isIOS) {
         setTimeout(() => {
           createModelViewer();
@@ -1391,7 +1391,7 @@
               menuList.scrollTop = Math.max(0, targetItem.offsetTop - 10);
             }
           }
-        }, 150);
+        }, 300);
       } else {
         createModelViewer();
         selectDish(currentIndex, false, false);
