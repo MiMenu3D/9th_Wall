@@ -1,4 +1,4 @@
-<!-- 9th_Design v5.16 (PMREM Freeze on iOS / Strategic Dual-Specular / Watchdog Auto-Recovery without Ready / Clean XR8 Exit / Adjusted Specular Lobes & AO / sRGB Ground AO / Fast AE Lerp / Multi-Select Photo Strip & Native Share / 0ms Instant Photo-Save / Landscape Warning Blocker) -->
+<!-- 9th_Design v5.16x (PMREM Freeze on iOS / Strategic Dual-Specular / Watchdog Auto-Recovery without Ready / Clean XR8 Exit / Adjusted Specular Lobes & AO / sRGB Ground AO / Fast AE Lerp / Multi-Select Photo Strip & Native Share / 0ms Instant Photo-Save / Landscape Warning Blocker) -->
 <html>
 <head>
   <meta charset="UTF-8">
@@ -694,8 +694,8 @@
       thin_expansion: 0.68,
 
       // Capa 2: Lóbulo WIDE (Halo envolvente suave - 15% menos intensidad, área expandida 15%)
-      wide_intensity: 0.36,
-      wide_expansion: 1.67,
+      wide_intensity: 0.28,
+      wide_expansion: 1.48,
 
       // Atenuación difusa en modo BOTH (Equilibrio de energía Checkpoint vB1.03)
       both_diffuse_mult: 1.00
@@ -711,15 +711,15 @@
       calibration_frames_target: 4,
       shadow_map_size: 512,
       day_shadow_radius: 4.8,     // v5.16: Radio de sombra expandido un 20%
-      night_shadow_radius: 9.6,   // v5.16: Radio nocturno expandido un 20%
+      night_shadow_radius: 10.6,   // v5.16: Radio nocturno expandido un 20%
       ground_opacity_fixed: 0.48, // v5.16: Opacidad base aumentada un 20%
 
       day_total_energy: 4.68,
       day_pmrem_mult: 1.65,
       day_pedestal: 0.035,
 
-      night_total_energy: 0.96,   // v5.16: Luz directa en penumbra aumentada un 30%
-      night_pmrem_mult: 4.49,     // v5.16: Exposición ambiental en penumbra aumentada un 30%
+      night_total_energy: 0.85,   // v5.16: Luz directa en penumbra aumentada un 30%
+      night_pmrem_mult: 3.95,     // v5.16: Exposición ambiental en penumbra aumentada un 30%
       night_pedestal: 0.050,
 
       weights_1_light: [1.00],
