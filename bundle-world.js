@@ -1,4 +1,4 @@
-// 9th Wall v5.15
+// 9th Wall v5.16
 (() => {
   var e = {
     574() {
@@ -146,7 +146,7 @@
     const e = window.ecs;
 
     // [INMUTABLE - NO MODIFICAR BAJO NINGÚN CONCEPTO: ARRANQUE CINEMÁTICO INICIAL v4.53 / v5.00]
-    // v5.15: Spawner con hundimiento proporcional completo (800ms), pausa de 5 frames en iOS antes de carga, texturas estándar nativas y blindaje sagrado de envMap
+    // v5.16: Spawner con hundimiento proporcional (800ms), pausa de 5 frames en iOS, desalojo forzado Metal 1x1, mipmaps=false en iOS y sombras a 0.48
     e.registerComponent({
       name: "dish-spawner",
       schema: { prefab: "eid" },
@@ -154,13 +154,14 @@
         let isPlaced = false;
         let spawnedEid = null;
         let isTransitioning = false;
+        let dummy1x1 = null;
 
         const scaleDuration = 2000;    // v4.47: 2000ms Escala (EaseOut Quadratic)
         const rotDuration = 3000;      // v4.47: 3000ms Rotación total (EaseOut Quintic)
         const opacityDuration = 800;   // v4.47: 800ms Opacidad rápida con presencia inmediata
         const totalSpinAngle = -Math.PI * 3; // -540° (1.5 vueltas completas en sentido horario)
 
-        // v5.14: Destrucción selectiva con purga de mapas PBR locales (map, normal, roughness, metalness, ao) blindando estrictamente envMap
+        // v5.16: Destrucción selectiva con desalojo forzado de Metal mediante dummy 1x1 px en iOS blindando estrictamente envMap
         const destruirMallaProfunda = (meshNode) => {
           if (!meshNode) return;
           meshNode.traverse((child) => {
@@ -173,7 +174,16 @@
                     const textureKeys = ['map', 'normalMap', 'roughnessMap', 'metalnessMap', 'aoMap'];
                     textureKeys.forEach(k => {
                       if (m[k] && m[k].isTexture && k !== 'envMap') {
-                        m[k].dispose();
+                        const oldTex = m[k];
+                        if (window.THREE) {
+                          if (!dummy1x1) {
+                            dummy1x1 = new window.THREE.DataTexture(new Uint8Array([0, 0, 0, 0]), 1, 1, window.THREE.RGBAFormat);
+                            dummy1x1.needsUpdate = true;
+                          }
+                          m[k] = dummy1x1;
+                          m.needsUpdate = true;
+                        }
+                        oldTex.dispose();
                       }
                     });
                     m.dispose();
@@ -199,7 +209,7 @@
             t.three.scene.traverse((child) => {
               if (child.isMesh && child.material) {
                 if (child.material.type === 'ShadowMaterial' || child.name === "Ground") {
-                  child.material.opacity = 0.40;
+                  child.material.opacity = 0.48;
                   child.receiveShadow = true;
                 } else if (child.name !== "Ground" && child.name !== "Hider" && child.material.type !== 'ShadowMaterial' && child.material.colorWrite !== false) {
                   child.castShadow = true;
@@ -312,7 +322,7 @@
             };
             requestAnimationFrame(comprobarMallaLista);
           })
-          // v5.14: Cinemática completa de hundimiento (800ms), retiro previo, 5 frames limpios en iOS y carga estándar sin manipulación de mipmaps
+          // v5.16: Cinemática completa de hundimiento (800ms), 5 frames limpios en iOS, mipmaps desactivados en iOS (-33% VRAM)
           .listen(t.events.globalId, "switch-dish-model", ev => {
             if (!isPlaced || !spawnedEid || isTransitioning || !ev.data || !ev.data.modelSrc || !window.THREE) return;
             isTransitioning = true;
@@ -403,10 +413,23 @@
                       newModel.rotation.set(0, 0, 0);
                       newModel.scale.set(1, 1, 1);
 
-                      // Proyección de sombras sobre el Ground
+                      // Proyección de sombras sobre el Ground y desactivación de mipmaps en iOS (-33% VRAM)
                       newModel.traverse((c) => {
                         if (c.isMesh) {
                           c.castShadow = true;
+                          if (isIOS && c.material) {
+                            const mats = Array.isArray(c.material) ? c.material : [c.material];
+                            mats.forEach((m) => {
+                              const textureKeys = ['map', 'normalMap', 'roughnessMap', 'metalnessMap', 'aoMap'];
+                              textureKeys.forEach(k => {
+                                if (m[k] && m[k].isTexture) {
+                                  m[k].generateMipmaps = false;
+                                  m[k].minFilter = rInstance.LinearFilter;
+                                  m[k].needsUpdate = true;
+                                }
+                              });
+                            });
+                          }
                         }
                       });
 
@@ -439,7 +462,7 @@
                   }
                 };
 
-                // v5.14: Pausa limpia de 5 frames en iOS para vaciado de Metal antes de parsear nuevo modelo
+                // Pausa limpia de 5 frames en iOS para vaciado de Metal antes de parsear nuevo modelo
                 if (isIOS) {
                   let framesWait = 5;
                   const waitFrames = () => {
@@ -1045,7 +1068,7 @@
           "material": {
             "type": "shadow",
             "color": "#000000",
-            "opacity": 0.40
+            "opacity": 0.48
           },
           "parentId": "84028e73-ee70-412d-b8d4-c09bf07c655c",
           "components": {
@@ -1131,7 +1154,7 @@
     delete i.historyVersion;
     const _idx = sessionStorage.getItem("modelo_actual");
 
-    // v5.14: Mapeo de modelos desde contents.js
+    // v5.14/v5.16: Mapeo de modelos desde contents.js
     const _cfg = window.MENU_CONFIG || {};
     const _raw = _cfg.platos || [];
     const _limit = _cfg.totalPlatos ? Math.min(_cfg.totalPlatos, _raw.length) : _raw.length;
