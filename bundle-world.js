@@ -1,4 +1,4 @@
-// 9th Wall v5.17
+// 9th Wall v5.18 (Bala 1 erradicada / Bala 3 limpia con Dummy 1x1 sin recompilación / 5 frames de drenaje Metal)
 (() => {
   var e = {
     574() {
@@ -10,13 +10,11 @@
           name: 'pointcloud-debugger-inner',
           onStart: () => {
             if (window.XR8) {
-              // Habilitamos la extracción de puntos únicamente si la depuración está activa
               window.XR8.XrController.configure({ enableWorldPoints: true });
             }
           },
           onUpdate: (e) => {
             if (e.processCpuResult && e.processCpuResult.reality) {
-              // Exponemos las coordenadas del SLAM globalmente para el componente 3D
               window.latestWorldPoints = e.processCpuResult.reality.worldPoints;
             }
           }
@@ -64,6 +62,17 @@
     cornerRadius: 0.035,
     color: 0x66ffff
   });
+
+  // Textura Dummy 1x1 compartida para desalojo inmediato en Metal (Bala 3)
+  let dummy1x1Texture = null;
+  const obtenerDummy1x1 = (THREE_INSTANCE) => {
+    if (!dummy1x1Texture && THREE_INSTANCE && THREE_INSTANCE.DataTexture) {
+      const pixelData = new Uint8Array([0, 0, 0, 255]);
+      dummy1x1Texture = new THREE_INSTANCE.DataTexture(pixelData, 1, 1);
+      dummy1x1Texture.needsUpdate = true;
+    }
+    return dummy1x1Texture;
+  };
 
   // [INMUTABLE: GEOMETRÍA ANALÍTICA DE MARCO]
   function crearGeometriaMarcoReticula(THREE_INSTANCE, sizeX, sizeZ, thickness, radius) {
@@ -145,7 +154,7 @@
     const e = window.ecs;
 
     // [INMUTABLE: ARRANQUE CINEMÁTICO INICIAL]
-    // v5.17: Bala 1 aislada (Mipmaps = false en iOS sin recompilación), base v5.15 pura al destruir, sombra Ground 0.48
+    // v5.18: Bala 3 limpia en iOS (dummy 1x1 sin recompilar), Bala 1 eliminada, pausa de 5 frames intacta
     e.registerComponent({
       name: "dish-spawner",
       schema: { prefab: "eid" },
@@ -159,17 +168,23 @@
         const opacityDuration = 800;   // 800ms Opacidad rápida
         const totalSpinAngle = -Math.PI * 3; // -540° (1.5 vueltas horarias)
 
-        // v5.17: Restauración base v5.15 limpia al destruir (sin dummy 1x1 ni órdenes contradictorias a Metal)
+        // v5.18: Bala 3 ejecutada limpiamente en desmontaje (dummy 1x1 sin needsUpdate)
         const destruirMallaProfunda = (meshNode) => {
           if (!meshNode) return;
+          const rInstance = window.THREE;
+          const dummy = isIOS ? obtenerDummy1x1(rInstance) : null;
+
           meshNode.traverse((child) => {
             if (child.isMesh) {
               if (isIOS) {
-                if (child.geometry) child.geometry.dispose();
+                if (child.geometry) {
+                  child.geometry.dispose();
+                }
                 if (child.material) {
                   const mats = Array.isArray(child.material) 
                     ? child.material 
                     : [child.material];
+
                   mats.forEach((m) => {
                     const textureKeys = [
                       'map', 
@@ -178,17 +193,26 @@
                       'metalnessMap', 
                       'aoMap'
                     ];
+
                     textureKeys.forEach((k) => {
                       if (m[k] && m[k].isTexture && k !== 'envMap') {
-                        m[k].dispose();
+                        const oldTex = m[k];
+                        if (dummy) {
+                          // Desvincula el búfer pesado en Metal reasignando a 1x1
+                          m[k] = dummy;
+                        }
+                        oldTex.dispose();
                       }
                     });
+
+                    // CRÍTICO Bala 3: NO invocar m.needsUpdate = true para no disparar recompilación
                     m.dispose();
                   });
                 }
               }
             }
           });
+
           if (meshNode.parent) {
             meshNode.parent.remove(meshNode);
           }
@@ -205,7 +229,7 @@
             t.three.scene.traverse((child) => {
               if (child.isMesh && child.material) {
                 if (child.material.type === 'ShadowMaterial' || child.name === "Ground") {
-                  child.material.opacity = 0.48; // Sombra sincronizada v5.17
+                  child.material.opacity = 0.48;
                   child.receiveShadow = true;
                 } else if (
                   child.name !== "Ground" && 
@@ -256,6 +280,7 @@
               y: currentScaleVal, 
               z: currentScaleVal 
             });
+
             t.getEntity(rootTarget).set(
               e.Quaternion, 
               e.math.quat.yRadians(currentAngle)
@@ -274,6 +299,7 @@
                 e.Quaternion, 
                 e.math.quat.yRadians(baseRotY + totalSpinAngle)
               );
+
               spawnMaterials.forEach((m) => {
                 m.opacity = 1.0;
                 m.transparent = false;
@@ -347,15 +373,20 @@
             };
             requestAnimationFrame(comprobarMallaLista);
           })
-          // v5.17: Hundimiento 800ms, pausa de 5 frames en iOS, y Bala 1 limpia (Mipmaps=false sin forzar needsUpdate)
+
+          // v5.18: Hundimiento 800ms, desalojo Bala 3, pausa de 5 frames en iOS, y recarga limpia
           .listen(t.events.globalId, "switch-dish-model", (ev) => {
-            if (!isPlaced || !spawnedEid || isTransitioning || !ev.data || !ev.data.modelSrc || !window.THREE) return;
+            if (!isPlaced || !spawnedEid || isTransitioning || !ev.data || 
+                !ev.data.modelSrc || !window.THREE) return;
+
             isTransitioning = true;
 
             setTimeout(() => {
               if (isTransitioning) {
                 isTransitioning = false;
-                if (window.notificarSpawnFinalizado) window.notificarSpawnFinalizado();
+                if (window.notificarSpawnFinalizado) {
+                  window.notificarSpawnFinalizado();
+                }
               }
             }, 4500);
 
@@ -404,7 +435,9 @@
             const startY = dishPos.y;
             const targetSinkY = startY - (dishHeight + 0.03);
 
-            const loader = (window.THREE.GLTFLoader) ? new window.THREE.GLTFLoader() : null;
+            const loader = (window.THREE.GLTFLoader) 
+              ? new window.THREE.GLTFLoader() 
+              : null;
 
             const animarHundimiento = () => {
               const elapsed = performance.now() - sinkStartTime;
@@ -422,7 +455,7 @@
               if (progress < 1.0) {
                 requestAnimationFrame(animarHundimiento);
               } else {
-                // Retirada del modelo previo al concluir los 800ms
+                // Retirada del modelo previo al concluir los 800ms aplicando Bala 3
                 const entityObj = (t.three && t.three.entityToObject) 
                   ? t.three.entityToObject.get(spawnedEid) 
                   : null;
@@ -459,30 +492,10 @@
                       newModel.rotation.set(0, 0, 0);
                       newModel.scale.set(1, 1, 1);
 
-                      // Sombras sobre Ground y Bala 1 limpia (Mipmaps = false en iOS sin recompilación previa)
+                      // Sombras sobre Ground (Bala 1 erradicada: sin alterar generateMipmaps ni minFilter)
                       newModel.traverse((c) => {
                         if (c.isMesh) {
                           c.castShadow = true;
-                          if (isIOS && c.material) {
-                            const mats = Array.isArray(c.material) 
-                              ? c.material 
-                              : [c.material];
-                            mats.forEach((m) => {
-                              const textureKeys = [
-                                'map', 
-                                'normalMap', 
-                                'roughnessMap', 
-                                'metalnessMap', 
-                                'aoMap'
-                              ];
-                              textureKeys.forEach((k) => {
-                                if (m[k] && m[k].isTexture) {
-                                  m[k].generateMipmaps = false;
-                                  m[k].minFilter = rInstance.LinearFilter;
-                                }
-                              });
-                            });
-                          }
                         }
                       });
 
@@ -514,11 +527,15 @@
                       dispararCinematicaSpawn(spawnedEid, currentRotY, currentScale);
                     }, undefined, () => {
                       isTransitioning = false;
-                      if (window.notificarSpawnFinalizado) window.notificarSpawnFinalizado();
+                      if (window.notificarSpawnFinalizado) {
+                        window.notificarSpawnFinalizado();
+                      }
                     });
                   } else {
                     isTransitioning = false;
-                    if (window.notificarSpawnFinalizado) window.notificarSpawnFinalizado();
+                    if (window.notificarSpawnFinalizado) {
+                      window.notificarSpawnFinalizado();
+                    }
                   }
                 };
 
@@ -800,7 +817,8 @@
               const nextZ = l.z + dragOffsetZ;
               if (
                 !isDragActive && 
-                Math.hypot(nextX - planarX, nextZ - planarZ) < DRAG_RETICLE_CONFIG.dragActivationThreshold
+                Math.hypot(nextX - planarX, nextZ - planarZ) < 
+                  DRAG_RETICLE_CONFIG.dragActivationThreshold
               ) return;
 
               planarX = nextX;
@@ -828,7 +846,6 @@
                 const rInstance = window.THREE;
 
                 if (rInstance) {
-                  // Caída vertical y bamboleo amortiguado (+8mm de elevación de seguridad)
                   const wobbleDuration = 1200;
                   const wobbleStartTime = performance.now();
                   const startY = n.y;
@@ -841,8 +858,12 @@
                   let currentRotY = 0;
                   if (e.Quaternion && e.Quaternion.has(t, a)) {
                     const qData = e.Quaternion.get(t, a);
-                    const qInit = new rInstance.Quaternion(qData.x, qData.y, qData.z, qData.w);
-                    const eulerInit = new rInstance.Euler().setFromQuaternion(qInit, 'YXZ');
+                    const qInit = new rInstance.Quaternion(
+                      qData.x, qData.y, qData.z, qData.w
+                    );
+                    const eulerInit = new rInstance.Euler().setFromQuaternion(
+                      qInit, 'YXZ'
+                    );
                     currentRotY = eulerInit.y;
                   }
 
@@ -1075,7 +1096,6 @@
 
     const i = {
       "objects": {
-
         // Prefab del objeto que se clona (Logo / Plato)
         "b534657a-38e6-4275-a37d-77b655561d5b": {
           "id": "b534657a-38e6-4275-a37d-77b655561d5b",
@@ -1097,7 +1117,7 @@
           "prefab": true
         },
 
-        // Luz direccional base (Contact AO y sombras del Ground)
+        // Luz direccional base
         "492cfe2c-9334-4a9c-a48a-be80132af9fb": {
           "id": "492cfe2c-9334-4a9c-a48a-be80132af9fb",
           "position": [0, 1, 0],
@@ -1157,7 +1177,7 @@
           "order": 2.1029089692509704
         },
 
-        // Plano del suelo (Ground) con opacidad calibrada 0.48
+        // Plano del suelo (Ground)
         "bc7753ae-2b39-4f48-910a-7921b756487b": {
           "id": "bc7753ae-2b39-4f48-910a-7921b756487b",
           "position": [0, 0.001, 0],
@@ -1193,7 +1213,7 @@
           }
         },
 
-        // Plano Ocultador (Hider físico nativo 8th Wall)
+        // Plano Ocultador
         "17af117a-efce-48dd-857e-e383a3649c7b": {
           "id": "17af117a-efce-48dd-857e-e383a3649c7b",
           "position": [0, -0.001, 0],
@@ -1213,7 +1233,7 @@
           "order": 7.322553197845954
         },
 
-        // Entidad del Modelo 3D (El archivo .glb)
+        // Entidad del Modelo 3D (.glb)
         "a02b4479-461e-40c2-ba91-0ccabbd1bd83": {
           "id": "a02b4479-461e-40c2-ba91-0ccabbd1bd83",
           "position": [0, 0, 0],
@@ -1260,14 +1280,19 @@
     // Mapeo dinámico de modelos desde contents.js
     const _cfg = window.MENU_CONFIG || {};
     const _raw = _cfg.platos || [];
-    const _limit = _cfg.totalPlatos ? Math.min(_cfg.totalPlatos, _raw.length) : _raw.length;
+    const _limit = _cfg.totalPlatos 
+      ? Math.min(_cfg.totalPlatos, _raw.length) 
+      : _raw.length;
     const _platos = _raw.slice(0, _limit);
-    const _models = _platos.length > 0 ? _platos.map((p) => p.archivoGLB) : [
-      "Plato_01.glb", "Plato_02.glb", "Plato_03.glb", "Plato_04.glb",
-      "Plato_05.glb", "Plato_06.glb", "Plato_07.glb", "Plato_08.glb",
-      "Plato_09.glb", "Plato_10.glb", "Plato_11.glb", "Plato_12.glb",
-      "Plato_13.glb", "Plato_14.glb", "Plato_15.glb"
-    ];
+
+    const _models = _platos.length > 0 
+      ? _platos.map((p) => p.archivoGLB) 
+      : [
+        "Plato_01.glb", "Plato_02.glb", "Plato_03.glb", "Plato_04.glb",
+        "Plato_05.glb", "Plato_06.glb", "Plato_07.glb", "Plato_08.glb",
+        "Plato_09.glb", "Plato_10.glb", "Plato_11.glb", "Plato_12.glb",
+        "Plato_13.glb", "Plato_14.glb", "Plato_15.glb"
+      ];
 
     if (_idx !== null && parseInt(_idx) < _models.length) {
       i.objects["a02b4479-461e-40c2-ba91-0ccabbd1bd83"].gltfModel.src = {
@@ -1277,8 +1302,10 @@
     }
 
     if (!DEBUG_VISUALS.slamPointCloud) {
-      delete i.objects["52ba8a86-a459-4df8-b954-a570e85e0484"].components["point-cloud-visualizer-comp"];
+      delete i.objects["52ba8a86-a459-4df8-b954-a570e85e0484"]
+        .components["point-cloud-visualizer-comp"];
     }
+
     window.ecs.application.init(i);
   })()
 })();
