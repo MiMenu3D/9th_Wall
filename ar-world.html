@@ -1,11 +1,11 @@
-<!-- 9th_Design v5.16x (PMREM Freeze on iOS / Strategic Dual-Specular / Watchdog Auto-Recovery without Ready / Clean XR8 Exit / Adjusted Specular Lobes & AO / sRGB Ground AO / Fast AE Lerp / Multi-Select Photo Strip & Native Share / 0ms Instant Photo-Save / Landscape Warning Blocker) -->
+<!-- 9th_Design v5.17 (PMREM Freeze on iOS / Strategic Dual-Specular / Watchdog Auto-Recovery without Ready / Clean XR8 Popstate / Balanced Specular Lobes / Ground AO 0.48 / Fast AE Lerp / Multi-Select Photo Strip & Native Share / 0ms Instant Photo-Save / Landscape Warning Blocker) -->
 <html>
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no,viewport-fit=cover">
   <meta name="theme-color" content="#040507">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <title>9th_Design AR 5.16</title>
+  <title>9th_Design AR 5.17</title>
   <script src="contents.js"></script>
   <script crossorigin="anonymous" src="external/runtime/runtime.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@8thwall/engine-binary@1/dist/xr.js" async crossorigin="anonymous" data-preload-chunks="slam"></script>
@@ -21,8 +21,8 @@
     style="position:fixed;top:10px;right:10px;z-index:1000000;background:rgba(0,0,0,0.9);color:#0f0;font-family:monospace;font-size:12px;padding:8px;border-radius:4px;cursor:pointer;line-height:1.3;border:1px solid #0f0;display:none;pointer-events:auto;">
     <div id="debugTitle">FPS: --</div>
     <div id="debugContent">
-      ar-world: v5.16<br>
-      bundle: v5.16<br>
+      ar-world: v5.17<br>
+      bundle: v5.17<br>
       <span id="envVerdictSpan" style="color:#0f0;">Entorno: ESPERANDO MESA...</span><br>
       <span id="telemetrySpan" style="color:#0f0;">P98: -- (/255) | Lum: -- (/255) | Cálido: --%</span><br>
       <span id="benchmarkSpan" style="color:#0f0;">Pre: --sec - Post: --sec</span><br>
@@ -63,12 +63,12 @@
     </button>
   </div>
 
-  <!-- v5.16: Watchdog de Cámara (Fase 1: Aviso centrado a la altura de 'Apunta hacia la mesa', z-index seguro bajo diálogos de sistema) -->
+  <!-- Watchdog de Cámara (Fase 1: Aviso centrado a la altura de 'Apunta hacia la mesa', z-index seguro bajo diálogos de sistema) -->
   <div id="cameraSyncBanner" style="position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:rgba(0,0,0,0.85);color:#00e5ff;font-family:sans-serif;font-size:15px;font-weight:bold;padding:12px 26px;border-radius:24px;border:1px solid rgba(0,229,255,0.5);box-shadow:0 4px 20px rgba(0,0,0,0.7);z-index:999980;display:none;pointer-events:none;letter-spacing:0.4px;white-space:nowrap;transition:opacity 0.3s ease;">
     Sincronizando sensor de cámara...
   </div>
 
-  <!-- v5.09: Watchdog de Cámara (Fase 2: Modal de recuperación a los 5.0s con liberación de tracks) -->
+  <!-- Watchdog de Cámara (Fase 2: Modal de recuperación a los 5.0s con liberación de tracks) -->
   <div id="cameraErrorModal" style="position:fixed;inset:0;background:rgba(4,5,7,0.96);z-index:1000010;display:none;flex-direction:column;align-items:center;justify-content:center;padding:28px;text-align:center;color:white;font-family:sans-serif;">
     <svg viewBox="0 0 24 24" width="48" height="48" fill="none" stroke="#00e5ff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-bottom:18px;">
       <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path>
@@ -416,7 +416,7 @@
     }
     #infoDishBtn:active { transform: scale(0.92); }
 
-    /* Card panorámica anclada al fondo de la pantalla en AR (sólido negro pulido sin blur ni sombra) */
+    /* Card gastronómica anclada al extremo inferior en AR (sólido negro pulido sin blur ni sombra) */
     .ar-card-docked {
       position: fixed;
       bottom: 0;
@@ -639,6 +639,7 @@
       background: #00e5ff;
       border-color: #00e5ff;
     }
+    /* v5.17: Escape Unicode puro sin caracteres literales UTF-8 problemáticos */
     .strip-thumb-card.selected .strip-thumb-check::after {
       content: "\2713";
       color: #000;
@@ -673,27 +674,27 @@
     // Detección infalible de entorno iOS para blindaje y balance de render
     const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
 
-    // v5.15/v5.16: Watchdog de crash WebGL con restauración automática saltando el flujo "Listo"
+    // Watchdog de crash WebGL con restauración automática saltando el flujo "Listo"
     const isCrashRecovery = sessionStorage.getItem('ar_crash_recovery') === '1';
     if (isCrashRecovery) {
       sessionStorage.removeItem('ar_crash_recovery');
     }
 
-    // v5.15/v5.16: Purga preventiva de memoria gestual residual para que cualquier recarga restaure el icono
+    // Purga preventiva de memoria gestual residual para que cualquier recarga restaure el icono
     try {
       sessionStorage.removeItem('ar_gesture_dismissed');
       localStorage.removeItem('ar_interacted');
     } catch (e) {}
 
     // =========================================================================
-    // 2. CONSOLA DE ESPECULARES (v5.16: Lóbulos Calibrados - Thin -10% / Wide -15%)
+    // 2. CONSOLA DE ESPECULARES (v5.17: Thin 0.80 Anti-titileo / Wide 1.48 Sedoso)
     // =========================================================================
     const SPECULAR_CONFIG = {
-      // Capa 1: Lóbulo THIN (Núcleo nítido puntual - 10% menos intensidad, radio ceñido 15%)
-      thin_intensity: 0.50,
-      thin_expansion: 0.68,
+      // Capa 1: Lóbulo THIN (Núcleo nítido puntual - grosor restaurado v5.14/v5.15)
+      thin_intensity: 0.55,
+      thin_expansion: 0.80,
 
-      // Capa 2: Lóbulo WIDE (Halo envolvente suave - 15% menos intensidad, área expandida 15%)
+      // Capa 2: Lóbulo WIDE (Halo envolvente suave - calibración sedosa sin velo blanco)
       wide_intensity: 0.28,
       wide_expansion: 1.48,
 
@@ -702,7 +703,7 @@
     };
 
     // =========================================================================
-    // 3. CONSOLA DE ILUMINACIÓN Y CALIBRACIÓN AMBIENTAL (v5.16: Penumbra +30% / Suave ~20%)
+    // 3. CONSOLA DE ILUMINACIÓN Y CALIBRACIÓN AMBIENTAL (v5.17: Penumbra 0.80 / 3.80)
     // =========================================================================
     const LIGHTING_CONFIG = {
       pmrem_resolution: isIOS ? 64 : 256,
@@ -710,16 +711,16 @@
       scan_interval_ms: isIOS ? 250 : 200,
       calibration_frames_target: 4,
       shadow_map_size: 512,
-      day_shadow_radius: 4.8,     // v5.16: Radio de sombra expandido un 20%
-      night_shadow_radius: 10.6,   // v5.16: Radio nocturno expandido un 20%
-      ground_opacity_fixed: 0.48, // v5.16: Opacidad base aumentada un 20%
+      day_shadow_radius: 4.8,     // Radio de sombra suave expandido
+      night_shadow_radius: 9.6,   // Radio nocturno suave expandido
+      ground_opacity_fixed: 0.48, // Opacidad base definida
 
       day_total_energy: 4.68,
       day_pmrem_mult: 1.65,
       day_pedestal: 0.035,
 
-      night_total_energy: 0.85,   // v5.16: Luz directa en penumbra aumentada un 30%
-      night_pmrem_mult: 3.95,     // v5.16: Exposición ambiental en penumbra aumentada un 30%
+      night_total_energy: 0.80,   // v5.17: Cifra limpia redondeada (+20% neto en penumbra)
+      night_pmrem_mult: 3.80,     // v5.17: Cifra limpia redondeada (+12% en ambiente suave)
       night_pedestal: 0.050,
 
       weights_1_light: [1.00],
@@ -1047,7 +1048,7 @@
     }
 
     // =========================================================================
-    // INYECCIÓN PBR Y SHADERS (v5.16: Especulares Thin/Wide Calibrados)
+    // INYECCIÓN PBR Y SHADERS (v5.17: Thin 0.80 / Wide 1.48)
     // =========================================================================
     window.aplicarAjustesSceneViewer = function (targetNode) {
       const root = targetNode || _scene;
@@ -2076,7 +2077,7 @@
     };
 
     // =========================================================================
-    // LÓGICA DE CARRUSEL Y DATOS CENTRALIZADOS DESDE contents.js (v5.16)
+    // LÓGICA DE CARRUSEL Y DATOS CENTRALIZADOS DESDE contents.js (v5.17)
     // =========================================================================
     const menuConfig = window.MENU_CONFIG || { platos: [], moneda: "€" };
     const rawPlatos = menuConfig.platos || [];
@@ -2197,7 +2198,7 @@
     if (closeArCardBtn) closeArCardBtn.addEventListener('click', cerrarCardAR);
 
     // =========================================================================
-    // GESTIÓN DEL ICONO FLOTANTE CON MEMORIA VOLÁTIL DE PÁGINA (v5.16)
+    // GESTIÓN DEL ICONO FLOTANTE CON MEMORIA VOLÁTIL DE PÁGINA (v5.17)
     // =========================================================================
     const arGestureHint = document.getElementById('arGestureHint');
     let hasInteractedWithAR = false;
@@ -2445,7 +2446,7 @@
     closeViewerBtn.addEventListener('click', cerrarVisorFotos);
 
     // =========================================================================
-    // INTERCEPCIÓN DE BOTÓN ATRÁS Y SALIDA LIMPIA (v5.16: XR8.stop + Dispose WebGL)
+    // INTERCEPCIÓN DE BOTÓN ATRÁS Y SALIDA LIMPIA (v5.17: History sin recarga)
     // =========================================================================
     history.pushState({ inAR: true }, '');
 
@@ -2493,21 +2494,16 @@
         }
       }
 
-      // v5.16: Parada biológica y desconexión total de WebGL antes de volver al menú
+      // v5.17: Parada limpia de XR8 sin forzar pérdida de contexto para no disparar el watchdog
       if (window.XR8) {
         try { window.XR8.stop(); } catch (err) {}
-      }
-      if (_renderer) {
-        try {
-          _renderer.dispose();
-          if (_renderer.forceContextLoss) _renderer.forceContextLoss();
-        } catch (err) {}
       }
 
       sessionStorage.setItem('from_ar', '1');
       sessionStorage.setItem('modelo_actual', currentDishIndex);
 
-      window.location.replace('index.html');
+      // v5.17: Cold boot con timestamp en iOS; retorno limpio estándar en Android
+      window.location.replace(isIOS ? ('index.html?v=' + Date.now()) : 'index.html');
     });
 
     viewerPrevBtn.addEventListener('click', () => {
