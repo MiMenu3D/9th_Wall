@@ -1,4 +1,4 @@
-<!-- Versión: 9th_Design v5.17 -->
+<!-- Versión: 9th_Design v5.18 -->
 <!DOCTYPE html>
 <html lang="es">
 <head>
@@ -15,7 +15,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Fredoka:wdth,wght@75..125,300..600&display=swap" rel="stylesheet">
 
-  <!-- Archivo de Contenidos Centralizado v5.17 -->
+  <!-- Archivo de Contenidos Centralizado v5.18 -->
   <script src="contents.js"></script>
 
   <!-- Model Viewer Oficial de Google -->
@@ -129,7 +129,7 @@
       overflow: hidden;
     }
 
-    /* Estilo del visor 3D (v5.17: Restauración base v5.12 sin capas CSS forzadas en iOS) */
+    /* Estilo del visor 3D (v5.18: Restauración base v5.12 sin capas CSS forzadas en iOS) */
     model-viewer {
       width: 100%;
       height: 100%;
@@ -833,7 +833,7 @@
       }
 
       // ======================================================================
-      // 0. GENERACIÓN DINÁMICA DE LA LISTA DESDE contents.js (v5.17)
+      // 0. GENERACIÓN DINÁMICA DE LA LISTA DESDE contents.js (v5.18)
       // ======================================================================
       const menuList = document.getElementById('menu-list');
       const menuConfig = window.MENU_CONFIG || { platos: [], moneda: "€" };
@@ -898,7 +898,7 @@
       // Modelos 3D leídos directamente desde contents.js
       const models = platosData.map(p => p.archivoGLB);
 
-      // v5.17: Lectura limpia de estado de navegación
+      // v5.18: Lectura limpia de estado de navegación
       const navEntries = performance.getEntriesByType('navigation');
       const isReload = navEntries.length > 0 && navEntries[0].type === 'reload';
       const fromAR = sessionStorage.getItem('from_ar') === '1';
@@ -1114,7 +1114,7 @@
       });
 
       // ======================================================================
-      // 6. INSTANCIACIÓN Y GESTIÓN LIMPIA DEL VISOR 3D (v5.17)
+      // 6. INSTANCIACIÓN Y GESTIÓN LIMPIA DEL VISOR 3D (v5.18)
       // ======================================================================
       function destroyModelViewer() {
         if (viewerSlot) {
@@ -1212,22 +1212,28 @@
       });
 
       // ======================================================================
-      // 7. GESTIÓN DEL ICONO FLOTANTE CON MEMORIA VOLÁTIL DE PÁGINA (v5.17)
+      // 7. GESTIÓN DEL ICONO FLOTANTE CON MEMORIA VOLÁTIL DE PÁGINA (v5.18)
       // ======================================================================
-      let hasInteractedWithMV = false;
+      // Purga condicionada: solo en apertura limpia o recarga manual, nunca si se vuelve de AR
+      if (!fromAR) {
+        try {
+          sessionStorage.removeItem('mv_gesture_dismissed');
+          localStorage.removeItem('mv_interacted');
+        } catch (err) {}
+      }
+
+      let hasInteractedWithMV = sessionStorage.getItem('mv_gesture_dismissed') === '1';
       let hintTimer1 = null;
       let hintTimer2 = null;
       let hintTimer3 = null;
       let hintTimer4 = null;
 
-      try {
-        sessionStorage.removeItem('mv_gesture_dismissed');
-        localStorage.removeItem('mv_interacted');
-      } catch (err) {}
-
       function dismissGestureHint() {
         if (hasInteractedWithMV) return;
         hasInteractedWithMV = true;
+        try {
+          sessionStorage.setItem('mv_gesture_dismissed', '1');
+        } catch (err) {}
         clearTimeout(hintTimer1);
         clearTimeout(hintTimer2);
         clearTimeout(hintTimer3);
@@ -1256,6 +1262,9 @@
               hintTimer4 = setTimeout(() => {
                 gestureHint.classList.remove('visible');
                 hasInteractedWithMV = true;
+                try {
+                  sessionStorage.setItem('mv_gesture_dismissed', '1');
+                } catch (err) {}
                 setTimeout(() => gestureHint.remove(), 400);
               }, 3000);
             }, 10000);
@@ -1327,16 +1336,15 @@
       });
 
       // ======================================================================
-      // 9. LANZAMIENTO HACIA AR Y RESTAURACIÓN LIMPIA AL VOLVER (v5.17)
+      // 9. LANZAMIENTO HACIA AR Y RESTAURACIÓN LIMPIA AL VOLVER (v5.18)
       // ======================================================================
-      // v5.17: Salida nativa limpia emulando v5.12 (sin destruir el visor antes de navegar)
       btnAr.addEventListener('click', () => {
         sessionStorage.setItem('from_ar', '1');
         sessionStorage.setItem('modelo_actual', currentIndex);
         window.location.href = 'ar-world.html';
       });
 
-      // v5.17: Gestión de páginas en caché BFCache
+      // v5.18: Gestión de páginas en caché BFCache
       window.addEventListener('pageshow', (e) => {
         if (e.persisted) {
           if (isIOS) {
@@ -1353,7 +1361,7 @@
         }
       });
 
-      // v5.17: Arranque inicial limpio y unificado
+      // v5.18: Arranque inicial limpio y unificado
       createModelViewer();
       selectDish(currentIndex, false, false);
 
