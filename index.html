@@ -1,4 +1,4 @@
-<!-- Versión: 9th_Design v5.16 -->
+<!-- Versión: 9th_Design v5.17 -->
 <!DOCTYPE html>
 <html lang="es">
 <head>
@@ -15,7 +15,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Fredoka:wdth,wght@75..125,300..600&display=swap" rel="stylesheet">
 
-  <!-- Archivo de Contenidos Centralizado v5.16 -->
+  <!-- Archivo de Contenidos Centralizado v5.17 -->
   <script src="contents.js"></script>
 
   <!-- Model Viewer Oficial de Google -->
@@ -129,7 +129,7 @@
       overflow: hidden;
     }
 
-    /* Estilo del visor 3D (v5.16: Blindaje GPU translateZ(0) restaurado en iOS / Android nativo sin will-change) */
+    /* Estilo del visor 3D (v5.17: Restauración base v5.12 sin capas CSS forzadas en iOS) */
     model-viewer {
       width: 100%;
       height: 100%;
@@ -140,9 +140,6 @@
 
     body.is-ios model-viewer {
       filter: saturate(0.95) contrast(0.95);
-      transform: translateZ(0);
-      will-change: filter, transform;
-      backface-visibility: hidden;
     }
 
     body:not(.is-ios) model-viewer {
@@ -664,7 +661,7 @@
       height: 8.8rem;
     }
 
-    /* v5.05: Fade superior recortado a la mitad de altura (~6% arriba frente a 28% abajo) */
+    /* Fade superior recortado a la mitad de altura (~6% arriba frente a 28% abajo) */
     .card-scroll-wrap {
       height: 100%;
       overflow-y: auto;
@@ -703,7 +700,7 @@
       border-radius: 0.05rem;
     }
 
-    /* v5.05: Bolita con área táctil ampliada al triple (~36px) mediante pseudo-elemento */
+    /* Bolita con área táctil ampliada (~36px) mediante pseudo-elemento */
     .card-scroll-dot {
       width: 0.58rem;
       height: 0.58rem;
@@ -836,7 +833,7 @@
       }
 
       // ======================================================================
-      // 0. GENERACIÓN DINÁMICA DE LA LISTA DESDE contents.js (v5.16)
+      // 0. GENERACIÓN DINÁMICA DE LA LISTA DESDE contents.js (v5.17)
       // ======================================================================
       const menuList = document.getElementById('menu-list');
       const menuConfig = window.MENU_CONFIG || { platos: [], moneda: "€" };
@@ -901,26 +898,24 @@
       // Modelos 3D leídos directamente desde contents.js
       const models = platosData.map(p => p.archivoGLB);
 
-      // v5.16: Handshake BFCache exclusivo para iOS con retardo limpio de 300ms anti T-1000
+      // v5.17: Lectura limpia de estado de navegación
       const navEntries = performance.getEntriesByType('navigation');
       const isReload = navEntries.length > 0 && navEntries[0].type === 'reload';
       const fromAR = sessionStorage.getItem('from_ar') === '1';
-      const isFromArReload = sessionStorage.getItem('from_ar_reload') === '1';
       let currentIndex = 0;
 
-      if (isReload && !fromAR && !isFromArReload) {
+      if (isReload && !fromAR) {
         // Recarga manual por el usuario: reseteo estricto a Plato 01
         sessionStorage.removeItem('modelo_actual');
         sessionStorage.removeItem('from_ar');
-        sessionStorage.removeItem('from_ar_reload');
         currentIndex = 0;
-      } else if (isFromArReload || fromAR) {
+      } else if (fromAR) {
         // Retorno legítimo desde AR: recuperación exacta del plato seleccionado
-        sessionStorage.removeItem('from_ar_reload');
         const saved = sessionStorage.getItem('modelo_actual');
         if (saved !== null && !isNaN(parseInt(saved, 10))) {
           currentIndex = parseInt(saved, 10);
         }
+        sessionStorage.removeItem('from_ar');
       } else {
         // Apertura inicial limpia
         sessionStorage.removeItem('modelo_actual');
@@ -940,7 +935,6 @@
       const BASE_SPEED = 0.055;
       let currentDirection = 1;
 
-      // v5.05: +10% en compresión de escala (scaleDip) y +25% en giro (twistPower)
       const layerConfigs = [
         { delay: 0,   twistPower: 0.525, twistDamp: 0.958, scaleDip: 0.9538, parallaxK: 1.80 },
         { delay: 170, twistPower: 1.025, twistDamp: 0.955, scaleDip: 0.9659, parallaxK: 1.28 },
@@ -1059,7 +1053,6 @@
       document.querySelectorAll('.card-scroll-wrap').forEach((wrap) => {
         wrap.addEventListener('scroll', () => updateCardScrollDot(wrap), { passive: true });
 
-        // v5.05: Interacción táctil en la bolita (arrastre abajo = contenido desciende)
         const container = wrap.closest('.card-scroll-container');
         if (!container) return;
         const track = container.querySelector('.card-scroll-track');
@@ -1121,7 +1114,7 @@
       });
 
       // ======================================================================
-      // 6. INSTANCIACIÓN Y GESTIÓN LIMPIA DEL VISOR 3D (v5.16)
+      // 6. INSTANCIACIÓN Y GESTIÓN LIMPIA DEL VISOR 3D (v5.17)
       // ======================================================================
       function destroyModelViewer() {
         if (viewerSlot) {
@@ -1140,7 +1133,6 @@
         newMv.setAttribute('auto-rotate', '');
         newMv.setAttribute('auto-rotate-delay', '0');
         newMv.setAttribute('rotation-per-second', '17deg');
-        // v5.16: Ángulo cenital consolidado restaurado a 70deg idéntico a v5.14
         newMv.setAttribute('camera-orbit', '0deg 70deg 45%');
         newMv.setAttribute('min-camera-orbit', '0deg 0deg 45%');
         newMv.setAttribute('max-camera-orbit', '360deg 90deg 45%');
@@ -1178,7 +1170,6 @@
         menuList.classList.remove('has-expanded');
       }
 
-      // v5.11 / v5.14: Restauración de selección v5.09 (cero saltos de lista en primer toque)
       function selectDish(index, shouldScroll = false, triggerReaction = true) {
         if (index < 0 || index >= models.length) return;
         currentIndex = index;
@@ -1221,7 +1212,7 @@
       });
 
       // ======================================================================
-      // 7. GESTIÓN DEL ICONO FLOTANTE CON MEMORIA VOLÁTIL DE PÁGINA (v5.16)
+      // 7. GESTIÓN DEL ICONO FLOTANTE CON MEMORIA VOLÁTIL DE PÁGINA (v5.17)
       // ======================================================================
       let hasInteractedWithMV = false;
       let hintTimer1 = null;
@@ -1229,7 +1220,6 @@
       let hintTimer3 = null;
       let hintTimer4 = null;
 
-      // Purga total de residuos de sesión previos para garantizar que cualquier recarga restaure el icono
       try {
         sessionStorage.removeItem('mv_gesture_dismissed');
         localStorage.removeItem('mv_interacted');
@@ -1254,14 +1244,12 @@
           return;
         }
 
-        // Ciclo 1: espera 5s -> visible 3s -> fade out
         hintTimer1 = setTimeout(() => {
           gestureHint.classList.add('visible');
 
           hintTimer2 = setTimeout(() => {
             gestureHint.classList.remove('visible');
 
-            // Ciclo 2: pausa 10s -> visible 3s -> fade out definitivo
             hintTimer3 = setTimeout(() => {
               gestureHint.classList.add('visible');
 
@@ -1281,7 +1269,7 @@
       initGestureHint();
 
       // ======================================================================
-      // 8. GESTOS TÁCTILES Y SELECCIÓN EN LA LISTA (RESTAURACIÓN v5.09)
+      // 8. GESTOS TÁCTILES Y SELECCIÓN EN LA LISTA
       // ======================================================================
       let touchStartY = 0;
       let touchStartX = 0;
@@ -1309,7 +1297,6 @@
           const isCurrentlyExpanded = item.classList.contains('expanded');
 
           if (isCurrentlyActive) {
-            // SEGUNDO TOQUE: Alterna Card con desplazamiento suave centrado
             if (isCurrentlyExpanded) {
               collapseAllCards();
             } else {
@@ -1334,44 +1321,30 @@
               }, 110);
             }
           } else {
-            // PRIMER TOQUE: Selección simple y actualización de visor (cero saltos de lista)
             selectDish(index, false, true);
           }
         });
       });
 
       // ======================================================================
-      // 9. LANZAMIENTO HACIA AR Y RESTAURACIÓN LIMPIA AL VOLVER (v5.16)
+      // 9. LANZAMIENTO HACIA AR Y RESTAURACIÓN LIMPIA AL VOLVER (v5.17)
       // ======================================================================
+      // v5.17: Salida nativa limpia emulando v5.12 (sin destruir el visor antes de navegar)
       btnAr.addEventListener('click', () => {
         sessionStorage.setItem('from_ar', '1');
         sessionStorage.setItem('modelo_actual', currentIndex);
-        destroyModelViewer(); // Desmontaje limpio de VRAM antes de levantar la cámara AR
         window.location.href = 'ar-world.html';
       });
 
-      // v5.16: Handshake en pageshow para iOS (recarga limpia) y Android (continuidad directa)
+      // v5.17: Gestión de páginas en caché BFCache
       window.addEventListener('pageshow', (e) => {
-        const navigatedFromAR = sessionStorage.getItem('from_ar') === '1';
-        if (navigatedFromAR) {
-          sessionStorage.removeItem('from_ar');
+        if (e.persisted) {
           if (isIOS) {
-            // Recarga obligatoria en Safari iOS para purgar VRAM de WebKit y levantar contexto nuevo
-            sessionStorage.setItem('from_ar_reload', '1');
-            window.location.reload();
+            // En iOS, si la página viene congelada en BFCache, forzar apertura virgen con timestamp
+            window.location.replace('index.html?v=' + Date.now());
             return;
           }
-
-          // En Android: flujo directo sin recargas
-          const saved = sessionStorage.getItem('modelo_actual');
-          if (saved !== null && !isNaN(parseInt(saved, 10))) {
-            currentIndex = parseInt(saved, 10);
-          }
-          selectDish(currentIndex, false, false);
-          return;
-        }
-
-        if (e.persisted) {
+          // En Android: continuidad directa sin recargas
           const saved = sessionStorage.getItem('modelo_actual');
           if (saved !== null && !isNaN(parseInt(saved, 10))) {
             currentIndex = parseInt(saved, 10);
@@ -1380,26 +1353,14 @@
         }
       });
 
-      // v5.16: Arranque inicial con margen de seguridad ampliado a 300ms anti T-1000 en iOS
-      if (isFromArReload && isIOS) {
-        setTimeout(() => {
-          createModelViewer();
-          selectDish(currentIndex, false, false);
-          if (currentIndex > 0) {
-            const targetItem = menuItems[currentIndex];
-            if (targetItem) {
-              menuList.scrollTop = Math.max(0, targetItem.offsetTop - 10);
-            }
-          }
-        }, 300);
-      } else {
-        createModelViewer();
-        selectDish(currentIndex, false, false);
-        if ((fromAR || isFromArReload) && currentIndex > 0) {
-          const targetItem = menuItems[currentIndex];
-          if (targetItem) {
-            menuList.scrollTop = Math.max(0, targetItem.offsetTop - 10);
-          }
+      // v5.17: Arranque inicial limpio y unificado
+      createModelViewer();
+      selectDish(currentIndex, false, false);
+
+      if (fromAR && currentIndex > 0) {
+        const targetItem = menuItems[currentIndex];
+        if (targetItem) {
+          menuList.scrollTop = Math.max(0, targetItem.offsetTop - 10);
         }
       }
     });
