@@ -1,4 +1,4 @@
-// 9th Wall v5.19A (Bala 3 erradicada / Ensayo Bala 4A: Reemplazo formal de entidad ECS en iOS / Android intacto)
+// 9th Wall v5.20 (iOS sin Balas / Retorno a base limpia v5.15 / Android intacto / 5 frames de drenaje)
 (() => {
   var e = {
     574() {
@@ -143,7 +143,7 @@
     const e = window.ecs;
 
     // [INMUTABLE: ARRANQUE CINEMÁTICO INICIAL]
-    // v5.19A: Descarte total de Bala 3 / Ensayo Bala 4A (Reemplazo formal ECS en iOS)
+    // v5.20: Base v5.15 pura (sin Balas 1, 3, 4A ni 4B) / Entidades ECS intactas / Pausa de 5 frames intacta
     e.registerComponent({
       name: "dish-spawner",
       schema: { prefab: "eid" },
@@ -157,7 +157,7 @@
         const opacityDuration = 800;   // 800ms Opacidad rápida
         const totalSpinAngle = -Math.PI * 3; // -540° (1.5 vueltas horarias)
 
-        // v5.19A: Retorno a destrucción pura v5.15 (sin dummy 1x1, erradicación de Bala 3)
+        // v5.20: Destrucción profunda limpia v5.15 (Three.js puro sin dummy 1x1 ni órdenes contradictorias a Metal)
         const destruirMallaProfunda = (meshNode) => {
           if (!meshNode) return;
 
@@ -355,7 +355,7 @@
             requestAnimationFrame(comprobarMallaLista);
           })
 
-          // v5.19A: Ensayo Bala 4A (Eliminación y reemplazo formal de la entidad en ECS para iOS)
+          // v5.20: Intercambio limpio a nivel de escena gráfica (sin tocar entidades ECS ni inventos de Balas)
           .listen(t.events.globalId, "switch-dish-model", (ev) => {
             if (!isPlaced || !spawnedEid || isTransitioning || !ev.data || 
                 !ev.data.modelSrc || !window.THREE) return;
@@ -436,7 +436,7 @@
               if (progress < 1.0) {
                 requestAnimationFrame(animarHundimiento);
               } else {
-                // Retirada y limpieza profunda de la malla previa
+                // Retirada del modelo previo al concluir los 800ms
                 const entityObj = (t.three && t.three.entityToObject) 
                   ? t.three.entityToObject.get(spawnedEid) 
                   : null;
@@ -464,13 +464,6 @@
                   nodosBorrar.forEach((n) => destruirMallaProfunda(n));
                 }
 
-                // Bala 4A (Exclusiva iOS): Destrucción formal de la entidad raíz en ECS
-                if (isIOS) {
-                  try {
-                    t.deleteEntity(spawnedEid);
-                  } catch (err) {}
-                }
-
                 const ejecutarCarga = () => {
                   if (loader) {
                     loader.load(ev.data.modelSrc, (gltf) => {
@@ -480,40 +473,16 @@
                       newModel.rotation.set(0, 0, 0);
                       newModel.scale.set(1, 1, 1);
 
+                      // Sombras sobre Ground y cargador estándar sin alterar texturas
                       newModel.traverse((c) => {
                         if (c.isMesh) {
                           c.castShadow = true;
                         }
                       });
 
-                      // Bala 4A (Exclusiva iOS): Recreación de entidad raíz en ECS
-                      if (isIOS) {
-                        const prefabEid = schemaAttr.get(a).prefab;
-                        spawnedEid = t.createEntity(prefabEid);
-
-                        // Purgar de forma preventiva cualquier hijo por defecto del prefab
-                        if (t.getChildren) {
-                          const hijosPrefab = t.getChildren(spawnedEid) || [];
-                          hijosPrefab.forEach((cEid) => {
-                            const cObj = (t.three && t.three.entityToObject)
-                              ? t.three.entityToObject.get(cEid)
-                              : null;
-                            if (cObj) destruirMallaProfunda(cObj);
-                            try { t.deleteEntity(cEid); } catch (e) {}
-                          });
-                        }
-                      }
-
                       // Emparentamiento en Object3D de ECS
-                      const targetEntityObj = (t.three && t.three.entityToObject) 
-                        ? t.three.entityToObject.get(spawnedEid) 
-                        : null;
-
-                      if (targetEntityObj) {
-                        while (targetEntityObj.children.length > 0) {
-                          destruirMallaProfunda(targetEntityObj.children[0]);
-                        }
-                        targetEntityObj.add(newModel);
+                      if (entityObj) {
+                        entityObj.add(newModel);
                       } else if (t.three && t.three.scene) {
                         t.three.scene.add(newModel);
                       }
@@ -551,7 +520,7 @@
                   }
                 };
 
-                // Pausa limpia de 5 frames en iOS para vaciado de Metal
+                // Pausa limpia de 5 frames en iOS para vaciado de Metal antes de parsear nuevo modelo
                 if (isIOS) {
                   let framesWait = 5;
                   const waitFrames = () => {
@@ -736,11 +705,6 @@
         };
 
         const actualizarElevacion = () => {
-          // Si la entidad fue destruida formalmente en ECS, cancelar bucle huérfano
-          if (t.entityExists && !t.entityExists(a)) {
-            return;
-          }
-
           const now = performance.now();
           const deltaSec = Math.max(0.001, (now - lastLiftFrameTime) / 1000);
           lastLiftFrameTime = now;
