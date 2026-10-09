@@ -1,11 +1,11 @@
-// 9th Wall v5.19A (Bala 3 erradicada / Ensayo Bala 4A: Reemplazo formal de entidad ECS en iOS / Android intacto)
+// 9th Wall v5.19B (Bala 3 erradicada / Ensayo Bala 4B: Desalojo formal de entidad hija en ECS / Android intacto)
 (() => {
   var e = {
     574() {
       const e = () => {
         XR8.addCameraPipelineModule(LandingPage.pipelineModule()),
 
-        // Registro del mÃ³dulo de puntos condicionado de forma estricta por el estado debug
+        // Registro del módulo de puntos condicionado de forma estricta por el estado debug
         DEBUG_VISUALS.slamPointCloud && XR8.addCameraPipelineModule({
           name: 'pointcloud-debugger-inner',
           onStart: () => {
@@ -29,7 +29,7 @@
   },
   t = {};
 
-  // DetecciÃ³n infalible de entorno iOS
+  // Detección infalible de entorno iOS
   const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || 
     (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
 
@@ -44,7 +44,7 @@
   // Limpieza inmediata para garantizar que futuros refrescos arranquen siempre limpios
   sessionStorage.setItem("debug_features", "false");
 
-  // Controles del modelo: rotaciÃ³n desacoplada y escala con umbral blindado
+  // Controles del modelo: rotación desacoplada y escala con umbral blindado
   const MODEL_GESTURES = Object.freeze({
     minimumScale: 0.90,
     maximumScale: 1.20,
@@ -52,7 +52,7 @@
     scaleDeadzone: 0.085
   });
 
-  // [INMUTABLE: RETÃCULA ADAPTATIVA CONSOLIDADA]
+  // [INMUTABLE: RETÍCULA ADAPTATIVA CONSOLIDADA]
   const DRAG_RETICLE_CONFIG = Object.freeze({
     liftHeight: 0.05,
     liftSmoothingRate: 8.0,
@@ -63,7 +63,7 @@
     color: 0x66ffff
   });
 
-  // [INMUTABLE: GEOMETRÃA ANALÃTICA DE MARCO]
+  // [INMUTABLE: GEOMETRÍA ANALÍTICA DE MARCO]
   function crearGeometriaMarcoReticula(THREE_INSTANCE, sizeX, sizeZ, thickness, radius) {
     const sx = sizeX / 2;
     const sz = sizeZ / 2;
@@ -142,8 +142,8 @@
     a(574);
     const e = window.ecs;
 
-    // [INMUTABLE: ARRANQUE CINEMÃTICO INICIAL]
-    // v5.19A: Descarte total de Bala 3 / Ensayo Bala 4A (Reemplazo formal ECS en iOS)
+    // [INMUTABLE: ARRANQUE CINEMÁTICO INICIAL]
+    // v5.19B: Descarte total de Bala 3 / Ensayo Bala 4B (Desalojo formal de entidad hija en ECS)
     e.registerComponent({
       name: "dish-spawner",
       schema: { prefab: "eid" },
@@ -153,11 +153,11 @@
         let isTransitioning = false;
 
         const scaleDuration = 2000;    // 2000ms Escala (EaseOut Quadratic)
-        const rotDuration = 3000;      // 3000ms RotaciÃ³n total (EaseOut Quintic)
-        const opacityDuration = 800;   // 800ms Opacidad rÃ¡pida
-        const totalSpinAngle = -Math.PI * 3; // -540Â° (1.5 vueltas horarias)
+        const rotDuration = 3000;      // 3000ms Rotación total (EaseOut Quintic)
+        const opacityDuration = 800;   // 800ms Opacidad rápida
+        const totalSpinAngle = -Math.PI * 3; // -540° (1.5 vueltas horarias)
 
-        // v5.19A: Retorno a destrucciÃ³n pura v5.15 (sin dummy 1x1, erradicaciÃ³n de Bala 3)
+        // v5.19B: Destrucción pura v5.15 (sin dummy 1x1, erradicación de Bala 3)
         const destruirMallaProfunda = (meshNode) => {
           if (!meshNode) return;
 
@@ -239,17 +239,17 @@
           const animarSpawnCompleto = () => {
             const elapsed = performance.now() - spawnStartTime;
 
-            // 1. CinemÃ¡tica de Escala (2000ms - Quadratic Ease-Out)
+            // 1. Cinemática de Escala (2000ms - Quadratic Ease-Out)
             const progressScale = Math.min(1.0, elapsed / scaleDuration);
             const easeScale = 1.0 - Math.pow(1.0 - progressScale, 2);
             const currentScaleVal = Math.max(0.001, easeScale * targetScale);
 
-            // 2. CinemÃ¡tica de RotaciÃ³n (3000ms - Quintic Ease-Out)
+            // 2. Cinemática de Rotación (3000ms - Quintic Ease-Out)
             const progressRot = Math.min(1.0, elapsed / rotDuration);
             const easeRot = 1.0 - Math.pow(1.0 - progressRot, 5);
             const currentAngle = baseRotY + (totalSpinAngle * easeRot);
 
-            // 3. Fundido de Opacidad RÃ¡pido (800ms)
+            // 3. Fundido de Opacidad Rápido (800ms)
             const progressOpacity = Math.min(1.0, elapsed / opacityDuration);
             const easeOpacity = 1.0 - Math.pow(1.0 - progressOpacity, 2);
             spawnMaterials.forEach((m) => {
@@ -309,7 +309,7 @@
             const targetY = ev.data.worldPosition.y;
             const targetZ = ev.data.worldPosition.z;
 
-            // RotaciÃ³n binaria base (0Â° o 180Â°)
+            // Rotación binaria base (0° o 180°)
             const baseRotY = Math.random() < 0.5 ? 0 : Math.PI;
 
             d.setLocalPosition({ x: targetX, y: targetY + 0.001, z: targetZ });
@@ -355,7 +355,7 @@
             requestAnimationFrame(comprobarMallaLista);
           })
 
-          // v5.19A: Ensayo Bala 4A (EliminaciÃ³n y reemplazo formal de la entidad en ECS para iOS)
+          // v5.19B: Ensayo Bala 4B (Desalojo quirúrgico formal de entidades hijas en ECS para iOS / Raíz intacta)
           .listen(t.events.globalId, "switch-dish-model", (ev) => {
             if (!isPlaced || !spawnedEid || isTransitioning || !ev.data || 
                 !ev.data.modelSrc || !window.THREE) return;
@@ -388,7 +388,7 @@
               currentRotY = euler.y;
             }
 
-            // MediciÃ³n de la altura del plato saliente para hundimiento proporcional
+            // Medición de la altura del plato saliente para hundimiento proporcional
             let dishHeight = 0.15;
             if (t.three && t.three.scene) {
               const bBox = new rInstance.Box3();
@@ -410,7 +410,7 @@
               if (sz.y > 0.01) dishHeight = sz.y;
             }
 
-            // CinemÃ¡tica de Hundimiento 800ms
+            // Cinemática de Hundimiento 800ms
             const sinkStartTime = performance.now();
             const sinkDuration = 800;
             const startY = dishPos.y;
@@ -464,10 +464,19 @@
                   nodosBorrar.forEach((n) => destruirMallaProfunda(n));
                 }
 
-                // Bala 4A (Exclusiva iOS): DestrucciÃ³n formal de la entidad raÃ­z en ECS
-                if (isIOS) {
+                // Bala 4B (Exclusiva iOS): Desalojo formal únicamente de las entidades hijas en ECS
+                if (isIOS && t.getChildren) {
                   try {
-                    t.deleteEntity(spawnedEid);
+                    const hijosEcs = t.getChildren(spawnedEid) || [];
+                    hijosEcs.forEach((childEid) => {
+                      const cObj = (t.three && t.three.entityToObject)
+                        ? t.three.entityToObject.get(childEid)
+                        : null;
+                      if (cObj) {
+                        destruirMallaProfunda(cObj);
+                      }
+                      t.deleteEntity(childEid);
+                    });
                   } catch (err) {}
                 }
 
@@ -486,25 +495,7 @@
                         }
                       });
 
-                      // Bala 4A (Exclusiva iOS): RecreaciÃ³n de entidad raÃ­z en ECS
-                      if (isIOS) {
-                        const prefabEid = schemaAttr.get(a).prefab;
-                        spawnedEid = t.createEntity(prefabEid);
-
-                        // Purgar de forma preventiva cualquier hijo por defecto del prefab
-                        if (t.getChildren) {
-                          const hijosPrefab = t.getChildren(spawnedEid) || [];
-                          hijosPrefab.forEach((cEid) => {
-                            const cObj = (t.three && t.three.entityToObject)
-                              ? t.three.entityToObject.get(cEid)
-                              : null;
-                            if (cObj) destruirMallaProfunda(cObj);
-                            try { t.deleteEntity(cEid); } catch (e) {}
-                          });
-                        }
-                      }
-
-                      // Emparentamiento en Object3D de ECS
+                      // Emparentamiento en Object3D de ECS (la entidad raíz spawnedEid se preserva intacta)
                       const targetEntityObj = (t.three && t.three.entityToObject) 
                         ? t.three.entityToObject.get(spawnedEid) 
                         : null;
@@ -573,7 +564,7 @@
       }
     });
 
-    // [INMUTABLE: RETÃCULA Y GESTOS TÃCTILES]
+    // [INMUTABLE: RETÍCULA Y GESTOS TÁCTILES]
     e.registerComponent({
       name: "model-gesture-controls",
       stateMachine: ({ world: t, eid: a, defineState: o }) => {
@@ -736,7 +727,6 @@
         };
 
         const actualizarElevacion = () => {
-          // Si la entidad fue destruida formalmente en ECS, cancelar bucle huÃ©rfano
           if (t.entityExists && !t.entityExists(a)) {
             return;
           }
@@ -888,12 +878,12 @@
                     const wElapsed = performance.now() - wobbleStartTime;
                     const wProgress = Math.min(1.0, wElapsed / wobbleDuration);
 
-                    // 1. CaÃ­da vertical pura en Y
+                    // 1. Caída vertical pura en Y
                     const dropProgress = Math.min(1.0, wElapsed / dropTimeMs);
                     const dropEase = dropProgress * dropProgress;
                     let currentY = rInstance.MathUtils.lerp(startY, dragPlaneY, dropEase);
 
-                    // 2. InclinaciÃ³n fÃ­sica y bamboleo amortiguado
+                    // 2. Inclinación física y bamboleo amortiguado
                     let tiltX = 0;
                     let tiltZ = 0;
                     let naturalY = currentRotY;
@@ -974,7 +964,7 @@
           .listen(t.events.globalId, e.input.GESTURE_MOVE, (o) => {
             if (!isModelTouchActive || !isTwoFingerGesture || 2 !== o.data.touchCount) return;
 
-            // 1. RotaciÃ³n estÃ¡ndar
+            // 1. Rotación estándar
             if (o.data.positionChange && o.data.positionChange.x) {
               const angleDelta = o.data.positionChange.x * MODEL_GESTURES.rotationSensitivity;
               t.transform.rotateSelf(a, e.math.quat.yRadians(angleDelta));
@@ -1155,7 +1145,7 @@
           "order": 0.6785011504707911
         },
 
-        // CÃ¡mara de Realidad Aumentada
+        // Cámara de Realidad Aumentada
         "52ba8a86-a459-4df8-b954-a570e85e0484": {
           "id": "52ba8a86-a459-4df8-b954-a570e85e0484",
           "position": [0, 0.23, 0.10],
@@ -1294,7 +1284,7 @@
     delete i.historyVersion;
     const _idx = sessionStorage.getItem("modelo_actual");
 
-    // Mapeo dinÃ¡mico de modelos desde contents.js
+    // Mapeo dinámico de modelos desde contents.js
     const _cfg = window.MENU_CONFIG || {};
     const _raw = _cfg.platos || [];
     const _limit = _cfg.totalPlatos 
