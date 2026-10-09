@@ -1,4 +1,4 @@
-<!-- 9th_Design v5.20 (Retorno limpio nativo en botón Atrás sin desincronización de cámara / PMREM 128px iOS / Pedestal 0.010 / Web Share Síncrono) -->
+<!-- 9th_Design v5.18 (PMREM 128px on iOS / Pedestal 0.010 / Synchronous Web Share for WhatsApp / Persistent Gesture Hint Memory / Clean Format) -->
 <html>
 <head>
   <meta charset="UTF-8">
@@ -6,7 +6,7 @@
         content="width=device-width,initial-scale=1,user-scalable=no,viewport-fit=cover">
   <meta name="theme-color" content="#040507">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <title>9th_Design AR 5.20</title>
+  <title>9th_Design AR 5.18</title>
   <script src="contents.js"></script>
   <script crossorigin="anonymous" src="external/runtime/runtime.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@8thwall/engine-binary@1/dist/xr.js" 
@@ -27,8 +27,8 @@
            line-height:1.3;border:1px solid #0f0;display:none;pointer-events:auto;">
     <div id="debugTitle">FPS: --</div>
     <div id="debugContent">
-      ar-world: v5.20<br>
-      bundle: v5.20<br>
+      ar-world: v5.18<br>
+      bundle: v5.18<br>
       <span id="envVerdictSpan" style="color:#0f0;">Entorno: ESPERANDO MESA...</span><br>
       <span id="telemetrySpan" style="color:#0f0;">P98: -- (/255) | Lum: -- (/255) | Cálido: --%</span><br>
       <span id="benchmarkSpan" style="color:#0f0;">Pre: --sec - Post: --sec</span><br>
@@ -66,12 +66,12 @@
     </div>
   </div>
 
-  <!-- Bloqueo táctil pre-Listo -->
+  <!-- Bloqueo táctil pre-Listo: arranca inactivo para permitir permisos de sistema en iOS y Android -->
   <div id="touchBlocker" 
        style="position:fixed;inset:0;width:100vw;height:100vh;
               z-index:999990;pointer-events:none;display:none;background:transparent;"></div>
 
-  <!-- Disparador secreto permanente -->
+  <!-- Disparador secreto permanente (touch-action: manipulation previene zoom doble-tap en iOS) -->
   <div id="secretDebugTrigger" 
        style="position:fixed;top:0;right:0;width:200px;height:200px;
               z-index:999995;pointer-events:auto;background:transparent;
@@ -109,7 +109,7 @@
     Sincronizando sensor de cámara...
   </div>
 
-  <!-- Watchdog de Cámara (Fase 2: Modal de recuperación) -->
+  <!-- Watchdog de Cámara (Fase 2: Modal de recuperación a los 5.0s) -->
   <div id="cameraErrorModal" 
        style="position:fixed;inset:0;background:rgba(4,5,7,0.96);z-index:1000010;
               display:none;flex-direction:column;align-items:center;
@@ -136,7 +136,7 @@
     </button>
   </div>
 
-  <!-- Círculo de Carga AR estilo Prime Video -->
+  <!-- Círculo de Carga AR estilo Prime Video (Cyan + Blanco fino) -->
   <div id="primeSpinner">
     <div class="prime-spinner-outer"></div>
     <div class="prime-spinner-inner"></div>
@@ -374,7 +374,7 @@
       pointer-events: none !important; 
     }
 
-    /* Icono flotante en AR */
+    /* Icono flotante en AR (-15% = 42px) */
     .gesture-hint-overlay {
       position: fixed;
       top: 50%;
@@ -778,7 +778,7 @@
     };
 
     // =========================================================================
-    // 3. CONSOLA DE ILUMINACIÓN Y CALIBRACIÓN AMBIENTAL (v5.20)
+    // 3. CONSOLA DE ILUMINACIÓN Y CALIBRACIÓN AMBIENTAL (v5.18: PMREM 128px iOS)
     // =========================================================================
     const LIGHTING_CONFIG = {
       pmrem_resolution: isIOS ? 128 : 256,
@@ -1126,7 +1126,7 @@
     }
 
     // =========================================================================
-    // INYECCIÓN PBR Y SHADERS (v5.20: Pedestal iOS 0.010)
+    // INYECCIÓN PBR Y SHADERS (v5.18: Pedestal iOS 0.010)
     // =========================================================================
     window.aplicarAjustesSceneViewer = function (targetNode) {
       const root = targetNode || _scene;
@@ -1720,7 +1720,7 @@
                         if (px < minCoreX) minCoreX = px; 
                         if (px > maxCoreX) maxCoreX = px;
                         if (py < minCoreY) minCoreY = py; 
-                        if (py > maxCoreY) maxCoreY = py; 
+                        if (py > maxCoreY) maxCoreY = py;
                       }
                     } else {
                       lowerLumSum += lum;
@@ -2252,7 +2252,7 @@
     };
 
     // =========================================================================
-    // LÓGICA DE CARRUSEL Y DATOS CENTRALIZADOS DESDE contents.js (v5.20)
+    // LÓGICA DE CARRUSEL Y DATOS CENTRALIZADOS DESDE contents.js (v5.18)
     // =========================================================================
     const menuConfig = window.MENU_CONFIG || { platos: [], moneda: "€" };
     const rawPlatos = menuConfig.platos || [];
@@ -2375,7 +2375,7 @@
     if (closeArCardBtn) closeArCardBtn.addEventListener('click', cerrarCardAR);
 
     // =========================================================================
-    // GESTIÓN DEL ICONO FLOTANTE CON MEMORIA VOLÁTIL DE PÁGINA (v5.20)
+    // GESTIÓN DEL ICONO FLOTANTE CON MEMORIA VOLÁTIL DE PÁGINA (v5.18)
     // =========================================================================
     const arGestureHint = document.getElementById('arGestureHint');
     let hasInteractedWithAR = sessionStorage.getItem('ar_gesture_dismissed') === '1';
@@ -2647,7 +2647,7 @@
     closeViewerBtn.addEventListener('click', cerrarVisorFotos);
 
     // =========================================================================
-    // INTERCEPCIÓN DE BOTÓN ATRÁS Y SALIDA LIMPIA (v5.20: Retorno limpio nativo)
+    // INTERCEPCIÓN DE BOTÓN ATRÁS Y SALIDA LIMPIA (v5.18)
     // =========================================================================
     history.pushState({ inAR: true }, '');
 
@@ -2661,6 +2661,42 @@
         cerrarCardAR();
         history.pushState({ inAR: true }, '');
         return;
+      }
+
+      const video = document.querySelector('video');
+      const threeCanvas = _renderer ? _renderer.domElement : null;
+
+      if (video && threeCanvas && freezeTravelCard) {
+        try {
+          const off = document.createElement('canvas');
+          off.width = window.innerWidth;
+          off.height = window.innerHeight;
+          const ctx = off.getContext('2d');
+          ctx.drawImage(video, 0, 0, off.width, off.height);
+          ctx.drawImage(threeCanvas, 0, 0, off.width, off.height);
+
+          freezeTravelCard.style.backgroundImage = `url(${off.toDataURL('image/jpeg', 0.90)})`;
+          freezeTravelCard.style.transition = 'none';
+          freezeTravelCard.style.top = '0px';
+          freezeTravelCard.style.left = '0px';
+          freezeTravelCard.style.width = '100vw';
+          freezeTravelCard.style.height = '100vh';
+          freezeTravelCard.style.borderRadius = '0px';
+          freezeTravelCard.style.opacity = '1';
+          freezeTravelCard.style.display = 'block';
+          freezeTravelCard.style.zIndex = '9999999';
+        } catch (err) {}
+      }
+
+      if (video) {
+        try { video.pause(); } catch (err) {}
+        if (video.srcObject) {
+          try { video.srcObject.getTracks().forEach(t => t.stop()); } catch (err) {}
+        }
+      }
+
+      if (window.XR8) {
+        try { window.XR8.stop(); } catch (err) {}
       }
 
       sessionStorage.setItem('from_ar', '1');
