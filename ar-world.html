@@ -1,4 +1,4 @@
-<!-- 9th_Design v5.20 (Transición directa e inmediata en botón Atrás sin freezeTravelCard / PMREM 128px iOS / Pedestal 0.010 / Web Share Síncrono) -->
+<!-- 9th_Design v5.20 (Retorno limpio nativo en botón Atrás sin desincronización de cámara / PMREM 128px iOS / Pedestal 0.010 / Web Share Síncrono) -->
 <html>
 <head>
   <meta charset="UTF-8">
@@ -1193,7 +1193,7 @@
 
                   vec3 h1 = fract(sin(vec3(
                     dot(ip + vec3(1.0, 1.0, 0.0), vec3(127.1, 311.7, 74.7)),
-                    dot(ip + vec3(0.0, 1.0, 0.0), vec3(127.1, 311.7, 74.7)),
+                    dot(ip + vec3(0.0, 0.0, 1.0), vec3(127.1, 311.7, 74.7)),
                     dot(ip + vec3(1.0, 0.0, 1.0), vec3(127.1, 311.7, 74.7))
                   )) * 43758.5453);
 
@@ -1720,7 +1720,7 @@
                         if (px < minCoreX) minCoreX = px; 
                         if (px > maxCoreX) maxCoreX = px;
                         if (py < minCoreY) minCoreY = py; 
-                        if (py > maxCoreY) maxCoreY = py;
+                        if (py > maxCoreY) maxCoreY = py; 
                       }
                     } else {
                       lowerLumSum += lum;
@@ -2647,7 +2647,7 @@
     closeViewerBtn.addEventListener('click', cerrarVisorFotos);
 
     // =========================================================================
-    // INTERCEPCIÓN DE BOTÓN ATRÁS Y SALIDA LIMPIA (v5.20: Transición directa limpia)
+    // INTERCEPCIÓN DE BOTÓN ATRÁS Y SALIDA LIMPIA (v5.20: Retorno limpio nativo)
     // =========================================================================
     history.pushState({ inAR: true }, '');
 
@@ -2661,20 +2661,6 @@
         cerrarCardAR();
         history.pushState({ inAR: true }, '');
         return;
-      }
-
-      const video = document.querySelector('video');
-      if (video) {
-        try { video.pause(); } catch (err) {}
-        if (video.srcObject) {
-          try { 
-            video.srcObject.getTracks().forEach((t) => t.stop()); 
-          } catch (err) {}
-        }
-      }
-
-      if (window.XR8) {
-        try { window.XR8.stop(); } catch (err) {}
       }
 
       sessionStorage.setItem('from_ar', '1');
