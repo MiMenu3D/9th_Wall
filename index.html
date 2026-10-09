@@ -1,9 +1,10 @@
-<!-- Versión: 9th_Design v5.18 -->
+<!-- Versión: 9th_Design v5.21 -->
 <!DOCTYPE html>
 <html lang="es">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <meta name="viewport" 
+        content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
   
   <meta name="theme-color" content="#040507">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -13,13 +14,15 @@
   <!-- Google Fonts: Fredoka Variable -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Fredoka:wdth,wght@75..125,300..600&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Fredoka:wdth,wght@75..125,300..600&display=swap" 
+        rel="stylesheet">
 
-  <!-- Archivo de Contenidos Centralizado v5.18 -->
+  <!-- Archivo de Contenidos Centralizado -->
   <script src="contents.js"></script>
 
   <!-- Model Viewer Oficial de Google -->
-  <script type="module" src="https://unpkg.com/@google/model-viewer/dist/model-viewer.min.js"></script>
+  <script type="module" 
+          src="https://unpkg.com/@google/model-viewer/dist/model-viewer.min.js"></script>
 
   <style>
     /* ==========================================================================
@@ -129,7 +132,7 @@
       overflow: hidden;
     }
 
-    /* Estilo del visor 3D (v5.18: Restauración base v5.12 sin capas CSS forzadas en iOS) */
+    /* Estilo del visor 3D */
     model-viewer {
       width: 100%;
       height: 100%;
@@ -142,9 +145,10 @@
       filter: saturate(0.95) contrast(0.95);
     }
 
-    body:not(.is-ios) model-viewer {
+    /* Ensayo v5.21: Filtro CSS comentado en Android para auditar Zero-Copy Direct Overlay */
+    /* body:not(.is-ios) model-viewer {
       filter: saturate(0.87) contrast(0.88);
-    }
+    } */
 
     /* Flechas de navegación (-10% = 36px × 36px, font 23px) */
     .ar-nav-arrow {
@@ -267,7 +271,14 @@
       transform-origin: center center;
       transform: translate(-50%, -50%) rotate(225deg) scale(1);
       will-change: transform;
-      background: linear-gradient(90deg, #CCD6E0 0%, #DCE4EC 25%, #E8EFF5 50%, #F5F8FA 78%, #FFFFFF 100%);
+      background: linear-gradient(
+        90deg, 
+        #CCD6E0 0%, 
+        #DCE4EC 25%, 
+        #E8EFF5 50%, 
+        #F5F8FA 78%, 
+        #FFFFFF 100%
+      );
     }
 
     /* CAPA 1: Terraza central (+5% escala: 16.73rem × 12.53rem) */
@@ -321,12 +332,20 @@
 
     .fade-top {
       top: 0;
-      background: linear-gradient(to bottom, rgba(248, 250, 252, 0.95) 15%, rgba(248, 250, 252, 0) 100%);
+      background: linear-gradient(
+        to bottom, 
+        rgba(248, 250, 252, 0.95) 15%, 
+        rgba(248, 250, 252, 0) 100%
+      );
     }
 
     .fade-bottom {
       bottom: 0;
-      background: linear-gradient(to top, rgba(226, 232, 238, 0.95) 20%, rgba(226, 232, 238, 0) 100%);
+      background: linear-gradient(
+        to top, 
+        rgba(226, 232, 238, 0.95) 20%, 
+        rgba(226, 232, 238, 0) 100%
+      );
     }
 
     /* ==========================================================================
@@ -388,7 +407,9 @@
       box-shadow: 
         0 0.875rem 1.75rem rgba(18, 25, 40, 0.12),
         0 0.25rem 0.625rem rgba(18, 25, 40, 0.06);
-      transition: opacity 0.35s var(--ease-webflow), right 0.06s ease-out, border-radius 0.06s ease-out;
+      transition: opacity 0.35s var(--ease-webflow), 
+                  right 0.06s ease-out, 
+                  border-radius 0.06s ease-out;
       z-index: 2;
     }
 
@@ -413,11 +434,18 @@
       width: 8.5rem;
       height: 1.6rem;
       border-radius: 50%;
-      background: radial-gradient(ellipse at 50% 50%, rgba(255, 255, 255, 0.95) 0%, rgba(255, 255, 255, 0.60) 30%, rgba(255, 255, 255, 0.18) 60%, transparent 80%);
+      background: radial-gradient(
+        ellipse at 50% 50%, 
+        rgba(255, 255, 255, 0.95) 0%, 
+        rgba(255, 255, 255, 0.60) 30%, 
+        rgba(255, 255, 255, 0.18) 60%, 
+        transparent 80%
+      );
       filter: blur(0.15rem);
       opacity: 0;
       pointer-events: none;
-      transition: opacity 0.35s var(--ease-webflow), transform 0.35s var(--ease-webflow);
+      transition: opacity 0.35s var(--ease-webflow), 
+                  transform 0.35s var(--ease-webflow);
       z-index: 4;
     }
 
@@ -454,7 +482,9 @@
         0 0.5rem 1.5rem rgba(18, 25, 40, 0.06),
         inset 0.09375rem 0.125rem 0.1875rem rgba(255, 255, 255, 0.92),
         inset -0.09375rem -0.125rem 0.25rem rgba(18, 25, 40, 0.04);
-      transition: opacity 0.35s var(--ease-webflow), right 0.06s ease-out, border-radius 0.06s ease-out;
+      transition: opacity 0.35s var(--ease-webflow), 
+                  right 0.06s ease-out, 
+                  border-radius 0.06s ease-out;
       z-index: 5;
     }
 
@@ -476,7 +506,13 @@
       width: 8rem;
       height: 1.4rem;
       border-radius: 50%;
-      background: radial-gradient(ellipse at 50% 50%, rgba(255, 255, 255, 0.85) 0%, rgba(255, 255, 255, 0.45) 35%, rgba(255, 255, 255, 0.12) 65%, transparent 85%);
+      background: radial-gradient(
+        ellipse at 50% 50%, 
+        rgba(255, 255, 255, 0.85) 0%, 
+        rgba(255, 255, 255, 0.45) 35%, 
+        rgba(255, 255, 255, 0.12) 65%, 
+        transparent 85%
+      );
       filter: blur(0.12rem);
       opacity: 0.95;
       pointer-events: none;
@@ -494,12 +530,24 @@
 
     .specular-top {
       top: 0;
-      background: linear-gradient(90deg, transparent 0%, rgba(255, 255, 255, 0.95) 35%, rgba(0, 0, 0, 0.05) 70%, transparent 100%);
+      background: linear-gradient(
+        90deg, 
+        transparent 0%, 
+        rgba(255, 255, 255, 0.95) 35%, 
+        rgba(0, 0, 0, 0.05) 70%, 
+        transparent 100%
+      );
     }
 
     .specular-bottom {
       bottom: 0;
-      background: linear-gradient(90deg, transparent 0%, rgba(255, 255, 255, 0.90) 35%, rgba(0, 0, 0, 0.04) 70%, transparent 100%);
+      background: linear-gradient(
+        90deg, 
+        transparent 0%, 
+        rgba(255, 255, 255, 0.90) 35%, 
+        rgba(0, 0, 0, 0.04) 70%, 
+        transparent 100%
+      );
     }
 
     /* LÍNEA ROJA: SALIDA INSTANTÁNEA (0.06s) AL EXPANDIR */
@@ -560,7 +608,8 @@
       letter-spacing: 0.03125rem;
       width: 1.4rem;
       opacity: 0.40;
-      transition: opacity 0.35s var(--ease-webflow), color 0.35s var(--ease-webflow);
+      transition: opacity 0.35s var(--ease-webflow), 
+                  color 0.35s var(--ease-webflow);
     }
 
     .menu-item.active .item-number {
@@ -616,7 +665,8 @@
       opacity: 0;
       pointer-events: none;
       transform: scale(1);
-      transition: opacity 0.18s var(--ease-webflow), transform 0.18s var(--ease-webflow);
+      transition: opacity 0.18s var(--ease-webflow), 
+                  transform 0.18s var(--ease-webflow);
     }
 
     .more-info-icon .bar {
@@ -634,7 +684,8 @@
     .menu-item.expanded .more-info-icon {
       opacity: 0;
       transform: scale(0.6);
-      transition: opacity 0.18s var(--ease-webflow), transform 0.18s var(--ease-webflow);
+      transition: opacity 0.18s var(--ease-webflow), 
+                  transform 0.18s var(--ease-webflow);
     }
 
     /* CUERPO DEL CARD */
@@ -644,14 +695,16 @@
       opacity: 0;
       pointer-events: none;
       transform: translateY(-0.25rem);
-      transition: opacity 0.16s ease-out 0s, transform 0.16s ease-out 0s;
+      transition: opacity 0.16s ease-out 0s, 
+                  transform 0.16s ease-out 0s;
     }
 
     .menu-item.expanded .card-body {
       opacity: 1;
       pointer-events: auto;
       transform: translateY(0);
-      transition: opacity 0.18s ease-out 0.18s, transform 0.18s ease-out 0.18s;
+      transition: opacity 0.18s ease-out 0.18s, 
+                  transform 0.18s ease-out 0.18s;
     }
 
     /* CONTENEDOR DE SCROLL */
@@ -667,8 +720,20 @@
       overflow-y: auto;
       padding-right: 1.6rem;
       padding-bottom: 2.6rem;
-      -webkit-mask-image: linear-gradient(to bottom, transparent 0%, black 6%, black 72%, transparent 100%);
-      mask-image: linear-gradient(to bottom, transparent 0%, black 6%, black 72%, transparent 100%);
+      -webkit-mask-image: linear-gradient(
+        to bottom, 
+        transparent 0%, 
+        black 6%, 
+        black 72%, 
+        transparent 100%
+      );
+      mask-image: linear-gradient(
+        to bottom, 
+        transparent 0%, 
+        black 6%, 
+        black 72%, 
+        transparent 100%
+      );
       scrollbar-width: none;
     }
 
@@ -754,14 +819,16 @@
       opacity: 0;
       pointer-events: none;
       transform: translateY(0.2rem);
-      transition: opacity 0.18s ease-out 0s, transform 0.18s ease-out 0s;
+      transition: opacity 0.18s ease-out 0s, 
+                  transform 0.18s ease-out 0s;
       z-index: 25;
     }
 
     .menu-item.expanded .card-price {
       opacity: 1;
       transform: translateY(0);
-      transition: opacity 0.18s ease-out 0.20s, transform 0.18s ease-out 0.20s;
+      transition: opacity 0.18s ease-out 0.20s, 
+                  transform 0.18s ease-out 0.20s;
     }
   </style>
 </head>
@@ -769,7 +836,9 @@
 
   <!-- Bloqueador visual para posición vertical (Landscape Warning) -->
   <div id="orientationBlocker">
-    <svg viewBox="0 0 24 24" width="48" height="48" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-bottom:16px;">
+    <svg viewBox="0 0 24 24" width="48" height="48" fill="none" 
+         stroke="currentColor" stroke-width="2" stroke-linecap="round" 
+         stroke-linejoin="round" style="margin-bottom:16px;">
       <rect x="5" y="2" width="14" height="20" rx="2" ry="2"></rect>
       <line x1="12" y1="18" x2="12.01" y2="18"></line>
       <path d="M17 6h2a2 2 0 0 1 2 2v2"></path>
@@ -794,10 +863,14 @@
       <!-- Icono flotante con animación de barrido (-15% escala = 39px) -->
       <div class="gesture-hint-overlay" id="gestureHint">
         <svg viewBox="0 0 48 48" fill="none" class="gesture-hint-icon">
-          <path d="M19 16V9a3 3 0 0 1 6 0v12" stroke="#FFFFFF" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
-          <path d="M25 19a3 3 0 0 1 6 0v2" stroke="#FFFFFF" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
-          <path d="M31 20a3 3 0 0 1 6 0v4c0 7-5 13-12 13s-11-5-11-10v-5a3 3 0 0 1 6 0v-2" stroke="#FFFFFF" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
-          <path d="M12 28a16 16 0 0 1 24 0" stroke="#00e5ff" stroke-width="2" stroke-linecap="round" stroke-dasharray="2 3" opacity="0.85"/>
+          <path d="M19 16V9a3 3 0 0 1 6 0v12" stroke="#FFFFFF" stroke-width="2.5" 
+                stroke-linecap="round" stroke-linejoin="round"/>
+          <path d="M25 19a3 3 0 0 1 6 0v2" stroke="#FFFFFF" stroke-width="2.5" 
+                stroke-linecap="round" stroke-linejoin="round"/>
+          <path d="M31 20a3 3 0 0 1 6 0v4c0 7-5 13-12 13s-11-5-11-10v-5a3 3 0 0 1 6 0v-2" 
+                stroke="#FFFFFF" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+          <path d="M12 28a16 16 0 0 1 24 0" stroke="#00e5ff" stroke-width="2" 
+                stroke-linecap="round" stroke-dasharray="2 3" opacity="0.85"/>
         </svg>
       </div>
 
@@ -827,18 +900,21 @@
   <script>
     document.addEventListener('DOMContentLoaded', () => {
       // Detección infalible de SO (Blindaje de entorno)
-      const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+      const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || 
+        (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
       if (isIOS) {
         document.body.classList.add('is-ios');
       }
 
       // ======================================================================
-      // 0. GENERACIÓN DINÁMICA DE LA LISTA DESDE contents.js (v5.18)
+      // 0. GENERACIÓN DINÁMICA DE LA LISTA DESDE contents.js
       // ======================================================================
       const menuList = document.getElementById('menu-list');
       const menuConfig = window.MENU_CONFIG || { platos: [], moneda: "€" };
       const rawPlatos = menuConfig.platos || [];
-      const totalToDisplay = menuConfig.totalPlatos ? Math.min(menuConfig.totalPlatos, rawPlatos.length) : rawPlatos.length;
+      const totalToDisplay = menuConfig.totalPlatos 
+        ? Math.min(menuConfig.totalPlatos, rawPlatos.length) 
+        : rawPlatos.length;
       const platosData = rawPlatos.slice(0, totalToDisplay);
 
       const symbol = menuConfig.moneda || "€";
@@ -898,7 +974,7 @@
       // Modelos 3D leídos directamente desde contents.js
       const models = platosData.map(p => p.archivoGLB);
 
-      // v5.18: Lectura limpia de estado de navegación
+      // Lectura limpia de estado de navegación
       const navEntries = performance.getEntriesByType('navigation');
       const isReload = navEntries.length > 0 && navEntries[0].type === 'reload';
       const fromAR = sessionStorage.getItem('from_ar') === '1';
@@ -998,7 +1074,8 @@
           const layerY = currentParallaxY * conf.parallaxK;
 
           // Renderizado final
-          layer.el.style.transform = `translate(-50%, calc(-50% + ${layerY}px)) rotate(${layer.angle}deg) scale(${layer.scale})`;
+          layer.el.style.transform = 
+            `translate(-50%, calc(-50% + ${layerY}px)) rotate(${layer.angle}deg) scale(${layer.scale})`;
         });
 
         requestAnimationFrame(kineticLoop);
@@ -1114,7 +1191,7 @@
       });
 
       // ======================================================================
-      // 6. INSTANCIACIÓN Y GESTIÓN LIMPIA DEL VISOR 3D (v5.18)
+      // 6. INSTANCIACIÓN Y GESTIÓN LIMPIA DEL VISOR 3D (v5.21)
       // ======================================================================
       function destroyModelViewer() {
         if (viewerSlot) {
@@ -1141,8 +1218,9 @@
         newMv.setAttribute('disable-pan', '');
         newMv.setAttribute('disable-zoom', '');
         newMv.setAttribute('interaction-prompt', 'none');
-        newMv.setAttribute('shadow-intensity', '0.4');
+        newMv.setAttribute('shadow-intensity', '0');
         newMv.setAttribute('exposure', '0.80');
+        newMv.setAttribute('tone-mapping', 'neutral');
         newMv.style.opacity = '0';
 
         newMv.addEventListener('load', () => {
@@ -1212,7 +1290,7 @@
       });
 
       // ======================================================================
-      // 7. GESTIÓN DEL ICONO FLOTANTE CON MEMORIA VOLÁTIL DE PÁGINA (v5.18)
+      // 7. GESTIÓN DEL ICONO FLOTANTE CON MEMORIA VOLÁTIL DE PÁGINA
       // ======================================================================
       // Purga condicionada: solo en apertura limpia o recarga manual, nunca si se vuelve de AR
       if (!fromAR) {
@@ -1336,7 +1414,7 @@
       });
 
       // ======================================================================
-      // 9. LANZAMIENTO HACIA AR Y RESTAURACIÓN LIMPIA AL VOLVER (v5.18)
+      // 9. LANZAMIENTO HACIA AR Y RESTAURACIÓN LIMPIA AL VOLVER
       // ======================================================================
       btnAr.addEventListener('click', () => {
         sessionStorage.setItem('from_ar', '1');
@@ -1344,7 +1422,7 @@
         window.location.href = 'ar-world.html';
       });
 
-      // v5.18: Gestión de páginas en caché BFCache
+      // Gestión de páginas en caché BFCache
       window.addEventListener('pageshow', (e) => {
         if (e.persisted) {
           if (isIOS) {
@@ -1361,7 +1439,7 @@
         }
       });
 
-      // v5.18: Arranque inicial limpio y unificado
+      // Arranque inicial limpio y unificado
       createModelViewer();
       selectDish(currentIndex, false, false);
 
