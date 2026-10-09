@@ -1,11 +1,11 @@
-// 9th Wall v5.19B (Bala 3 erradicada / Ensayo Bala 4B: Desalojo formal de entidad hija en ECS / Android intacto)
+// 9th Wall v5.21 (Bala 4B en observaciÃ³n / Desalojo formal entidades hijas ECS en iOS / Android intacto / 5 frames Metal)
 (() => {
   var e = {
     574() {
       const e = () => {
         XR8.addCameraPipelineModule(LandingPage.pipelineModule()),
 
-        // Registro del módulo de puntos condicionado de forma estricta por el estado debug
+        // Registro del mÃ³dulo de puntos condicionado de forma estricta por el estado debug
         DEBUG_VISUALS.slamPointCloud && XR8.addCameraPipelineModule({
           name: 'pointcloud-debugger-inner',
           onStart: () => {
@@ -29,7 +29,7 @@
   },
   t = {};
 
-  // Detección infalible de entorno iOS
+  // DetecciÃ³n infalible de entorno iOS
   const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || 
     (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
 
@@ -44,7 +44,7 @@
   // Limpieza inmediata para garantizar que futuros refrescos arranquen siempre limpios
   sessionStorage.setItem("debug_features", "false");
 
-  // Controles del modelo: rotación desacoplada y escala con umbral blindado
+  // Controles del modelo: rotaciÃ³n desacoplada y escala con umbral blindado
   const MODEL_GESTURES = Object.freeze({
     minimumScale: 0.90,
     maximumScale: 1.20,
@@ -52,7 +52,7 @@
     scaleDeadzone: 0.085
   });
 
-  // [INMUTABLE: RETÍCULA ADAPTATIVA CONSOLIDADA]
+  // [INMUTABLE: RETÃCULA ADAPTATIVA CONSOLIDADA]
   const DRAG_RETICLE_CONFIG = Object.freeze({
     liftHeight: 0.05,
     liftSmoothingRate: 8.0,
@@ -63,7 +63,7 @@
     color: 0x66ffff
   });
 
-  // [INMUTABLE: GEOMETRÍA ANALÍTICA DE MARCO]
+  // [INMUTABLE: GEOMETRÃA ANALÃTICA DE MARCO]
   function crearGeometriaMarcoReticula(THREE_INSTANCE, sizeX, sizeZ, thickness, radius) {
     const sx = sizeX / 2;
     const sz = sizeZ / 2;
@@ -142,8 +142,8 @@
     a(574);
     const e = window.ecs;
 
-    // [INMUTABLE: ARRANQUE CINEMÁTICO INICIAL]
-    // v5.19B: Descarte total de Bala 3 / Ensayo Bala 4B (Desalojo formal de entidad hija en ECS)
+    // [INMUTABLE: ARRANQUE CINEMÃTICO INICIAL]
+    // v5.21: ReintroducciÃ³n experimental de la Bala 4B bajo observaciÃ³n exclusiva en iOS / Android intacto
     e.registerComponent({
       name: "dish-spawner",
       schema: { prefab: "eid" },
@@ -153,11 +153,11 @@
         let isTransitioning = false;
 
         const scaleDuration = 2000;    // 2000ms Escala (EaseOut Quadratic)
-        const rotDuration = 3000;      // 3000ms Rotación total (EaseOut Quintic)
-        const opacityDuration = 800;   // 800ms Opacidad rápida
-        const totalSpinAngle = -Math.PI * 3; // -540° (1.5 vueltas horarias)
+        const rotDuration = 3000;      // 3000ms RotaciÃ³n total (EaseOut Quintic)
+        const opacityDuration = 800;   // 800ms Opacidad rÃ¡pida
+        const totalSpinAngle = -Math.PI * 3; // -540Â° (1.5 vueltas horarias)
 
-        // v5.19B: Destrucción pura v5.15 (sin dummy 1x1, erradicación de Bala 3)
+        // DestrucciÃ³n profunda limpia de Three.js (geometrÃ­as y texturas nativas en iOS)
         const destruirMallaProfunda = (meshNode) => {
           if (!meshNode) return;
 
@@ -239,17 +239,17 @@
           const animarSpawnCompleto = () => {
             const elapsed = performance.now() - spawnStartTime;
 
-            // 1. Cinemática de Escala (2000ms - Quadratic Ease-Out)
+            // 1. CinemÃ¡tica de Escala (2000ms - Quadratic Ease-Out)
             const progressScale = Math.min(1.0, elapsed / scaleDuration);
             const easeScale = 1.0 - Math.pow(1.0 - progressScale, 2);
             const currentScaleVal = Math.max(0.001, easeScale * targetScale);
 
-            // 2. Cinemática de Rotación (3000ms - Quintic Ease-Out)
+            // 2. CinemÃ¡tica de RotaciÃ³n (3000ms - Quintic Ease-Out)
             const progressRot = Math.min(1.0, elapsed / rotDuration);
             const easeRot = 1.0 - Math.pow(1.0 - progressRot, 5);
             const currentAngle = baseRotY + (totalSpinAngle * easeRot);
 
-            // 3. Fundido de Opacidad Rápido (800ms)
+            // 3. Fundido de Opacidad RÃ¡pido (800ms)
             const progressOpacity = Math.min(1.0, elapsed / opacityDuration);
             const easeOpacity = 1.0 - Math.pow(1.0 - progressOpacity, 2);
             spawnMaterials.forEach((m) => {
@@ -309,7 +309,7 @@
             const targetY = ev.data.worldPosition.y;
             const targetZ = ev.data.worldPosition.z;
 
-            // Rotación binaria base (0° o 180°)
+            // RotaciÃ³n binaria base (0Â° o 180Â°)
             const baseRotY = Math.random() < 0.5 ? 0 : Math.PI;
 
             d.setLocalPosition({ x: targetX, y: targetY + 0.001, z: targetZ });
@@ -355,7 +355,7 @@
             requestAnimationFrame(comprobarMallaLista);
           })
 
-          // v5.19B: Ensayo Bala 4B (Desalojo quirúrgico formal de entidades hijas en ECS para iOS / Raíz intacta)
+          // v5.21: TransiciÃ³n de plato con ensayo Bala 4B en observaciÃ³n para iOS
           .listen(t.events.globalId, "switch-dish-model", (ev) => {
             if (!isPlaced || !spawnedEid || isTransitioning || !ev.data || 
                 !ev.data.modelSrc || !window.THREE) return;
@@ -388,7 +388,7 @@
               currentRotY = euler.y;
             }
 
-            // Medición de la altura del plato saliente para hundimiento proporcional
+            // MediciÃ³n de la altura del plato saliente para hundimiento proporcional
             let dishHeight = 0.15;
             if (t.three && t.three.scene) {
               const bBox = new rInstance.Box3();
@@ -410,7 +410,7 @@
               if (sz.y > 0.01) dishHeight = sz.y;
             }
 
-            // Cinemática de Hundimiento 800ms
+            // CinemÃ¡tica de Hundimiento 800ms
             const sinkStartTime = performance.now();
             const sinkDuration = 800;
             const startY = dishPos.y;
@@ -436,7 +436,7 @@
               if (progress < 1.0) {
                 requestAnimationFrame(animarHundimiento);
               } else {
-                // Retirada y limpieza profunda de la malla previa
+                // Retirada del modelo previo al concluir los 800ms
                 const entityObj = (t.three && t.three.entityToObject) 
                   ? t.three.entityToObject.get(spawnedEid) 
                   : null;
@@ -464,20 +464,23 @@
                   nodosBorrar.forEach((n) => destruirMallaProfunda(n));
                 }
 
-                // Bala 4B (Exclusiva iOS): Desalojo formal únicamente de las entidades hijas en ECS
-                if (isIOS && t.getChildren) {
-                  try {
-                    const hijosEcs = t.getChildren(spawnedEid) || [];
-                    hijosEcs.forEach((childEid) => {
-                      const cObj = (t.three && t.three.entityToObject)
-                        ? t.three.entityToObject.get(childEid)
+                // =========================================================================
+                // [EXPERIMENTAL EN PRUEBAS - BALA 4B: PENDIENTE DE VALIDACIÃ“N O RETIRADA]
+                // Desalojo formal de entidades hijas en ECS en iOS. En fase de testeo.
+                // =========================================================================
+                if (isIOS) {
+                  if (t.getChildren) {
+                    const hijosPrevios = t.getChildren(spawnedEid) || [];
+                    hijosPrevios.forEach((childEid) => {
+                      const cObj = (t.three && t.three.entityToObject) 
+                        ? t.three.entityToObject.get(childEid) 
                         : null;
-                      if (cObj) {
-                        destruirMallaProfunda(cObj);
-                      }
-                      t.deleteEntity(childEid);
+                      if (cObj) destruirMallaProfunda(cObj);
+                      try {
+                        t.deleteEntity(childEid);
+                      } catch (err) {}
                     });
-                  } catch (err) {}
+                  }
                 }
 
                 const ejecutarCarga = () => {
@@ -489,22 +492,16 @@
                       newModel.rotation.set(0, 0, 0);
                       newModel.scale.set(1, 1, 1);
 
+                      // Sombras sobre Ground y cargador estÃ¡ndar sin alterar texturas
                       newModel.traverse((c) => {
                         if (c.isMesh) {
                           c.castShadow = true;
                         }
                       });
 
-                      // Emparentamiento en Object3D de ECS (la entidad raíz spawnedEid se preserva intacta)
-                      const targetEntityObj = (t.three && t.three.entityToObject) 
-                        ? t.three.entityToObject.get(spawnedEid) 
-                        : null;
-
-                      if (targetEntityObj) {
-                        while (targetEntityObj.children.length > 0) {
-                          destruirMallaProfunda(targetEntityObj.children[0]);
-                        }
-                        targetEntityObj.add(newModel);
+                      // Emparentamiento en Object3D de ECS
+                      if (entityObj) {
+                        entityObj.add(newModel);
                       } else if (t.three && t.three.scene) {
                         t.three.scene.add(newModel);
                       }
@@ -542,7 +539,7 @@
                   }
                 };
 
-                // Pausa limpia de 5 frames en iOS para vaciado de Metal
+                // Pausa limpia de 5 frames en iOS para vaciado de Metal antes de parsear nuevo modelo
                 if (isIOS) {
                   let framesWait = 5;
                   const waitFrames = () => {
@@ -564,7 +561,7 @@
       }
     });
 
-    // [INMUTABLE: RETÍCULA Y GESTOS TÁCTILES]
+    // [INMUTABLE: RETÃCULA Y GESTOS TÃCTILES]
     e.registerComponent({
       name: "model-gesture-controls",
       stateMachine: ({ world: t, eid: a, defineState: o }) => {
@@ -727,10 +724,6 @@
         };
 
         const actualizarElevacion = () => {
-          if (t.entityExists && !t.entityExists(a)) {
-            return;
-          }
-
           const now = performance.now();
           const deltaSec = Math.max(0.001, (now - lastLiftFrameTime) / 1000);
           lastLiftFrameTime = now;
@@ -878,12 +871,12 @@
                     const wElapsed = performance.now() - wobbleStartTime;
                     const wProgress = Math.min(1.0, wElapsed / wobbleDuration);
 
-                    // 1. Caída vertical pura en Y
+                    // 1. CaÃ­da vertical pura en Y
                     const dropProgress = Math.min(1.0, wElapsed / dropTimeMs);
                     const dropEase = dropProgress * dropProgress;
                     let currentY = rInstance.MathUtils.lerp(startY, dragPlaneY, dropEase);
 
-                    // 2. Inclinación física y bamboleo amortiguado
+                    // 2. InclinaciÃ³n fÃ­sica y bamboleo amortiguado
                     let tiltX = 0;
                     let tiltZ = 0;
                     let naturalY = currentRotY;
@@ -964,7 +957,7 @@
           .listen(t.events.globalId, e.input.GESTURE_MOVE, (o) => {
             if (!isModelTouchActive || !isTwoFingerGesture || 2 !== o.data.touchCount) return;
 
-            // 1. Rotación estándar
+            // 1. RotaciÃ³n estÃ¡ndar
             if (o.data.positionChange && o.data.positionChange.x) {
               const angleDelta = o.data.positionChange.x * MODEL_GESTURES.rotationSensitivity;
               t.transform.rotateSelf(a, e.math.quat.yRadians(angleDelta));
@@ -1145,7 +1138,7 @@
           "order": 0.6785011504707911
         },
 
-        // Cámara de Realidad Aumentada
+        // CÃ¡mara de Realidad Aumentada
         "52ba8a86-a459-4df8-b954-a570e85e0484": {
           "id": "52ba8a86-a459-4df8-b954-a570e85e0484",
           "position": [0, 0.23, 0.10],
@@ -1284,7 +1277,7 @@
     delete i.historyVersion;
     const _idx = sessionStorage.getItem("modelo_actual");
 
-    // Mapeo dinámico de modelos desde contents.js
+    // Mapeo dinÃ¡mico de modelos desde contents.js
     const _cfg = window.MENU_CONFIG || {};
     const _raw = _cfg.platos || [];
     const _limit = _cfg.totalPlatos 
