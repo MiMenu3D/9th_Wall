@@ -1,12 +1,13 @@
-<!-- 9th_Design v5.21 (Bypass Micro-ruido iOS / Ruido Comentado Android / Descarga Síncrona 0ms / Historial Galería X / Banner z-999 / Watchdog 7s) -->
-<html>
+<!-- 9th_Design v5.22 (Restauración Ruido Procedural v5.20 / Cierre Total Cámara y XR8 en Popstate / Watchdog 8s / Modo Negro Absoluto / Sin '?v=') -->
+<html style="background-color:#040507;color-scheme:dark;">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" 
         content="width=device-width,initial-scale=1,user-scalable=no,viewport-fit=cover">
   <meta name="theme-color" content="#040507">
+  <meta name="color-scheme" content="dark">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <title>9th_Design AR 5.21</title>
+  <title>9th_Design AR 5.22</title>
   <script src="contents.js"></script>
   <script crossorigin="anonymous" src="external/runtime/runtime.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@8thwall/engine-binary@1/dist/xr.js" 
@@ -27,8 +28,8 @@
            line-height:1.3;border:1px solid #0f0;display:none;pointer-events:auto;">
     <div id="debugTitle">FPS: --</div>
     <div id="debugContent">
-      ar-world: v5.21<br>
-      bundle: v5.21<br>
+      ar-world: v5.22<br>
+      bundle: v5.22<br>
       <span id="envVerdictSpan" style="color:#0f0;">Entorno: ESPERANDO MESA...</span><br>
       <span id="telemetrySpan" style="color:#0f0;">P98: -- (/255) | Lum: -- (/255) | Cálido: --%</span><br>
       <span id="benchmarkSpan" style="color:#0f0;">Pre: --sec - Post: --sec</span><br>
@@ -37,6 +38,12 @@
     </div>
   </div>
   <style>
+    /* Forzado de Modo Negro Absoluto a nivel de motor de render */
+    html, body {
+      background-color: #040507 !important;
+      color-scheme: dark !important;
+    }
+
     #debugLog.minimized { 
       height: 15px; 
       width: 60px; 
@@ -98,7 +105,7 @@
     </button>
   </div>
 
-  <!-- Watchdog de Cámara (Fase 1: Aviso centrado, z-index 999 entre canvas y diálogos 8th Wall) -->
+  <!-- Watchdog de Cámara (Fase 1: Aviso centrado, z-index 999 calibrado) -->
   <div id="cameraSyncBanner" 
        style="position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);
               background:rgba(0,0,0,0.85);color:#00e5ff;font-family:sans-serif;
@@ -109,7 +116,7 @@
     Sincronizando sensor de cámara...
   </div>
 
-  <!-- Watchdog de Cámara (Fase 2: Modal de recuperación a los 7.0s) -->
+  <!-- Watchdog de Cámara (Fase 2: Modal de recuperación a los 8.0s) -->
   <div id="cameraErrorModal" 
        style="position:fixed;inset:0;background:rgba(4,5,7,0.96);z-index:1000010;
               display:none;flex-direction:column;align-items:center;
@@ -778,7 +785,7 @@
     };
 
     // =========================================================================
-    // 3. CONSOLA DE ILUMINACIÓN Y CALIBRACIÓN AMBIENTAL (v5.21)
+    // 3. CONSOLA DE ILUMINACIÓN Y CALIBRACIÓN AMBIENTAL (v5.22)
     // =========================================================================
     const LIGHTING_CONFIG = {
       pmrem_resolution: isIOS ? 128 : 256,
@@ -1126,7 +1133,7 @@
     }
 
     // =========================================================================
-    // INYECCIÓN PBR Y SHADERS (v5.21: Bypass Ruido iOS / Comentado Android)
+    // INYECCIÓN PBR Y SHADERS (v5.22: Ruido Procedural Completo Restaurado v5.20)
     // =========================================================================
     window.aplicarAjustesSceneViewer = function (targetNode) {
       const root = targetNode || _scene;
@@ -1176,40 +1183,34 @@
                   `
                 );
 
-                // v5.21: En iOS se omite el bloque procedural. En Android queda comentado para evaluación.
-                if (!isIOS) {
-                  shader.fragmentShader = shader.fragmentShader.replace(
-                    '#include <normal_fragment_begin>',
-                    `
-                    #include <normal_fragment_begin>
-                    /*
-                    // [MICRO-RUIDO PROCEDURAL TEMPORALMENTE COMENTADO EN ANDROID PARA EVALUACIÓN v5.21]
-                    vec3 pNoise = vLocalPos * 600.0;
-                    vec3 ip = floor(pNoise);
-                    vec3 fp = fract(pNoise);
-                    fp = fp * fp * (3.0 - 2.0 * fp);
+                shader.fragmentShader = shader.fragmentShader.replace(
+                  '#include <normal_fragment_begin>',
+                  `
+                  #include <normal_fragment_begin>
+                  vec3 pNoise = vLocalPos * 600.0;
+                  vec3 ip = floor(pNoise);
+                  vec3 fp = fract(pNoise);
+                  fp = fp * fp * (3.0 - 2.0 * fp);
 
-                    vec3 h0 = fract(sin(vec3(
-                      dot(ip, vec3(127.1, 311.7, 74.7)),
-                      dot(ip + vec3(1.0, 0.0, 0.0), vec3(127.1, 311.7, 74.7)),
-                      dot(ip + vec3(0.0, 1.0, 0.0), vec3(127.1, 311.7, 74.7))
-                    )) * 43758.5453);
+                  vec3 h0 = fract(sin(vec3(
+                    dot(ip, vec3(127.1, 311.7, 74.7)),
+                    dot(ip + vec3(1.0, 0.0, 0.0), vec3(127.1, 311.7, 74.7)),
+                    dot(ip + vec3(0.0, 1.0, 0.0), vec3(127.1, 311.7, 74.7))
+                  )) * 43758.5453);
 
-                    vec3 h1 = fract(sin(vec3(
-                      dot(ip + vec3(1.0, 1.0, 0.0), vec3(127.1, 311.7, 74.7)),
-                      dot(ip + vec3(0.0, 0.0, 1.0), vec3(127.1, 311.7, 74.7)),
-                      dot(ip + vec3(1.0, 0.0, 1.0), vec3(127.1, 311.7, 74.7))
-                    )) * 43758.5453);
+                  vec3 h1 = fract(sin(vec3(
+                    dot(ip + vec3(1.0, 1.0, 0.0), vec3(127.1, 311.7, 74.7)),
+                    dot(ip + vec3(0.0, 0.0, 1.0), vec3(127.1, 311.7, 74.7)),
+                    dot(ip + vec3(1.0, 0.0, 1.0), vec3(127.1, 311.7, 74.7))
+                  )) * 43758.5453);
 
-                    float nVal = mix(mix(h0.x, h0.y, fp.x), mix(h0.z, h1.x, fp.x), fp.y);
-                    float nValZ = mix(mix(h1.y, h1.z, fp.x), mix(h0.x, h0.y, fp.x), fp.z);
-                    vec3 localDisp = vec3(nVal - 0.5, 0.0, nValZ - 0.5) * 0.0235;
+                  float nVal = mix(mix(h0.x, h0.y, fp.x), mix(h0.z, h1.x, fp.x), fp.y);
+                  float nValZ = mix(mix(h1.y, h1.z, fp.x), mix(h0.x, h0.y, fp.x), fp.z);
+                  vec3 localDisp = vec3(nVal - 0.5, 0.0, nValZ - 0.5) * 0.0235;
 
-                    normal = normalize(normal + localDisp);
-                    */
-                    `
-                  );
-                }
+                  normal = normalize(normal + localDisp);
+                  `
+                );
 
                 shader.fragmentShader = shader.fragmentShader.replace(
                   '#include <lights_fragment_end>',
@@ -1516,7 +1517,7 @@
           }
         }, 2000);
 
-        // v5.21: Ampliado de 5000ms a 7000ms para evitar colisiones con permisos de iOS
+        // v5.22: Ampliado a 8000ms para evitar falsos positivos con permisos de iOS
         const watchdogTimer2 = setTimeout(() => {
           if (!isCameraConnected) {
             if (cameraSyncBanner) cameraSyncBanner.style.display = 'none';
@@ -1528,7 +1529,7 @@
               } catch (err) {}
             }
           }
-        }, 7000);
+        }, 8000);
 
         const waitForVideo = setInterval(() => {
           const video = document.querySelector('video');
@@ -2259,7 +2260,7 @@
     };
 
     // =========================================================================
-    // LÓGICA DE CARRUSEL Y DATOS CENTRALIZADOS DESDE contents.js (v5.21)
+    // LÓGICA DE CARRUSEL Y DATOS CENTRALIZADOS DESDE contents.js (v5.22)
     // =========================================================================
     const menuConfig = window.MENU_CONFIG || { platos: [], moneda: "€" };
     const rawPlatos = menuConfig.platos || [];
@@ -2382,7 +2383,7 @@
     if (closeArCardBtn) closeArCardBtn.addEventListener('click', cerrarCardAR);
 
     // =========================================================================
-    // GESTIÓN DEL ICONO FLOTANTE CON MEMORIA VOLÁTIL DE PÁGINA (v5.21)
+    // GESTIÓN DEL ICONO FLOTANTE CON MEMORIA VOLÁTIL DE PÁGINA (v5.22)
     // =========================================================================
     const arGestureHint = document.getElementById('arGestureHint');
     let hasInteractedWithAR = sessionStorage.getItem('ar_gesture_dismissed') === '1';
@@ -2447,7 +2448,7 @@
     }, { passive: true });
 
     // =========================================================================
-    // CAPTURA CON FEEDBACK 0ms Y DESCARGA DIRECTA (v5.21: Sin Blobs Asíncronos)
+    // CAPTURA CON FEEDBACK 0ms Y DESCARGA DIRECTA SÍNCRONA
     // =========================================================================
     const sessionCapturedMedia = [];
     const selectedIndices = new Set();
@@ -2470,7 +2471,6 @@
     const shareBtnLabel = document.getElementById('shareBtnLabel');
     const thumbnailStripContainer = document.getElementById('thumbnailStripContainer');
 
-    // Conversor síncrono ultra-rápido en memoria pura para preservar User Activation
     function dataURLtoFile(dataurl, filename) {
       const arr = dataurl.split(',');
       const mimeMatch = arr[0].match(/:(.*?);/);
@@ -2546,7 +2546,6 @@
 
       dispararAnimacionCaptura(dataUrl);
 
-      // v5.21: Descarga directa síncrona mediante DataURL sin esperas ni Blobs
       const downloadAnchor = document.createElement('a');
       downloadAnchor.href = dataUrl;
       downloadAnchor.download = fileName;
@@ -2637,7 +2636,6 @@
       }
     };
 
-    // v5.21: Delegación limpia en history.back() para que popstate gestione el cierre sin salir de AR
     const cerrarVisorFotos = () => {
       if (mediaViewerModal && mediaViewerModal.style.display === 'flex') {
         if (history.state && history.state.modalAbierto) {
@@ -2652,7 +2650,7 @@
     closeViewerBtn.addEventListener('click', cerrarVisorFotos);
 
     // =========================================================================
-    // INTERCEPCIÓN DE BOTÓN ATRÁS Y SALIDA LIMPIA (v5.21)
+    // INTERCEPCIÓN DE BOTÓN ATRÁS Y SALIDA LIMPIA (v5.22: Cierre Total Hardware)
     // =========================================================================
     history.pushState({ inAR: true }, '');
 
@@ -2668,10 +2666,25 @@
         return;
       }
 
+      // v5.22: Detención fulminante de hardware de cámara y motor de tracking
+      const video = document.querySelector('video');
+      if (video) {
+        try { video.pause(); } catch (err) {}
+        if (video.srcObject) {
+          try {
+            video.srcObject.getTracks().forEach(t => t.stop());
+          } catch (err) {}
+        }
+      }
+
+      if (window.XR8) {
+        try { window.XR8.stop(); } catch (err) {}
+      }
+
       sessionStorage.setItem('from_ar', '1');
       sessionStorage.setItem('modelo_actual', currentDishIndex);
 
-      window.location.replace(isIOS ? ('index.html?v=' + Date.now()) : 'index.html');
+      window.location.replace('index.html');
     });
 
     viewerPrevBtn.addEventListener('click', () => {
@@ -2705,7 +2718,6 @@
       }
     });
 
-    // Compartición síncrona en memoria pura (blindaje de Transient User Activation en iOS)
     shareMediaBtn.addEventListener('click', async () => {
       if (sessionCapturedMedia.length === 0) return;
 
