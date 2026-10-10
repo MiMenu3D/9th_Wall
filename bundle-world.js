@@ -1,4 +1,4 @@
-// 9th Wall v5.21 (Bala 4B en observación / Desalojo formal entidades hijas ECS en iOS / Android intacto / 5 frames Metal)
+// 9th Wall v5.22 (Bala 4B erradicada / Retorno a base limpia v5.20 / Android intacto / 5 frames Metal)
 (() => {
   var e = {
     574() {
@@ -85,7 +85,7 @@
 
     const cornersInner = [
       { cx: inSx - inR,  cz: -inSz + inR, startAngle: -Math.PI / 2, endAngle: 0 },
-      { cx: inSx - inR,  cz: inSz - inR,  startAngle: 0,            endAngle: Math.PI / 2 },
+      { cx: inSx - inR,  cz: -inSz + inR, startAngle: 0,            endAngle: Math.PI / 2 },
       { cx: -inSx + inR, cz: inSz - inR,  startAngle: Math.PI / 2,  endAngle: Math.PI },
       { cx: -inSx + inR, cz: -inSz + inR, startAngle: Math.PI,      endAngle: (3 * Math.PI) / 2 }
     ];
@@ -143,7 +143,7 @@
     const e = window.ecs;
 
     // [INMUTABLE: ARRANQUE CINEMÁTICO INICIAL]
-    // v5.21: Reintroducción experimental de la Bala 4B bajo observación exclusiva en iOS / Android intacto
+    // v5.22: Base v5.20 limpia pura / Bala 4B erradicada / Entidades ECS intactas / 5 frames Metal
     e.registerComponent({
       name: "dish-spawner",
       schema: { prefab: "eid" },
@@ -355,7 +355,7 @@
             requestAnimationFrame(comprobarMallaLista);
           })
 
-          // v5.21: Transición de plato con ensayo Bala 4B en observación para iOS
+          // Intercambio limpio a nivel de escena gráfica (Three.js puro sin tocar entidades ECS)
           .listen(t.events.globalId, "switch-dish-model", (ev) => {
             if (!isPlaced || !spawnedEid || isTransitioning || !ev.data || 
                 !ev.data.modelSrc || !window.THREE) return;
@@ -462,25 +462,6 @@
                     }
                   });
                   nodosBorrar.forEach((n) => destruirMallaProfunda(n));
-                }
-
-                // =========================================================================
-                // [EXPERIMENTAL EN PRUEBAS - BALA 4B: PENDIENTE DE VALIDACIÓN O RETIRADA]
-                // Desalojo formal de entidades hijas en ECS en iOS. En fase de testeo.
-                // =========================================================================
-                if (isIOS) {
-                  if (t.getChildren) {
-                    const hijosPrevios = t.getChildren(spawnedEid) || [];
-                    hijosPrevios.forEach((childEid) => {
-                      const cObj = (t.three && t.three.entityToObject) 
-                        ? t.three.entityToObject.get(childEid) 
-                        : null;
-                      if (cObj) destruirMallaProfunda(cObj);
-                      try {
-                        t.deleteEntity(childEid);
-                      } catch (err) {}
-                    });
-                  }
                 }
 
                 const ejecutarCarga = () => {
