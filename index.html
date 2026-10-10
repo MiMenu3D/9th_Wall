@@ -1,4 +1,4 @@
-<!-- Versión: 9th_Design v5.21 -->
+<!-- Versión: 9th_Design v5.22 -->
 <!DOCTYPE html>
 <html lang="es">
 <head>
@@ -7,6 +7,7 @@
         content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
   
   <meta name="theme-color" content="#040507">
+  <meta name="color-scheme" content="dark">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   
   <title>Menú 3D - Development</title>
@@ -26,7 +27,7 @@
 
   <style>
     /* ==========================================================================
-       1. RESET Y VARIABLES GLOBALES (BLOQUEO ESTRICTO DE SCROLL HORIZONTAL)
+       1. RESET Y VARIABLES GLOBALES
        ========================================================================== */
     *, *::before, *::after {
       box-sizing: border-box;
@@ -49,15 +50,18 @@
     html, body {
       width: 100%;
       height: 100dvh;
-      background-color: #040507;
+      background-color: #040507 !important;
       color: var(--color-text-active);
       font-family: var(--font-fredoka);
       overflow: hidden;
       position: fixed;
       inset: 0;
+      color-scheme: dark;
+    }
+
+    body.is-ios {
       overscroll-behavior-x: none;
       touch-action: pan-y;
-      color-scheme: dark;
     }
 
     /* Bloqueador visual para posición vertical (Landscape Warning) */
@@ -87,7 +91,7 @@
     }
 
     /* ==========================================================================
-       2. CONTENEDOR PRINCIPAL
+       2. CONTENEDOR PRINCIPAL (v5.22: Base limpia v5.01 sin clip en Android)
        ========================================================================== */
     .app-container {
       position: relative;
@@ -96,11 +100,14 @@
       height: 100dvh;
       margin: 0 auto;
       overflow-x: hidden;
-      overflow-x: clip;
       overflow-y: hidden;
       display: flex;
       flex-direction: column;
       background-color: var(--color-bg-base);
+    }
+
+    body.is-ios .app-container {
+      overflow-x: clip;
       touch-action: pan-y;
       overscroll-behavior-x: none;
     }
@@ -132,7 +139,7 @@
       overflow: hidden;
     }
 
-    /* Estilo del visor 3D */
+    /* Estilo del visor 3D (v5.22: Restauración de filtros probados y ACES nativo) */
     model-viewer {
       width: 100%;
       height: 100%;
@@ -145,10 +152,9 @@
       filter: saturate(0.95) contrast(0.95);
     }
 
-    /* Ensayo v5.21: Filtro CSS comentado en Android para auditar Zero-Copy Direct Overlay */
-    /* body:not(.is-ios) model-viewer {
+    body:not(.is-ios) model-viewer {
       filter: saturate(0.87) contrast(0.88);
-    } */
+    }
 
     /* Flechas de navegación (-10% = 36px × 36px, font 23px) */
     .ar-nav-arrow {
@@ -180,7 +186,7 @@
       transform: translateY(-50%) scale(0.92);
     }
 
-    /* Icono flotante indicador de gestos (-15% = 39px) */
+    /* Icono flotante indicador de gestos (v5.22: Animación pausada mientras está oculto) */
     .gesture-hint-overlay {
       position: absolute;
       inset: 0;
@@ -194,6 +200,12 @@
     }
     .gesture-hint-overlay.visible {
       opacity: 1;
+    }
+    .gesture-hint-overlay:not(.visible) .gesture-hint-icon {
+      animation-play-state: paused;
+    }
+    .gesture-hint-overlay.visible .gesture-hint-icon {
+      animation-play-state: running;
     }
     .gesture-hint-icon {
       width: 39px;
@@ -349,20 +361,22 @@
     }
 
     /* ==========================================================================
-       5. LISTA DE PLATOS Y CARD FLUIDA (BLUR A 6px)
+       5. LISTA DE PLATOS Y CARD FLUIDA (v5.22: blur a 3px optimizado)
        ========================================================================== */
     .menu-list {
       position: relative;
       z-index: 10;
       width: 100%;
       height: 100%;
-      overflow-x: hidden;
-      overflow-x: clip;
       overflow-y: auto;
       -webkit-overflow-scrolling: touch;
       list-style: none;
       padding: 0.8rem 0 0.8rem 0;
       scrollbar-width: none;
+    }
+
+    body.is-ios .menu-list {
+      overflow-x: clip;
       touch-action: pan-y;
       overscroll-behavior-x: none;
     }
@@ -459,7 +473,7 @@
       bottom: -0.5rem;
     }
 
-    /* 3. CRISTAL LÍQUIDO (BLUR 6px + CONTRACCIÓN 0.06s) */
+    /* 3. CRISTAL LÍQUIDO (v5.22: BLUR A 3px COMO EN v5.01) */
     .glass-overlay {
       position: absolute;
       left: 2rem;
@@ -473,8 +487,8 @@
         rgba(255, 255, 255, 0.18) 55%, 
         rgba(255, 255, 255, 0.03) 100%
       );
-      backdrop-filter: blur(6px);
-      -webkit-backdrop-filter: blur(6px);
+      backdrop-filter: blur(3px);
+      -webkit-backdrop-filter: blur(3px);
       opacity: 0;
       pointer-events: none;
       overflow: hidden;
@@ -1191,7 +1205,7 @@
       });
 
       // ======================================================================
-      // 6. INSTANCIACIÓN Y GESTIÓN LIMPIA DEL VISOR 3D (v5.21)
+      // 6. INSTANCIACIÓN Y GESTIÓN LIMPIA DEL VISOR 3D (v5.22: ACES + Sin Doble Carga)
       // ======================================================================
       function destroyModelViewer() {
         if (viewerSlot) {
@@ -1220,7 +1234,6 @@
         newMv.setAttribute('interaction-prompt', 'none');
         newMv.setAttribute('shadow-intensity', '0');
         newMv.setAttribute('exposure', '0.80');
-        newMv.setAttribute('tone-mapping', 'neutral');
         newMv.style.opacity = '0';
 
         newMv.addEventListener('load', () => {
@@ -1248,7 +1261,8 @@
         menuList.classList.remove('has-expanded');
       }
 
-      function selectDish(index, shouldScroll = false, triggerReaction = true) {
+      // v5.22: updateViewer condicional para evitar doble arranque del plato 1 en frío
+      function selectDish(index, shouldScroll = false, triggerReaction = true, updateViewer = true) {
         if (index < 0 || index >= models.length) return;
         currentIndex = index;
 
@@ -1271,7 +1285,9 @@
           }
         });
 
-        updateModelViewer();
+        if (updateViewer) {
+          updateModelViewer();
+        }
         if (triggerReaction) {
           triggerChainReaction();
         }
@@ -1280,19 +1296,18 @@
       prevDishBtn.addEventListener('click', (e) => {
         e.stopPropagation();
         const nextIdx = (currentIndex - 1 + models.length) % models.length;
-        selectDish(nextIdx, true, true);
+        selectDish(nextIdx, true, true, true);
       });
 
       nextDishBtn.addEventListener('click', (e) => {
         e.stopPropagation();
         const nextIdx = (currentIndex + 1) % models.length;
-        selectDish(nextIdx, true, true);
+        selectDish(nextIdx, true, true, true);
       });
 
       // ======================================================================
       // 7. GESTIÓN DEL ICONO FLOTANTE CON MEMORIA VOLÁTIL DE PÁGINA
       // ======================================================================
-      // Purga condicionada: solo en apertura limpia o recarga manual, nunca si se vuelve de AR
       if (!fromAR) {
         try {
           sessionStorage.removeItem('mv_gesture_dismissed');
@@ -1408,40 +1423,37 @@
               }, 110);
             }
           } else {
-            selectDish(index, false, true);
+            selectDish(index, false, true, true);
           }
         });
       });
 
       // ======================================================================
-      // 9. LANZAMIENTO HACIA AR Y RESTAURACIÓN LIMPIA AL VOLVER
+      // 9. LANZAMIENTO HACIA AR Y RESTAURACIÓN LIMPIA AL VOLVER (v5.22)
       // ======================================================================
       btnAr.addEventListener('click', () => {
         sessionStorage.setItem('from_ar', '1');
         sessionStorage.setItem('modelo_actual', currentIndex);
+        // v5.22: Destrucción previa limpia del visor WebGL antes de navegar como en v5.01
+        destroyModelViewer();
         window.location.href = 'ar-world.html';
       });
 
-      // Gestión de páginas en caché BFCache
+      // Gestión limpia de BFCache sin parámetros '?v='
       window.addEventListener('pageshow', (e) => {
         if (e.persisted) {
-          if (isIOS) {
-            // En iOS, si la página viene congelada en BFCache, forzar apertura virgen con timestamp
-            window.location.replace('index.html?v=' + Date.now());
-            return;
-          }
-          // En Android: continuidad directa sin recargas
           const saved = sessionStorage.getItem('modelo_actual');
           if (saved !== null && !isNaN(parseInt(saved, 10))) {
             currentIndex = parseInt(saved, 10);
           }
-          selectDish(currentIndex, false, false);
+          createModelViewer();
+          selectDish(currentIndex, false, false, false);
         }
       });
 
-      // Arranque inicial limpio y unificado
+      // Arranque inicial limpio: createModelViewer monta el plato y selectDish NO duplica la carga
       createModelViewer();
-      selectDish(currentIndex, false, false);
+      selectDish(currentIndex, false, false, false);
 
       if (fromAR && currentIndex > 0) {
         const targetItem = menuItems[currentIndex];
